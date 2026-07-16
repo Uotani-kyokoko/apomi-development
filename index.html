@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>apomi - ビジネスマッチング</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css?v=20260712a">
+</head>
+<body>
+
+  <!-- ===== ログイン画面 ===== -->
+  <div id="login-screen">
+    <div id="google-btn-host" class="google-btn-host"></div>
+    <p id="login-hint" class="login-hint hidden"></p>
+  </div>
+
+  <!-- ===== メインアプリ ===== -->
+  <div id="app-screen" class="hidden">
+    <header class="app-header" id="app-header">
+      <button type="button" class="header-menu-btn hidden" id="header-menu-btn" aria-label="メニュー">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <h1 id="header-title" class="header-title">APOMY HOME</h1>
+      <span id="header-range" class="header-range hidden">No.00001 ~ No.00100</span>
+    </header>
+
+    <main class="app-main">
+
+      <!-- ホームタブ -->
+      <section id="tab-home" class="tab-panel active">
+        <button id="search-open-btn" class="search-bar-btn" type="button">
+          <i class="fa-solid fa-sliders"></i>
+          <span>条件から絞り込む</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div id="banner-list" class="banner-list"></div>
+      </section>
+
+      <!-- 繋がるタブ -->
+      <section id="tab-connect" class="tab-panel">
+        <p id="connect-filter-banner" class="connect-filter-banner hidden"></p>
+        <div id="user-list" class="user-list"></div>
+      </section>
+
+      <!-- マイページタブ -->
+      <section id="tab-mypage" class="tab-panel">
+        <div id="mypage-profile" class="mypage-profile"></div>
+        <div class="mypage-actions">
+          <button id="btn-edit-profile" class="mypage-link" type="button">プロフィール変更</button>
+          <button id="btn-salon" class="mypage-link" type="button">井口智明オンラインサロン表示</button>
+          <button id="btn-president-badge" class="mypage-link" type="button">社長マーク掲載依頼</button>
+          <button id="btn-stop-listing" class="mypage-link" type="button">掲載停止</button>
+          <button id="btn-logout" class="mypage-link mypage-link-muted" type="button">ログアウト</button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 下部タブナビ -->
+    <nav class="bottom-nav" aria-label="メインナビゲーション">
+      <button class="nav-item active" data-tab="home" type="button">
+        <i class="fa-solid fa-house"></i>
+        <span>ホーム</span>
+      </button>
+      <button class="nav-item" data-tab="connect" type="button">
+        <i class="fa-solid fa-handshake"></i>
+        <span>繋がる</span>
+      </button>
+      <button class="nav-item" data-tab="mypage" type="button">
+        <i class="fa-solid fa-user"></i>
+        <span>マイページ</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- 繋がる：ページ切替メニュー -->
+  <div id="connect-menu-overlay" class="connect-menu-overlay hidden" aria-hidden="true"></div>
+  <nav id="connect-menu" class="connect-menu hidden" aria-label="繋がるページ切替">
+    <div class="connect-menu-head">
+      <p class="connect-menu-title">ページを選ぶ</p>
+      <button type="button" id="connect-menu-close" class="connect-menu-close" aria-label="閉じる">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <ul id="connect-menu-list" class="connect-menu-list"></ul>
+  </nav>
+
+  <!-- ===== 絞り込み画面 ===== -->
+  <div id="filter-screen" class="filter-screen hidden">
+    <div class="filter-top">
+      <button type="button" id="filter-back" class="filter-back" aria-label="戻る">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <button type="button" id="btn-reset" class="filter-reset">リセット</button>
+    </div>
+
+    <div class="filter-body">
+      <!-- 地域は外部リンク（URLはマスタ「地域リンク」） -->
+      <button type="button" id="btn-region-link" class="filter-link-card">
+        <span id="region-link-label">地域を絞る</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </button>
+
+      <div class="filter-card" data-filter-card="gender">
+        <button type="button" class="filter-card-toggle">
+          <span>性別を絞る</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div class="filter-card-body">
+          <div class="chip-grid" id="filter-gender-chips"></div>
+        </div>
+      </div>
+
+      <div class="filter-card" data-filter-card="age">
+        <button type="button" class="filter-card-toggle">
+          <span>年代を絞る</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div class="filter-card-body">
+          <div class="chip-grid" id="filter-age-chips"></div>
+        </div>
+      </div>
+
+      <div class="filter-card" data-filter-card="industry">
+        <button type="button" class="filter-card-toggle">
+          <span>業種を絞る</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div class="filter-card-body">
+          <select id="filter-industry" class="filter-select">
+            <option value="all">すべて</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-card" data-filter-card="job">
+        <button type="button" class="filter-card-toggle">
+          <span>職種を絞る</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div class="filter-card-body">
+          <div class="chip-grid" id="filter-job-chips"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-footer">
+      <button type="button" id="btn-search" class="btn-search-gradient">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        検索
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== プロフィール編集画面 ===== -->
+  <div id="edit-screen" class="edit-screen hidden">
+    <div class="edit-top">
+      <button type="button" id="edit-back" class="filter-back" aria-label="戻る">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <h2 class="edit-title">プロフィール変更</h2>
+      <span class="edit-top-spacer"></span>
+    </div>
+
+    <form id="edit-form" class="edit-body">
+      <div class="edit-card">
+        <label class="edit-label" for="edit-name">名前</label>
+        <input id="edit-name" name="name" type="text" class="edit-input" required maxlength="40">
+      </div>
+
+      <div class="edit-card">
+        <p class="edit-label">性別</p>
+        <div class="chip-grid" id="edit-gender-chips"></div>
+      </div>
+
+      <div class="edit-card">
+        <p class="edit-label">年代</p>
+        <div class="chip-grid" id="edit-age-chips"></div>
+      </div>
+
+      <div class="edit-card">
+        <label class="edit-label" for="edit-industry">業種</label>
+        <select id="edit-industry" name="industry" class="filter-select"></select>
+      </div>
+
+      <div class="edit-card">
+        <p class="edit-label">職種</p>
+        <div class="chip-grid" id="edit-job-chips"></div>
+      </div>
+
+      <div class="edit-card">
+        <label class="edit-label" for="edit-location">現在地</label>
+        <select id="edit-location" name="location" class="filter-select"></select>
+      </div>
+
+      <div class="edit-card">
+        <label class="edit-label" for="edit-hometown">出身地</label>
+        <select id="edit-hometown" name="hometown" class="filter-select"></select>
+      </div>
+
+      <div class="edit-card">
+        <p class="edit-label">プロフィール画像</p>
+        <label class="edit-upload-btn" for="edit-avatar-file">
+          <i class="fa-solid fa-image"></i>
+          画像を選択してアップロード
+        </label>
+        <input id="edit-avatar-file" type="file" accept="image/*" class="edit-file-input">
+        <input id="edit-avatar" name="avatarUrl" type="hidden" value="">
+        <p id="edit-avatar-status" class="edit-help-text">自動で縮小し、最新1枚だけDriveに保存します</p>
+        <div class="edit-avatar-preview-wrap">
+          <img id="edit-avatar-preview" class="edit-avatar-preview" alt="プレビュー">
+        </div>
+      </div>
+
+      <div class="edit-card">
+        <label class="edit-label" for="edit-bio">自己紹介※改行は反映されません</label>
+        <textarea id="edit-bio" name="bio" class="edit-textarea" rows="4" maxlength="500"></textarea>
+      </div>
+
+      <div class="edit-card">
+        <label class="edit-label" for="edit-want">こんな人と繋がりたい※改行は反映されません</label>
+        <textarea id="edit-want" name="wantMeet" class="edit-textarea" rows="3" maxlength="300"></textarea>
+      </div>
+
+      <div class="edit-card">
+        <label class="edit-label" for="edit-avoid">こんな人とは繋がりたくない※改行は反映されません</label>
+        <textarea id="edit-avoid" name="avoidMeet" class="edit-textarea" rows="3" maxlength="300"></textarea>
+      </div>
+
+      <div class="edit-card">
+        <label class="edit-label" for="edit-line">LINE URL</label>
+        <input id="edit-line" name="line" type="url" class="edit-input" placeholder="https://line.me/...">
+      </div>
+      <div class="edit-card">
+        <label class="edit-label" for="edit-instagram">Instagram URL</label>
+        <input id="edit-instagram" name="instagram" type="url" class="edit-input" placeholder="https://instagram.com/...">
+      </div>
+      <div class="edit-card">
+        <label class="edit-label" for="edit-x">X URL</label>
+        <input id="edit-x" name="x" type="url" class="edit-input" placeholder="https://x.com/...">
+      </div>
+      <div class="edit-card">
+        <label class="edit-label" for="edit-youtube">YouTube URL</label>
+        <input id="edit-youtube" name="youtube" type="url" class="edit-input" placeholder="https://youtube.com/...">
+      </div>
+
+      <div class="edit-footer-space"></div>
+    </form>
+
+    <div class="edit-footer">
+      <button type="submit" form="edit-form" id="btn-save-profile" class="btn-search-gradient">
+        <i class="fa-solid fa-check"></i>
+        保存する
+      </button>
+    </div>
+  </div>
+
+  <!-- ローディング -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner" role="status" aria-label="読み込み中"></div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="js/config.js?v=20260712b"></script>
+  <script src="js/auth.js?v=20260712b"></script>
+  <script src="js/sample-users-240.js?v=20260712b"></script>
+  <script src="js/mock-api.js?v=20260712b"></script>
+  <script src="js/gas-api.js?v=20260716a"></script>
+  <script src="js/app.js?v=20260712b"></script>
+</body>
+</html>

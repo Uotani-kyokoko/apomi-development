@@ -1,0 +1,5 @@
+バナーID,タイトル,説明,画像URL,リンクURL,表示順,有効,開始日時,終了日時
+b1,Webブラウザ版 GLOOK リリース！,いつでもどこでもマッチング,https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&h=300&fit=crop,https://example.com/glook,1,TRUE,2026-06-01 00:00:00,2026-12-31 23:59:59
+b2,オンラインサロン開催中,経営者限定の交流イベント,https://images.unsplash.com/photo-1521737711862-ece3cc7dabbc?w=600&h=300&fit=crop,https://example.com/salon,2,TRUE,2026-06-01 00:00:00,2026-12-31 23:59:59
+b3,社長マーク掲載キャンペーン,先着50名様に特別バッジをプレゼント,https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=300&fit=crop,https://example.com/badge,3,TRUE,2026-07-01 00:00:00,2026-09-30 23:59:59
+b4,旧キャンペーン（非表示）,終了済みのテスト用バナー,https://images.unsplash.com/photo-1556761175-b413da4baf72?w=600&h=300&fit=crop,https://example.com/old,99,FALSE,2026-01-01 00:00:00,2026-05-31 23:59:59
