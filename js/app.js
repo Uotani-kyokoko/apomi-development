@@ -18,6 +18,9 @@
   const SPLASH_FADE_MS = 220;
   const SPLASH_HOLD_MS = 900;
 
+  /** このセッションでウェルカムを出したら再表示しない */
+  let welcomeSplashShown = false;
+
   const CONNECT_MENU = [
     { id: "latest", label: "最新ユーザー", type: "latest" },
     { id: "no-1", label: "No.1～No.100", type: "range", from: 1, to: 100 },
@@ -692,7 +695,10 @@
       if (salonBtn) salonBtn.textContent = state.salonLabel;
 
       if (meRes?.data) {
+        const wasNew = Boolean(state.currentUser?.isNew);
         state.currentUser = meRes.data;
+        // me API は isNew を返さないため、ログイン時の新規フラグを保持
+        if (wasNew) state.currentUser.isNew = true;
         lastTouchAt = Date.now();
         applyMyActivity(meRes.data.lastLoginAt);
       } else if (!state.currentUser) {
@@ -822,6 +828,10 @@
     }
   }
 
+  function shouldShowWelcomeSplash() {
+    return shouldForceSplash() || Boolean(state.currentUser?.isNew);
+  }
+
   /**
    * 初回ログイン直後のみウェルカムを表示。
    * 既存連携済み会員（isNew=false）は対象外。
@@ -871,12 +881,17 @@
         });
 
       const run = async () => {
+        welcomeSplashShown = true;
         screen.classList.remove("hidden");
         screen.setAttribute("aria-hidden", "false");
         screen.setAttribute("tabindex", "0");
         screen.addEventListener("click", onSkip);
         screen.addEventListener("keydown", onKey);
-        screen.focus({ preventScroll: true });
+        try {
+          screen.focus({ preventScroll: true });
+        } catch {
+          /* ignore */
+        }
 
         for (const text of WELCOME_MESSAGES) {
           if (finished) return;
@@ -897,13 +912,15 @@
     });
   }
 
+  async function showWelcomeSplashIfNeeded() {
+    if (welcomeSplashShown) return;
+    if (!shouldShowWelcomeSplash()) return;
+    showLoading(false);
+    await playWelcomeSplash();
+  }
+
   async function maybeOpenRequiredEdit() {
-    const forceSplash = shouldForceSplash();
-    // 新規会員、または ?splash=1 のテスト時のみスプラッシュ
-    if (forceSplash || state.currentUser?.isNew) {
-      showLoading(false);
-      await playWelcomeSplash();
-    }
+    await showWelcomeSplashIfNeeded();
     if (!needsProfileSetup(state.currentUser)) return;
     openEditScreen({ required: true });
   }
@@ -1185,6 +1202,13 @@
     $("#login-screen").classList.add("hidden");
     $("#app-screen").classList.remove("hidden");
     switchTab("home");
+    // テスト用 ?splash=1 はデータ読み込みを待たずすぐ出す
+    if (shouldForceSplash()) {
+      showWelcomeSplashIfNeeded().finally(() => {
+        loadAllData();
+      });
+      return;
+    }
     loadAllData();
   }
 
@@ -1408,8 +1432,12 @@
     });
   }
 
-  function init() {
+  async function init() {
     bindEvents();
+    // テスト用 ?splash=1 はログイン前後どちらでもすぐ見えるようにする
+    if (shouldForceSplash()) {
+      await showWelcomeSplashIfNeeded();
+    }
     tryRestoreSession();
   }
 
