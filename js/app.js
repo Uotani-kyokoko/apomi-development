@@ -813,9 +813,19 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  /** テスト用: URL に ?splash=1 があれば強制表示 */
+  function shouldForceSplash() {
+    try {
+      return new URLSearchParams(window.location.search).get("splash") === "1";
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * 初回ログイン直後のみウェルカムを表示。
    * 既存連携済み会員（isNew=false）は対象外。
+   * 例外: ?splash=1 でテスト強制表示。
    */
   function playWelcomeSplash() {
     return new Promise((resolve) => {
@@ -888,12 +898,13 @@
   }
 
   async function maybeOpenRequiredEdit() {
-    if (!needsProfileSetup(state.currentUser)) return;
-    // 新規会員のみスプラッシュ。掲載停止の再入力は飛ばす
-    if (state.currentUser.isNew) {
+    const forceSplash = shouldForceSplash();
+    // 新規会員、または ?splash=1 のテスト時のみスプラッシュ
+    if (forceSplash || state.currentUser?.isNew) {
       showLoading(false);
       await playWelcomeSplash();
     }
+    if (!needsProfileSetup(state.currentUser)) return;
     openEditScreen({ required: true });
   }
 
