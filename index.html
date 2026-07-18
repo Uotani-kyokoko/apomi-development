@@ -6,9 +6,15 @@
   <meta name="robots" content="noindex, nofollow">
   <title>apomi - ビジネスマッチング</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260712a">
+  <link rel="stylesheet" href="css/style.css?v=20260719a">
 </head>
 <body>
+
+  <!-- ===== 初回ウェルカム（新規会員のみ） ===== -->
+  <div id="splash-screen" class="splash-screen hidden" aria-hidden="true">
+    <p id="splash-message" class="splash-message" role="status" aria-live="polite"></p>
+    <p class="splash-skip-hint">タップでスキップ</p>
+  </div>
 
   <!-- ===== ログイン画面 ===== -->
   <div id="login-screen">
@@ -22,7 +28,7 @@
       <button type="button" class="header-menu-btn hidden" id="header-menu-btn" aria-label="メニュー">
         <i class="fa-solid fa-bars"></i>
       </button>
-      <h1 id="header-title" class="header-title">APOMY HOME</h1>
+      <h1 id="header-title" class="header-title">apomi HOME</h1>
       <span id="header-range" class="header-range hidden">No.00001 ~ No.00100</span>
     </header>
 
@@ -271,6 +277,6 @@
   <script src="js/sample-users-240.js?v=20260712b"></script>
   <script src="js/mock-api.js?v=20260712b"></script>
   <script src="js/gas-api.js?v=20260716a"></script>
-  <script src="js/app.js?v=20260712b"></script>
+  <script src="js/app.js?v=20260719a"></script>
 </body>
 </html>

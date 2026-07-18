@@ -8,6 +8,15 @@
   const ONLINE_WITHIN_MINUTES = 30;
   /** 最新ページ：掲載日から何日以内 */
   const LATEST_WITHIN_DAYS = 7;
+  /** 検索結果の初回表示件数・追加読み込み単位 */
+  const SEARCH_RESULT_PAGE_SIZE = 50;
+  /** 初回ログイン時のウェルカム文言（新規会員のみ） */
+  const WELCOME_MESSAGES = [
+    "アポイントメイトへようこそ！",
+    "あなたのこと教えてください"
+  ];
+  const SPLASH_FADE_MS = 220;
+  const SPLASH_HOLD_MS = 900;
 
   const CONNECT_MENU = [
     { id: "latest", label: "最新ユーザー", type: "latest" },
@@ -42,7 +51,9 @@
       gender: "all",
       jobTitle: "all",
       ageGroup: "all"
-    }
+    },
+    /** 検索結果の表示件数（もっと見る用） */
+    searchVisibleCount: SEARCH_RESULT_PAGE_SIZE
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -70,6 +81,11 @@
   function memberNoNum(id) {
     const n = parseInt(String(id || "").replace(/\D/g, ""), 10);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  /** 会員No.の昇順（00001 → 00002 → …） */
+  function sortUsersByMemberNo(users) {
+    return (users || []).slice().sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
   }
 
   function getConnectPage(pageId = state.connectPageId) {
@@ -262,9 +278,14 @@
 
   function renderUserList(users) {
     const container = $("#user-list");
-    if (!users.length) {
+    const isSearch = hasActiveFilters();
+    const totalMatched = (users || []).length;
+    const displayUsers = isSearch ? users.slice(0, state.searchVisibleCount) : users;
+    const remaining = totalMatched - displayUsers.length;
+
+    if (!totalMatched) {
       const total = (state.allUsers || []).length;
-      if (total > 0 && hasActiveFilters()) {
+      if (total > 0 && isSearch) {
         container.innerHTML = `
           <div class="empty-state">
             <i class="fa-solid fa-filter"></i>
@@ -283,13 +304,36 @@
       updateConnectRangeLabel();
       return;
     }
-    container.innerHTML = users.map((u) => renderProfileCard(u)).join("");
+
+    let html = displayUsers.map((u) => renderProfileCard(u)).join("");
+    if (isSearch && remaining > 0) {
+      html += `
+        <div class="load-more-wrap">
+          <p class="load-more-note">${displayUsers.length} / ${totalMatched} 件を表示中</p>
+          <button type="button" id="btn-load-more" class="btn-load-more">
+            さらに ${Math.min(SEARCH_RESULT_PAGE_SIZE, remaining)} 件表示（残り ${remaining} 件）
+          </button>
+        </div>`;
+    }
+    container.innerHTML = html;
+
+    $("#btn-load-more")?.addEventListener("click", () => {
+      state.searchVisibleCount += SEARCH_RESULT_PAGE_SIZE;
+      renderUserList(state.users);
+    });
+
     updateConnectRangeLabel();
   }
 
   function updateConnectRangeLabel() {
     const el = $("#header-range");
     if (!el) return;
+    if (hasActiveFilters()) {
+      const total = state.users.length;
+      const shown = Math.min(state.searchVisibleCount, total);
+      el.textContent = total > shown ? `検索結果 ${shown}/${total}件（No.順）` : `検索結果 ${total}件（No.順）`;
+      return;
+    }
     const page = getConnectPage();
     if (page.type === "latest") {
       el.textContent = `最新（${LATEST_WITHIN_DAYS}日以内）`;
@@ -340,8 +384,17 @@
   }
 
   function refreshConnectList() {
-    const paged = filterByConnectPage(state.allUsers, getConnectPage());
-    state.users = filterUsersLocal(paged, state.filters);
+    if (hasActiveFilters()) {
+      // 検索時は No. 帯を無視し、全会員から条件一致 → No. 昇順で表示
+      const matched = filterUsersLocal(state.allUsers, state.filters);
+      state.users = sortUsersByMemberNo(matched);
+    } else {
+      state.searchVisibleCount = SEARCH_RESULT_PAGE_SIZE;
+      state.users = filterUsersLocal(
+        filterByConnectPage(state.allUsers, getConnectPage()),
+        state.filters
+      );
+    }
     renderUserList(state.users);
     updateConnectFilterBanner();
     renderConnectMenu();
@@ -413,7 +466,7 @@
     range.classList.toggle("hidden", tabId !== "connect");
 
     if (tabId === "home") {
-      title.textContent = "APOMY HOME";
+      title.textContent = "apomi HOME";
       title.classList.remove("hidden");
     } else if (tabId === "mypage") {
       title.textContent = "マイページ";
@@ -574,7 +627,7 @@
     if (state.filters.ageGroup !== "all") parts.push(state.filters.ageGroup);
     if (state.filters.industry !== "all") parts.push(state.filters.industry);
     if (state.filters.jobTitle !== "all") parts.push(state.filters.jobTitle);
-    el.textContent = `絞り込み: ${parts.join(" / ")}（${state.users.length}件）`;
+    el.textContent = `絞り込み: ${parts.join(" / ")}（全 ${state.users.length} 件・No.順）`;
     el.classList.remove("hidden");
   }
 
@@ -692,6 +745,7 @@
   async function applyFilters() {
     showLoading(true);
     scheduleTouchActivity();
+    state.searchVisibleCount = SEARCH_RESULT_PAGE_SIZE;
     try {
       // 最新の会員一覧を取得し、フロントでページ＋絞り込み
       const res = await GasAPI.fetchUsers({});
@@ -755,8 +809,91 @@
     return false;
   }
 
-  function maybeOpenRequiredEdit() {
+  function waitMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 初回ログイン直後のみウェルカムを表示。
+   * 既存連携済み会員（isNew=false）は対象外。
+   */
+  function playWelcomeSplash() {
+    return new Promise((resolve) => {
+      const screen = $("#splash-screen");
+      const msgEl = $("#splash-message");
+      if (!screen || !msgEl) {
+        resolve();
+        return;
+      }
+
+      let finished = false;
+      let cancelWait = null;
+
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (typeof cancelWait === "function") cancelWait();
+        screen.removeEventListener("click", onSkip);
+        screen.removeEventListener("keydown", onKey);
+        msgEl.classList.remove("is-visible");
+        msgEl.textContent = "";
+        screen.classList.add("hidden");
+        screen.setAttribute("aria-hidden", "true");
+        screen.removeAttribute("tabindex");
+        resolve();
+      };
+
+      const onSkip = () => finish();
+      const onKey = (e) => {
+        if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
+          e.preventDefault();
+          finish();
+        }
+      };
+
+      const wait = (ms) =>
+        new Promise((res) => {
+          const t = setTimeout(res, ms);
+          cancelWait = () => {
+            clearTimeout(t);
+            res();
+          };
+        });
+
+      const run = async () => {
+        screen.classList.remove("hidden");
+        screen.setAttribute("aria-hidden", "false");
+        screen.setAttribute("tabindex", "0");
+        screen.addEventListener("click", onSkip);
+        screen.addEventListener("keydown", onKey);
+        screen.focus({ preventScroll: true });
+
+        for (const text of WELCOME_MESSAGES) {
+          if (finished) return;
+          msgEl.textContent = text;
+          // 次フレームでフェード開始（空白待ちをほぼゼロに）
+          await wait(16);
+          if (finished) return;
+          msgEl.classList.add("is-visible");
+          await wait(SPLASH_FADE_MS + SPLASH_HOLD_MS);
+          if (finished) return;
+          msgEl.classList.remove("is-visible");
+          await wait(SPLASH_FADE_MS);
+        }
+        finish();
+      };
+
+      run();
+    });
+  }
+
+  async function maybeOpenRequiredEdit() {
     if (!needsProfileSetup(state.currentUser)) return;
+    // 新規会員のみスプラッシュ。掲載停止の再入力は飛ばす
+    if (state.currentUser.isNew) {
+      showLoading(false);
+      await playWelcomeSplash();
+    }
     openEditScreen({ required: true });
   }
 
