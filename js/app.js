@@ -64,6 +64,15 @@
     const g = (gender || "").trim();
     if (g === "男性" || g === "男" || g.toLowerCase() === "male" || g === "M") return "male";
     if (g === "女性" || g === "女" || g.toLowerCase() === "female" || g === "F") return "female";
+    // マスタ例: その他 / その他(LGBTQ) / LGBTQ など
+    if (
+      g === "その他" ||
+      g.includes("LGBTQ") ||
+      g.includes("LGBT") ||
+      g.toLowerCase().includes("other")
+    ) {
+      return "other";
+    }
     return "unknown";
   }
 
@@ -205,7 +214,12 @@
   /* ---------- Profile Card（繋がる / マイページ共通） ---------- */
   function renderProfileCard(user) {
     const genderKey = normalizeGender(user.gender);
-    const genderClass = genderKey === "female" ? "gender-female" : "gender-male";
+    const genderClass =
+      genderKey === "female"
+        ? "gender-female"
+        : genderKey === "other"
+          ? "gender-other"
+          : "gender-male";
     const avatar = normalizeAvatarUrl(user.avatarUrl, user.name);
 
     return `

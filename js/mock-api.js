@@ -71,7 +71,8 @@ const MockAPI = (() => {
         地域リンク: [{ value: "https://www.google.com", label: "地域を絞る" }],
         性別: [
           { value: "男性", label: "男性" },
-          { value: "女性", label: "女性" }
+          { value: "女性", label: "女性" },
+          { value: "その他(LGBTQ)", label: "その他(LGBTQ)" }
         ],
         年代: [
           { value: "20代", label: "20代" },
