@@ -639,10 +639,24 @@ function listingMeta_(typeLabel) {
 function getOwnerEmail_() {
   try {
     const settings = getSettings_();
-    return String(settings['オーナーメール'] || '').trim();
+    var email = String(settings['オーナーメール'] || '').trim();
+    if (email) return email;
   } catch (e) {
-    return '';
+    // fall through
   }
+  // 誤って「マスタ」シート（区分=オーナーメール）に書いた場合も拾う
+  try {
+    const rows = readObjects_(SHEET.MASTERS);
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i]['区分'] || '').trim() !== 'オーナーメール') continue;
+      if (rows[i]['有効'] !== '' && rows[i]['有効'] !== undefined && !toBool_(rows[i]['有効'])) continue;
+      var v = String(rows[i]['値'] || '').trim();
+      if (v) return v;
+    }
+  } catch (e2) {
+    // ignore
+  }
+  return '';
 }
 
 function getApprovalToken_() {
