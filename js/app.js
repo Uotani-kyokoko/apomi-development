@@ -1420,15 +1420,6 @@
         scheduleTouchActivity();
       }
     });
-
-    $("#btn-logout").addEventListener("click", () => {
-      Session.clear();
-      if (window.google?.accounts?.id) {
-        google.accounts.id.disableAutoSelect();
-      }
-      showToast("ログアウトしました");
-      showLogin();
-    });
   }
 
   async function init() {
