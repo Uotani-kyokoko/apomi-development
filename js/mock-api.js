@@ -135,13 +135,12 @@ const MockAPI = (() => {
         wantMeet: profile.wantMeet ?? currentUser.wantMeet,
         avoidMeet: profile.avoidMeet ?? currentUser.avoidMeet,
         avatarUrl: profile.avatarUrl ?? currentUser.avatarUrl,
-        sns: {
-          line: profile.sns?.line ?? currentUser.sns?.line ?? "",
-          instagram: profile.sns?.instagram ?? currentUser.sns?.instagram ?? "",
-          x: profile.sns?.x ?? currentUser.sns?.x ?? "",
-          youtube: profile.sns?.youtube ?? currentUser.sns?.youtube ?? ""
-        }
+        snsLinks: Array.isArray(profile.snsLinks)
+          ? profile.snsLinks.map((u) => String(u || "").trim()).filter(Boolean).slice(0, 4)
+          : currentUser.snsLinks || []
       });
+      // 旧フィールドは残さない
+      delete currentUser.sns;
       const idx = users.findIndex((u) => u.id === currentUser.id);
       if (idx >= 0) users[idx] = { ...currentUser };
       return delay({ ...currentUser });

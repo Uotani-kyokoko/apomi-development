@@ -57,8 +57,33 @@
     searchVisibleCount: SEARCH_RESULT_PAGE_SIZE
   };
 
-  const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
+  /** 掲載SNS（最大4・URLから種別判定・表示は優先順位順） */
+  const SNS_MAX = 4;
+  const SNS_PRIORITY = [
+    "instagram",
+    "facebook",
+    "x",
+    "line",
+    "youtube",
+    "home",
+    "litlink",
+    "canva",
+    "ameblo"
+  ];
+  const SNS_META = {
+    instagram: { label: "Instagram", icon: "fa-brands fa-instagram", cls: "sns-instagram" },
+    facebook: { label: "Facebook", icon: "fa-brands fa-facebook-f", cls: "sns-facebook" },
+    x: { label: "X", icon: "fa-brands fa-x-twitter", cls: "sns-x" },
+    line: { label: "公式LINE", icon: "fa-brands fa-line", cls: "sns-line" },
+    youtube: { label: "YouTube", icon: "fa-brands fa-youtube", cls: "sns-youtube" },
+    home: { label: "ホーム", icon: "fa-solid fa-globe", cls: "sns-home" },
+    litlink: { label: "lit.link", icon: "fa-solid fa-link", cls: "sns-litlink" },
+    canva: { label: "Canva", icon: "fa-solid fa-palette", cls: "sns-canva" },
+    ameblo: { label: "アメブロ", icon: "fa-solid fa-blog", cls: "sns-ameblo" }
+  };
+
+  /** 編集画面のSNS入力（URL配列） */
+  let editSnsUrls = [];
 
   function normalizeGender(gender) {
     const g = (gender || "").trim();
@@ -118,23 +143,127 @@
     return raw;
   }
 
-  function renderSns(user) {
-    const snsItems = [
-      { key: "line", icon: "fa-brands fa-line", cls: "sns-line", label: "LINE" },
-      { key: "instagram", icon: "fa-brands fa-instagram", cls: "sns-instagram", label: "Instagram" },
-      { key: "x", icon: "fa-brands fa-x-twitter", cls: "sns-x", label: "X" },
-      { key: "youtube", icon: "fa-brands fa-youtube", cls: "sns-youtube", label: "YouTube" }
-    ];
+  function detectSnsType(url) {
+    const raw = String(url || "").trim().toLowerCase();
+    if (!raw) return null;
+    try {
+      const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+      const host = u.hostname.replace(/^www\./, "");
+      if (host.includes("instagram.com") || host === "instagr.am") return "instagram";
+      if (host.includes("facebook.com") || host === "fb.com" || host === "fb.me") return "facebook";
+      if (host === "x.com" || host.includes("twitter.com")) return "x";
+      if (host.includes("line.me") || host === "lin.ee" || host.includes("page.line.me")) return "line";
+      if (host.includes("youtube.com") || host === "youtu.be") return "youtube";
+      if (host === "lit.link" || host.endsWith(".lit.link")) return "litlink";
+      if (host.includes("canva.com")) return "canva";
+      if (host.includes("ameblo.jp")) return "ameblo";
+      if (u.protocol === "http:" || u.protocol === "https:") return "home";
+    } catch {
+      return null;
+    }
+    return null;
+  }
 
-    return snsItems
-      .map(({ key, icon, cls, label }) => {
-        const url = user.sns?.[key];
-        if (url) {
-          return `<a href="${escapeHtml(url)}" class="sns-link ${cls}" target="_blank" rel="noopener noreferrer" aria-label="${label}"><i class="${icon}"></i></a>`;
-        }
-        return `<span class="sns-link ${cls} disabled" aria-hidden="true"><i class="${icon}"></i></span>`;
+  function normalizeSnsUrl(url) {
+    const raw = String(url || "").trim();
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return `https://${raw}`;
+  }
+
+  /** 旧形式 {line,instagram,...} / snsLinks[] を URL 配列に統一 */
+  function getUserSnsUrls(user) {
+    if (!user) return [];
+    if (Array.isArray(user.snsLinks) && user.snsLinks.length) {
+      return user.snsLinks.map((u) => String(u || "").trim()).filter(Boolean).slice(0, SNS_MAX);
+    }
+    if (Array.isArray(user.sns)) {
+      return user.sns
+        .map((item) => (typeof item === "string" ? item : item?.url))
+        .map((u) => String(u || "").trim())
+        .filter(Boolean)
+        .slice(0, SNS_MAX);
+    }
+    const obj = user.sns && typeof user.sns === "object" ? user.sns : {};
+    const legacyOrder = ["instagram", "facebook", "x", "line", "youtube", "home", "litlink", "canva", "ameblo"];
+    const out = [];
+    legacyOrder.forEach((key) => {
+      const v = String(obj[key] || "").trim();
+      if (v) out.push(v);
+    });
+    return out.slice(0, SNS_MAX);
+  }
+
+  function sortSnsByPriority(urls) {
+    return (urls || [])
+      .map((url) => {
+        const normalized = normalizeSnsUrl(url);
+        const type = detectSnsType(normalized);
+        return type ? { type, url: normalized } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => SNS_PRIORITY.indexOf(a.type) - SNS_PRIORITY.indexOf(b.type));
+  }
+
+  function renderSns(user) {
+    const items = sortSnsByPriority(getUserSnsUrls(user));
+    if (!items.length) return "";
+    return items
+      .map(({ type, url }) => {
+        const meta = SNS_META[type] || SNS_META.home;
+        return `<a href="${escapeHtml(url)}" class="sns-link ${meta.cls}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(meta.label)}"><i class="${meta.icon}"></i></a>`;
       })
       .join("");
+  }
+
+  function validateEditSnsUrls(urls) {
+    const cleaned = [];
+    const seen = new Set();
+    for (const raw of urls || []) {
+      const url = String(raw || "").trim();
+      if (!url) continue;
+      const normalized = normalizeSnsUrl(url);
+      const type = detectSnsType(normalized);
+      if (!type) {
+        return { ok: false, message: `対応していないURLです: ${url}` };
+      }
+      if (seen.has(type)) {
+        return { ok: false, message: `${SNS_META[type].label} はすでに追加されています` };
+      }
+      seen.add(type);
+      cleaned.push(normalized);
+      if (cleaned.length > SNS_MAX) {
+        return { ok: false, message: `SNSは最大${SNS_MAX}件までです` };
+      }
+    }
+    return { ok: true, urls: cleaned };
+  }
+
+  function renderEditSnsList() {
+    const list = $("#edit-sns-list");
+    const addBtn = $("#btn-add-sns");
+    if (!list) return;
+    list.innerHTML = editSnsUrls
+      .map((url, idx) => {
+        const type = detectSnsType(normalizeSnsUrl(url));
+        const meta = type ? SNS_META[type] : null;
+        const previewCls = meta ? meta.cls : "";
+        const icon = meta ? meta.icon : "fa-solid fa-question";
+        return `
+          <div class="edit-sns-row" data-sns-index="${idx}">
+            <span class="edit-sns-preview ${previewCls}" aria-hidden="true"><i class="${icon}"></i></span>
+            <input type="url" class="edit-input edit-sns-url" value="${escapeHtml(url)}" placeholder="https://..." inputmode="url">
+            <button type="button" class="edit-sns-remove" data-remove-sns="${idx}" aria-label="削除">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>`;
+      })
+      .join("");
+    if (addBtn) addBtn.disabled = editSnsUrls.length >= SNS_MAX;
+  }
+
+  function syncEditSnsFromDom() {
+    editSnsUrls = Array.from(document.querySelectorAll(".edit-sns-url")).map((el) => el.value.trim());
   }
 
   function renderTags(tags) {
@@ -956,10 +1085,9 @@
     $("#edit-bio").value = user.bio || "";
     $("#edit-want").value = user.wantMeet || "";
     $("#edit-avoid").value = user.avoidMeet || "";
-    $("#edit-line").value = user.sns?.line || "";
-    $("#edit-instagram").value = user.sns?.instagram || "";
-    $("#edit-x").value = user.sns?.x || "";
-    $("#edit-youtube").value = user.sns?.youtube || "";
+    editSnsUrls = getUserSnsUrls(user);
+    if (!editSnsUrls.length) editSnsUrls = [""];
+    renderEditSnsList();
     const status = $("#edit-avatar-status");
     if (status) status.textContent = "JPEG / PNG（自動で縮小して保存します）";
     updateEditAvatarPreview();
@@ -1031,6 +1159,8 @@
   }
 
   function collectEditForm() {
+    syncEditSnsFromDom();
+    const snsCheck = validateEditSnsUrls(editSnsUrls);
     return {
       name: ($("#edit-name").value || "").trim(),
       gender: getSelectedChipValue("#edit-gender-chips"),
@@ -1043,12 +1173,8 @@
       bio: ($("#edit-bio").value || "").trim(),
       wantMeet: ($("#edit-want").value || "").trim(),
       avoidMeet: ($("#edit-avoid").value || "").trim(),
-      sns: {
-        line: ($("#edit-line").value || "").trim(),
-        instagram: ($("#edit-instagram").value || "").trim(),
-        x: ($("#edit-x").value || "").trim(),
-        youtube: ($("#edit-youtube").value || "").trim()
-      }
+      snsLinks: snsCheck.ok ? snsCheck.urls : editSnsUrls.filter(Boolean),
+      _snsError: snsCheck.ok ? "" : snsCheck.message
     };
   }
 
@@ -1141,6 +1267,11 @@
       showToast("現在地を選択してください");
       return;
     }
+    if (profile._snsError) {
+      showToast(profile._snsError);
+      return;
+    }
+    const { _snsError, ...profilePayload } = profile;
 
     const shouldPublish = state.editRequired || state.currentUser?.isPublished === false;
 
@@ -1149,9 +1280,12 @@
       const res = await GasAPI.updateProfile({
         memberNo: state.identity?.memberNo || state.currentUser?.id || "",
         email: state.identity?.email || state.currentUser?.email || "",
-        profile
+        profile: profilePayload
       });
-      state.currentUser = res.data || { ...state.currentUser, ...profile };
+      state.currentUser = res.data || { ...state.currentUser, ...profilePayload };
+      if (!state.currentUser.snsLinks) {
+        state.currentUser.snsLinks = profilePayload.snsLinks || [];
+      }
       applyMyActivity(state.currentUser.lastLoginAt);
 
       if (shouldPublish) {
@@ -1369,6 +1503,35 @@
     $("#edit-back").addEventListener("click", closeEditScreen);
     $("#edit-form").addEventListener("submit", saveProfile);
     $("#edit-avatar-file")?.addEventListener("change", handleAvatarFileChange);
+
+    $("#btn-add-sns")?.addEventListener("click", () => {
+      syncEditSnsFromDom();
+      if (editSnsUrls.length >= SNS_MAX) return;
+      editSnsUrls.push("");
+      renderEditSnsList();
+    });
+    $("#edit-sns-list")?.addEventListener("click", (e) => {
+      const removeBtn = e.target.closest("[data-remove-sns]");
+      if (!removeBtn) return;
+      syncEditSnsFromDom();
+      const idx = Number(removeBtn.dataset.removeSns);
+      editSnsUrls.splice(idx, 1);
+      if (!editSnsUrls.length) editSnsUrls = [""];
+      renderEditSnsList();
+    });
+    $("#edit-sns-list")?.addEventListener("input", (e) => {
+      const input = e.target.closest(".edit-sns-url");
+      if (!input) return;
+      const row = input.closest(".edit-sns-row");
+      if (!row) return;
+      const preview = row.querySelector(".edit-sns-preview");
+      const type = detectSnsType(normalizeSnsUrl(input.value));
+      const meta = type ? SNS_META[type] : null;
+      if (preview) {
+        preview.className = `edit-sns-preview ${meta ? meta.cls : ""}`;
+        preview.innerHTML = `<i class="${meta ? meta.icon : "fa-solid fa-question"}"></i>`;
+      }
+    });
 
     ["#edit-gender-chips", "#edit-age-chips", "#edit-job-chips"].forEach((id) => {
       $(id)?.addEventListener("click", (e) => {

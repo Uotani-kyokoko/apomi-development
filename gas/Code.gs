@@ -394,11 +394,22 @@ function updateProfile_(body) {
     setCellByHeader_(sheet, table.headers, rowNumber, map[key], profile[key]);
   });
 
-  if (profile.sns) {
-    if (profile.sns.line !== undefined) setCellByHeader_(sheet, table.headers, rowNumber, 'LINE', profile.sns.line);
-    if (profile.sns.instagram !== undefined) setCellByHeader_(sheet, table.headers, rowNumber, 'Instagram', profile.sns.instagram);
-    if (profile.sns.x !== undefined) setCellByHeader_(sheet, table.headers, rowNumber, 'X', profile.sns.x);
-    if (profile.sns.youtube !== undefined) setCellByHeader_(sheet, table.headers, rowNumber, 'YouTube', profile.sns.youtube);
+  if (profile.snsLinks || profile.sns) {
+    var links = [];
+    if (Array.isArray(profile.snsLinks)) {
+      links = profile.snsLinks;
+    } else if (profile.sns && typeof profile.sns === 'object') {
+      // 旧形式互換
+      ['instagram', 'facebook', 'x', 'line', 'youtube', 'home', 'litlink', 'canva', 'ameblo'].forEach(function (k) {
+        if (profile.sns[k]) links.push(String(profile.sns[k]));
+      });
+    }
+    links = links.map(function (u) { return String(u || '').trim(); }).filter(Boolean).slice(0, 4);
+    while (links.length < 4) links.push('');
+    setCellByHeader_(sheet, table.headers, rowNumber, 'SNS1', links[0] || '');
+    setCellByHeader_(sheet, table.headers, rowNumber, 'SNS2', links[1] || '');
+    setCellByHeader_(sheet, table.headers, rowNumber, 'SNS3', links[2] || '');
+    setCellByHeader_(sheet, table.headers, rowNumber, 'SNS4', links[3] || '');
   }
 
   allowed.forEach(function (col) {
@@ -654,13 +665,24 @@ function mapUser_(r) {
     isPublished: toBool_(r['掲載中']),
     presidentMark: toBool_(r['社長マーク']),
     presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
-    sns: {
-      line: String(r['LINE'] || ''),
-      instagram: String(r['Instagram'] || ''),
-      x: String(r['X'] || ''),
-      youtube: String(r['YouTube'] || '')
-    }
+    snsLinks: extractSnsLinks_(r)
   };
+}
+
+function extractSnsLinks_(r) {
+  var links = [];
+  ['SNS1', 'SNS2', 'SNS3', 'SNS4'].forEach(function (col) {
+    var v = String(r[col] || '').trim();
+    if (v) links.push(v);
+  });
+  if (links.length) return links.slice(0, 4);
+
+  // 旧列からの読み取り互換
+  ['Instagram', 'Facebook', 'X', 'LINE', 'YouTube'].forEach(function (col) {
+    var v = String(r[col] || '').trim();
+    if (v) links.push(v);
+  });
+  return links.slice(0, 4);
 }
 
 /* ========== Sheet Helpers ========== */

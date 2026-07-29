@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>apomi - ビジネスマッチング</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260729d">
+  <link rel="stylesheet" href="css/style.css?v=20260729e">
 </head>
 <body>
 
@@ -235,20 +235,13 @@
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-line">LINE URL</label>
-        <input id="edit-line" name="line" type="url" class="edit-input" placeholder="https://line.me/...">
-      </div>
-      <div class="edit-card">
-        <label class="edit-label" for="edit-instagram">Instagram URL</label>
-        <input id="edit-instagram" name="instagram" type="url" class="edit-input" placeholder="https://instagram.com/...">
-      </div>
-      <div class="edit-card">
-        <label class="edit-label" for="edit-x">X URL</label>
-        <input id="edit-x" name="x" type="url" class="edit-input" placeholder="https://x.com/...">
-      </div>
-      <div class="edit-card">
-        <label class="edit-label" for="edit-youtube">YouTube URL</label>
-        <input id="edit-youtube" name="youtube" type="url" class="edit-input" placeholder="https://youtube.com/...">
+        <p class="edit-label">掲載SNS（最大4件）</p>
+        <p class="edit-help-text">URLを入れると種類を自動判定します。同じ種類は1つまで。</p>
+        <div id="edit-sns-list" class="edit-sns-list"></div>
+        <button type="button" id="btn-add-sns" class="edit-sns-add" aria-label="SNSを追加">
+          <i class="fa-solid fa-plus"></i>
+          <span>SNSを追加</span>
+        </button>
       </div>
 
       <div class="edit-footer-space"></div>
@@ -271,11 +264,11 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/config.js?v=20260729d"></script>
-  <script src="js/auth.js?v=20260729d"></script>
-  <script src="js/sample-users-240.js?v=20260729d"></script>
-  <script src="js/mock-api.js?v=20260729d"></script>
-  <script src="js/gas-api.js?v=20260729d"></script>
-  <script src="js/app.js?v=20260729d"></script>
+  <script src="js/config.js?v=20260729e"></script>
+  <script src="js/auth.js?v=20260729e"></script>
+  <script src="js/sample-users-240.js?v=20260729e"></script>
+  <script src="js/mock-api.js?v=20260729e"></script>
+  <script src="js/gas-api.js?v=20260729e"></script>
+  <script src="js/app.js?v=20260729e"></script>
 </body>
 </html>

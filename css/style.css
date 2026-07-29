@@ -446,12 +446,81 @@ img {
 
 .sns-line { background: #06c755; }
 .sns-instagram { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
+.sns-facebook { background: #1877f2; }
 .sns-x { background: #111111; border-radius: 6px; }
 .sns-youtube { background: #ff0000; }
+.sns-home { background: #2563eb; }
+.sns-litlink { background: #111827; }
+.sns-canva { background: #00c4cc; }
+.sns-ameblo { background: #f90; }
 
-.sns-link.disabled {
-  opacity: 0.28;
+.edit-sns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.edit-sns-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-sns-preview {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  background: #d1d5db;
+  font-size: 0.95rem;
+}
+
+.edit-sns-row .edit-input {
+  flex: 1;
+  margin: 0;
+}
+
+.edit-sns-remove {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #6b7280;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-sns-add {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px dashed #c4b5fd;
+  color: #7c3aed;
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: #faf5ff;
+}
+
+.edit-sns-add:disabled {
+  opacity: 0.4;
   pointer-events: none;
+}
+
+.edit-sns-hint {
+  font-size: 0.75rem;
+  color: #b91c1c;
+  margin-top: 4px;
 }
 
 .profile-name {
