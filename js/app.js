@@ -57,6 +57,9 @@
     searchVisibleCount: SEARCH_RESULT_PAGE_SIZE
   };
 
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
   /** 掲載SNS（最大4・URLから種別判定・表示は優先順位順） */
   const SNS_MAX = 4;
   const SNS_PRIORITY = [
