@@ -31,6 +31,7 @@
     masters: {},
     settings: {},
     regionLinkUrl: "https://www.google.com",
+    regionLinks: [],
     salonUrl: "https://example.com/salon",
     salonLabel: "井口智明オンラインサロン",
     currentUser: null,
@@ -802,13 +803,30 @@
     fillChips("#filter-age-chips", m["年代"], state.filters.ageGroup);
     fillSelect("#filter-industry", m["業種"], state.filters.industry);
     fillChips("#filter-job-chips", m["職種"], state.filters.jobTitle);
+    fillRegionLinks(m["地域リンク"]);
+  }
 
-    const region = (m["地域リンク"] || [])[0];
-    if (region) {
-      state.regionLinkUrl = region.value || "https://www.google.com";
-      const label = $("#region-link-label");
-      if (label) label.textContent = region.label || "地域を絞る";
-    }
+  /** マスタ「地域リンク」：表示名＝地域ブロック名、値＝遷移先URL */
+  function fillRegionLinks(items) {
+    const list = $("#filter-region-links");
+    if (!list) return;
+    const defaults = [
+      { label: "北海道・東北", value: "https://example.com/region/hokkaido-tohoku" },
+      { label: "関東", value: "https://example.com/region/kanto" },
+      { label: "中部", value: "https://example.com/region/chubu" },
+      { label: "中国", value: "https://example.com/region/chugoku" },
+      { label: "四国", value: "https://example.com/region/shikoku" },
+      { label: "近畿", value: "https://example.com/region/kinki" },
+      { label: "九州・沖縄", value: "https://example.com/region/kyushu-okinawa" }
+    ];
+    const rows = Array.isArray(items) && items.length ? items : defaults;
+    state.regionLinks = rows;
+    list.innerHTML = rows
+      .map(
+        (r) =>
+          `<button type="button" class="region-link-item" data-region-url="${escapeHtml(r.value)}"><span>${escapeHtml(r.label || r.value)}</span><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
+      )
+      .join("");
   }
 
   function resetFiltersUI() {
@@ -1564,9 +1582,13 @@
       });
     });
 
-    $("#btn-region-link").addEventListener("click", () => {
-      const url = state.regionLinkUrl || "https://www.google.com";
+    $("#filter-region-links")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-region-url]");
+      if (!btn) return;
+      const url = btn.dataset.regionUrl || "";
+      if (!url) return;
       window.open(url, "_blank", "noopener,noreferrer");
+      scheduleTouchActivity();
     });
 
     $("#btn-search").addEventListener("click", () => {

@@ -68,7 +68,15 @@ const MockAPI = (() => {
 
     async fetchMasters() {
       return delay({
-        地域リンク: [{ value: "https://www.google.com", label: "地域を絞る" }],
+        地域リンク: [
+          { value: "https://example.com/region/hokkaido-tohoku", label: "北海道・東北" },
+          { value: "https://example.com/region/kanto", label: "関東" },
+          { value: "https://example.com/region/chubu", label: "中部" },
+          { value: "https://example.com/region/chugoku", label: "中国" },
+          { value: "https://example.com/region/shikoku", label: "四国" },
+          { value: "https://example.com/region/kinki", label: "近畿" },
+          { value: "https://example.com/region/kyushu-okinawa", label: "九州・沖縄" }
+        ],
         性別: [
           { value: "男性", label: "男性" },
           { value: "女性", label: "女性" },

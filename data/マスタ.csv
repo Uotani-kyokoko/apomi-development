@@ -1,5 +1,11 @@
 区分,値,表示名,表示順,有効
-地域リンク,https://www.google.com,地域を絞る,1,TRUE
+地域リンク,https://example.com/region/hokkaido-tohoku,北海道・東北,1,TRUE
+地域リンク,https://example.com/region/kanto,関東,2,TRUE
+地域リンク,https://example.com/region/chubu,中部,3,TRUE
+地域リンク,https://example.com/region/chugoku,中国,4,TRUE
+地域リンク,https://example.com/region/shikoku,四国,5,TRUE
+地域リンク,https://example.com/region/kinki,近畿,6,TRUE
+地域リンク,https://example.com/region/kyushu-okinawa,九州・沖縄,7,TRUE
 性別,男性,男性,1,TRUE
 性別,女性,女性,2,TRUE
 年代,20代,20代,1,TRUE
