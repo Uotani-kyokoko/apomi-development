@@ -575,6 +575,13 @@
     scheduleTouchActivity();
   }
 
+  /** 繋がるタブの井口智明オンラインサロン一覧へ移動 */
+  function goToSalonConnectPage() {
+    state.connectPageId = "salon";
+    switchTab("connect");
+    showToast(state.salonLabel || "井口智明オンラインサロン");
+  }
+
   function selectConnectPage(pageId) {
     const page = getConnectPage(pageId);
     if (!page) return;
@@ -603,11 +610,11 @@
 
     if (salonBtn) {
       if (user?.salonListing) {
-        salonBtn.textContent = salonName;
+        salonBtn.textContent = `${salonName}（オンラインサロンを開く）`;
         salonBtn.disabled = false;
       } else if (salonStatus === "申請中") {
-        salonBtn.textContent = `${salonName}：申請中`;
-        salonBtn.disabled = true;
+        salonBtn.textContent = `${salonName}（申請中）`;
+        salonBtn.disabled = false;
       } else if (salonStatus === "却下") {
         salonBtn.textContent = `${salonName}を再申請`;
         salonBtn.disabled = false;
@@ -1596,10 +1603,14 @@
     $("#btn-salon").addEventListener("click", async () => {
       const user = state.currentUser;
       const salonName = state.salonLabel || "井口智明オンラインサロン";
-      if (user?.salonListing) {
-        openSalonCommunityUrl();
+      const salonStatus = String(user?.salonListingStatus || "なし");
+
+      // 申請中・掲載済み → 繋がるタブのサロン一覧へ
+      if (user?.salonListing || salonStatus === "申請中") {
+        goToSalonConnectPage();
         return;
       }
+
       if (!confirm(`${salonName}への掲載を申請しますか？\nオーナー確認後、apomi とサロンの両方に掲載されます。`)) {
         return;
       }
