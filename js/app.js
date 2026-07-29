@@ -63,10 +63,10 @@
   /** 掲載SNS（最大4・URLから種別判定・表示は優先順位順） */
   const SNS_MAX = 4;
   const SNS_PRIORITY = [
+    "line",
     "instagram",
     "facebook",
     "x",
-    "line",
     "youtube",
     "home",
     "litlink",
@@ -188,7 +188,7 @@
         .slice(0, SNS_MAX);
     }
     const obj = user.sns && typeof user.sns === "object" ? user.sns : {};
-    const legacyOrder = ["instagram", "facebook", "x", "line", "youtube", "home", "litlink", "canva", "ameblo"];
+    const legacyOrder = ["line", "instagram", "facebook", "x", "youtube", "home", "litlink", "canva", "ameblo"];
     const out = [];
     legacyOrder.forEach((key) => {
       const v = String(obj[key] || "").trim();

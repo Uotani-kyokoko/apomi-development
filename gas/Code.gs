@@ -400,7 +400,7 @@ function updateProfile_(body) {
       links = profile.snsLinks;
     } else if (profile.sns && typeof profile.sns === 'object') {
       // 旧形式互換
-      ['instagram', 'facebook', 'x', 'line', 'youtube', 'home', 'litlink', 'canva', 'ameblo'].forEach(function (k) {
+      ['line', 'instagram', 'facebook', 'x', 'youtube', 'home', 'litlink', 'canva', 'ameblo'].forEach(function (k) {
         if (profile.sns[k]) links.push(String(profile.sns[k]));
       });
     }
