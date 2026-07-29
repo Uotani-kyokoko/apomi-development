@@ -650,6 +650,22 @@ img {
   opacity: 0.55;
 }
 
+.mypage-link:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.connect-salon-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-weight: 700;
+  color: #6b21a8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ===== Bottom Nav ===== */
 .bottom-nav {
   position: fixed;

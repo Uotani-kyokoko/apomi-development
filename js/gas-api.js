@@ -139,6 +139,13 @@ const GasAPI = (() => {
       return post('requestPresidentMark', payload);
     },
 
+    async requestSalonListing(payload) {
+      if (!USE_GAS) {
+        return { success: true, data: { salonListingStatus: '申請中' } };
+      }
+      return post('requestSalonListing', payload);
+    },
+
     async stopListing(payload) {
       if (!USE_GAS) {
         return { success: true, data: { isPublished: false } };

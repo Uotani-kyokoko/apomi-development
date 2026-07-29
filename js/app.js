@@ -478,6 +478,10 @@
       el.textContent = `${prefix}${formatMemberNo(page.from)} ~ ${formatMemberNo(page.to)}`;
       return;
     }
+    if (page.type === "salon") {
+      el.textContent = state.salonLabel || page.label;
+      return;
+    }
     el.textContent = page.label;
   }
 
@@ -512,6 +516,11 @@
           const n = memberNoNum(u.id);
           return n >= page.from && n <= page.to;
         })
+        .sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
+    }
+    if (page.type === "salon") {
+      return list
+        .filter((u) => u.salonListing)
         .sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
     }
     return list;
@@ -553,14 +562,14 @@
     const salonLabel = state.salonLabel || "井口オンラインサロン";
     list.innerHTML = CONNECT_MENU.map((item) => {
       const label = item.type === "salon" ? salonLabel : item.label;
-      const active = item.id === state.connectPageId && item.type !== "salon";
+      const active = item.id === state.connectPageId;
       const salonCls = item.type === "salon" ? " is-salon" : "";
       const activeCls = active ? " is-active" : "";
       return `<li><button type="button" class="connect-menu-item${activeCls}${salonCls}" data-page-id="${escapeHtml(item.id)}">${escapeHtml(label)}</button></li>`;
     }).join("");
   }
 
-  function openSalonFromMenu() {
+  function openSalonCommunityUrl() {
     const url = state.salonUrl || "https://example.com/salon";
     window.open(url, "_blank", "noopener,noreferrer");
     scheduleTouchActivity();
@@ -569,15 +578,10 @@
   function selectConnectPage(pageId) {
     const page = getConnectPage(pageId);
     if (!page) return;
-    if (page.type === "salon") {
-      closeConnectMenu();
-      openSalonFromMenu();
-      return;
-    }
     state.connectPageId = page.id;
     closeConnectMenu();
     refreshConnectList();
-    showToast(page.label);
+    showToast(page.type === "salon" ? state.salonLabel || page.label : page.label);
   }
 
   function renderMyPage(user) {
@@ -587,6 +591,46 @@
       return;
     }
     container.innerHTML = renderProfileCard(user);
+    updateMypageActionLabels(user);
+  }
+
+  function updateMypageActionLabels(user) {
+    const salonBtn = $("#btn-salon");
+    const presidentBtn = $("#btn-president-badge");
+    const salonStatus = String(user?.salonListingStatus || "なし");
+    const presidentStatus = String(user?.presidentMarkStatus || "なし");
+
+    if (salonBtn) {
+      if (user?.salonListing) {
+        salonBtn.textContent = "サロン掲載済み（コミュニティを開く）";
+        salonBtn.disabled = false;
+      } else if (salonStatus === "申請中") {
+        salonBtn.textContent = "サロン掲載：申請中";
+        salonBtn.disabled = true;
+      } else if (salonStatus === "却下") {
+        salonBtn.textContent = "サロン掲載を再申請";
+        salonBtn.disabled = false;
+      } else {
+        salonBtn.textContent = "井口オンラインサロン掲載を申請";
+        salonBtn.disabled = false;
+      }
+    }
+
+    if (presidentBtn) {
+      if (user?.presidentMark) {
+        presidentBtn.textContent = "社長マーク掲載済み";
+        presidentBtn.disabled = true;
+      } else if (presidentStatus === "申請中") {
+        presidentBtn.textContent = "社長マーク：申請中";
+        presidentBtn.disabled = true;
+      } else if (presidentStatus === "却下") {
+        presidentBtn.textContent = "社長マークを再申請";
+        presidentBtn.disabled = false;
+      } else {
+        presidentBtn.textContent = "社長マーク掲載を申請";
+        presidentBtn.disabled = false;
+      }
+    }
   }
 
   function updateHeader(tabId) {
@@ -751,6 +795,12 @@
   function updateConnectFilterBanner() {
     const el = $("#connect-filter-banner");
     if (!el) return;
+    const page = getConnectPage();
+    if (!hasActiveFilters() && page.type === "salon" && state.salonUrl) {
+      el.classList.remove("hidden");
+      el.innerHTML = `<button type="button" id="btn-open-salon-community" class="connect-salon-link">サロンコミュニティを開く <i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
+      return;
+    }
     if (!hasActiveFilters()) {
       el.classList.add("hidden");
       el.textContent = "";
@@ -822,8 +872,7 @@
       state.salonUrl = String(state.settings["サロンURL"] || state.salonUrl || "").trim() || state.salonUrl;
       state.salonLabel =
         String(state.settings["サロンボタン名"] || state.salonLabel || "").trim() || state.salonLabel;
-      const salonBtn = $("#btn-salon");
-      if (salonBtn) salonBtn.textContent = state.salonLabel;
+      if (state.currentUser) updateMypageActionLabels(state.currentUser);
 
       if (meRes?.data) {
         const wasNew = Boolean(state.currentUser?.isNew);
@@ -1546,20 +1595,52 @@
       });
     });
 
-    $("#btn-salon").addEventListener("click", () => {
-      openSalonFromMenu();
+    $("#btn-salon").addEventListener("click", async () => {
+      const user = state.currentUser;
+      if (user?.salonListing) {
+        openSalonCommunityUrl();
+        return;
+      }
+      if (!confirm("井口オンラインサロンへの掲載を申請しますか？\nオーナー確認後、apomi とサロンの両方に掲載されます。")) {
+        return;
+      }
+      try {
+        showLoading(true);
+        const res = await GasAPI.requestSalonListing(state.identity || {});
+        if (state.currentUser) {
+          state.currentUser.salonListingStatus = res.data?.salonListingStatus || "申請中";
+        }
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        showToast("サロン掲載申請を受け付けました。オーナーに通知しました");
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "申請に失敗しました");
+      } finally {
+        showLoading(false);
+      }
     });
     $("#btn-president-badge").addEventListener("click", async () => {
+      if (!confirm("社長マークの掲載を申請しますか？\nオーナー確認後に反映されます。")) return;
       try {
         showLoading(true);
         const res = await GasAPI.requestPresidentMark(state.identity || {});
+        if (state.currentUser) {
+          state.currentUser.presidentMarkStatus = res.data?.presidentMarkStatus || "申請中";
+        }
         applyMyActivity(res.data?.lastLoginAt);
-        showToast("社長マーク掲載依頼を受け付けました");
+        updateMypageActionLabels(state.currentUser);
+        showToast("社長マーク申請を受け付けました。オーナーに通知しました");
       } catch (err) {
         console.error(err);
-        showToast(err.message || "依頼に失敗しました");
+        showToast(err.message || "申請に失敗しました");
       } finally {
         showLoading(false);
+      }
+    });
+    $("#connect-filter-banner")?.addEventListener("click", (e) => {
+      if (e.target.closest("#btn-open-salon-community")) {
+        openSalonCommunityUrl();
       }
     });
     $("#btn-stop-listing").addEventListener("click", async () => {

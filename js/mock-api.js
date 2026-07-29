@@ -112,7 +112,8 @@ const MockAPI = (() => {
       return delay({
         アプリ名: "apomi",
         サロンURL: "https://example.com/salon",
-        サロンボタン名: "井口智明オンラインサロン表示"
+        サロンボタン名: "井口オンラインサロン",
+        オーナーメール: ""
       });
     },
 

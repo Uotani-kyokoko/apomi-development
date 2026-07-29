@@ -11,6 +11,8 @@
  * 5. 発行された URL をフロントの GAS_URL に設定
  *
  * 【シート】会員 / バナー / 申請 / マスタ / 設定
+ * 【設定キー】オーナーメール（申請通知先） / サロンURL / サロンボタン名
+ * 【申請】マイページから サロン掲載・社長マーク → オーナーへメール（承認/却下リンク）
  */
 
 // コンテナバインド（スプレッドシートに紐付いたスクリプト）なら空文字のままでOK
@@ -61,12 +63,20 @@ function doGet(e) {
       case 'ping':
         data = { ok: true, message: 'apomi GAS is alive' };
         break;
+      case 'approveRequest':
+        return htmlDecision_(processOwnerDecision_(p, '承認'));
+      case 'rejectRequest':
+        return htmlDecision_(processOwnerDecision_(p, '却下'));
       default:
         return json_({ success: false, error: '不明なactionです: ' + action });
     }
 
     return json_({ success: true, data: data });
   } catch (err) {
+    if (String((e && e.parameter && e.parameter.action) || '') === 'approveRequest' ||
+        String((e && e.parameter && e.parameter.action) || '') === 'rejectRequest') {
+      return htmlDecision_({ ok: false, message: String(err.message || err) });
+    }
     return json_({ success: false, error: String(err.message || err) });
   }
 }
@@ -88,7 +98,10 @@ function doPost(e) {
         data = uploadAvatar_(body);
         break;
       case 'requestPresidentMark':
-        data = requestPresidentMark_(body);
+        data = requestListing_(body, '社長マーク');
+        break;
+      case 'requestSalonListing':
+        data = requestListing_(body, 'サロン掲載');
         break;
       case 'stopListing':
         data = setPublished_(body, false, '掲載停止');
@@ -297,6 +310,8 @@ function login_(body) {
   setRowValue_(newRow, table.headers, '掲載中', false);
   setRowValue_(newRow, table.headers, '社長マーク', false);
   setRowValue_(newRow, table.headers, '社長マーク状態', 'なし');
+  setRowValue_(newRow, table.headers, 'サロン掲載', false);
+  setRowValue_(newRow, table.headers, 'サロン掲載状態', 'なし');
   setRowValue_(newRow, table.headers, '登録日時', now);
   setRowValue_(newRow, table.headers, '更新日時', now);
   setRowValue_(newRow, table.headers, '最終ログイン日時', now);
@@ -554,11 +569,16 @@ function extractDriveFileId_(url) {
   return '';
 }
 
-function requestPresidentMark_(body) {
+/**
+ * 社長マーク / サロン掲載の申請
+ * typeLabel: '社長マーク' | 'サロン掲載'
+ */
+function requestListing_(body, typeLabel) {
   const memberNo = String(body.memberNo || body.member_no || '').trim();
   const email = String(body.email || '').trim();
   if (!memberNo && !email) throw new Error('memberNo または email が必要です');
 
+  const meta = listingMeta_(typeLabel);
   const userSheet = getSheet_(SHEET.USERS);
   const table = readTable_(userSheet);
   const idx = findUserIndex_(table.rows, memberNo, email);
@@ -567,19 +587,228 @@ function requestPresidentMark_(body) {
   const user = table.rows[idx];
   const no = String(user['会員番号'] || memberNo);
   const rowNumber = idx + 2;
+  const currentStatus = String(user[meta.statusCol] || 'なし').trim();
+  if (toBool_(user[meta.flagCol])) {
+    throw new Error('すでに' + typeLabel + 'が許可されています');
+  }
+  if (currentStatus === '申請中') {
+    throw new Error(typeLabel + 'はすでに申請中です。オーナーの確認をお待ちください');
+  }
 
   const now = formatDateTime_(new Date());
-  setCellByHeader_(userSheet, table.headers, rowNumber, '社長マーク状態', '申請中');
+  setCellByHeader_(userSheet, table.headers, rowNumber, meta.statusCol, '申請中');
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
 
-  const requestId = createRequest_(no, '社長マーク', '受付', String(body.note || ''));
-  return {
+  const requestId = createRequest_(no, typeLabel, '受付', String(body.note || ''));
+  notifyOwnerOfRequest_({
+    requestId: requestId,
+    typeLabel: typeLabel,
+    memberNo: no,
+    name: String(user['名前'] || ''),
+    email: String(user['Googleメール'] || email),
+    note: String(body.note || '')
+  });
+
+  const out = {
     requestId: requestId,
     memberNo: no,
-    presidentMarkStatus: '申請中',
     lastLoginAt: now
   };
+  out[meta.statusKey] = '申請中';
+  return out;
+}
+
+function listingMeta_(typeLabel) {
+  if (typeLabel === 'サロン掲載') {
+    return {
+      flagCol: 'サロン掲載',
+      statusCol: 'サロン掲載状態',
+      statusKey: 'salonListingStatus',
+      flagKey: 'salonListing'
+    };
+  }
+  return {
+    flagCol: '社長マーク',
+    statusCol: '社長マーク状態',
+    statusKey: 'presidentMarkStatus',
+    flagKey: 'presidentMark'
+  };
+}
+
+function getOwnerEmail_() {
+  try {
+    const settings = getSettings_();
+    return String(settings['オーナーメール'] || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+
+function getApprovalToken_() {
+  const props = PropertiesService.getScriptProperties();
+  var token = String(props.getProperty('APPROVAL_TOKEN') || '').trim();
+  if (token) return token;
+  try {
+    const settings = getSettings_();
+    token = String(settings['承認トークン'] || '').trim();
+  } catch (e) {
+    token = '';
+  }
+  if (!token) {
+    token = Utilities.getUuid().replace(/-/g, '');
+  }
+  props.setProperty('APPROVAL_TOKEN', token);
+  return token;
+}
+
+function getWebAppUrl_() {
+  try {
+    return String(ScriptApp.getService().getUrl() || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+
+function notifyOwnerOfRequest_(info) {
+  const ownerEmail = getOwnerEmail_();
+  if (!ownerEmail) {
+    // 設定未記入でも申請自体は通す（シートの申請一覧で確認可能）
+    return;
+  }
+  const webUrl = getWebAppUrl_();
+  const token = getApprovalToken_();
+  const approveUrl = webUrl
+    ? (webUrl + '?action=approveRequest&requestId=' + encodeURIComponent(info.requestId) + '&token=' + encodeURIComponent(token))
+    : '';
+  const rejectUrl = webUrl
+    ? (webUrl + '?action=rejectRequest&requestId=' + encodeURIComponent(info.requestId) + '&token=' + encodeURIComponent(token))
+    : '';
+
+  var body = [
+    'apomi に新しい申請があります。',
+    '',
+    '種別: ' + info.typeLabel,
+    '申請ID: ' + info.requestId,
+    '会員番号: ' + info.memberNo,
+    '名前: ' + info.name,
+    'メール: ' + info.email,
+    info.note ? ('備考: ' + info.note) : '',
+    ''
+  ];
+  if (approveUrl) {
+    body.push('【承認する】');
+    body.push(approveUrl);
+    body.push('');
+    body.push('【却下する】');
+    body.push(rejectUrl);
+    body.push('');
+  } else {
+    body.push('スプレッドシートの「申請」シートで状態を確認・更新してください。');
+    body.push('');
+  }
+  if (info.typeLabel === 'サロン掲載') {
+    body.push('承認すると apomi のサロン掲載一覧に表示されます。');
+    body.push('あわせて井口オンラインサロン側にも会員を追加してください。');
+  } else {
+    body.push('承認すると apomi の社長マーク一覧に表示されます。');
+  }
+
+  MailApp.sendEmail({
+    to: ownerEmail,
+    subject: '[apomi] ' + info.typeLabel + '申請 #' + info.memberNo + ' ' + info.name,
+    body: body.filter(function (line, i, arr) {
+      // 連続空行を少し抑える
+      return !(line === '' && arr[i - 1] === '');
+    }).join('\n')
+  });
+}
+
+/**
+ * メール内リンクからの承認 / 却下
+ */
+function processOwnerDecision_(p, decision) {
+  const requestId = String((p && p.requestId) || '').trim();
+  const token = String((p && p.token) || '').trim();
+  if (!requestId) throw new Error('requestId がありません');
+  if (!token || token !== getApprovalToken_()) throw new Error('認証トークンが無効です');
+
+  const reqSheet = getSheet_(SHEET.REQUESTS);
+  const reqTable = readTable_(reqSheet);
+  const reqIdx = reqTable.rows.findIndex(function (r) {
+    return String(r['申請ID'] || '') === requestId;
+  });
+  if (reqIdx < 0) throw new Error('申請が見つかりません');
+
+  const req = reqTable.rows[reqIdx];
+  const status = String(req['状態'] || '').trim();
+  if (status === '承認' || status === '却下' || status === '対応済') {
+    return {
+      ok: true,
+      already: true,
+      message: 'この申請はすでに処理済みです（状態: ' + status + '）'
+    };
+  }
+
+  const typeLabel = String(req['種別'] || '').trim();
+  const memberNo = String(req['会員番号'] || '').trim();
+  if (typeLabel !== '社長マーク' && typeLabel !== 'サロン掲載') {
+    throw new Error('この種別はメール承認に対応していません: ' + typeLabel);
+  }
+
+  const meta = listingMeta_(typeLabel);
+  const userSheet = getSheet_(SHEET.USERS);
+  const userTable = readTable_(userSheet);
+  const userIdx = findUserIndex_(userTable.rows, memberNo, '');
+  if (userIdx < 0) throw new Error('会員が見つかりません: ' + memberNo);
+
+  const now = formatDateTime_(new Date());
+  const userRow = userIdx + 2;
+  const reqRow = reqIdx + 2;
+
+  if (decision === '承認') {
+    setCellByHeader_(userSheet, userTable.headers, userRow, meta.flagCol, true);
+    setCellByHeader_(userSheet, userTable.headers, userRow, meta.statusCol, '承認');
+    // サロン掲載承認時は通常掲載もオン（両方に載せる前提）
+    if (typeLabel === 'サロン掲載') {
+      setCellByHeader_(userSheet, userTable.headers, userRow, '掲載中', true);
+      setCellByHeader_(userSheet, userTable.headers, userRow, '掲載日', now);
+    }
+  } else {
+    setCellByHeader_(userSheet, userTable.headers, userRow, meta.flagCol, false);
+    setCellByHeader_(userSheet, userTable.headers, userRow, meta.statusCol, '却下');
+  }
+  setCellByHeader_(userSheet, userTable.headers, userRow, '更新日時', now);
+
+  setCellByHeader_(reqSheet, reqTable.headers, reqRow, '状態', decision);
+  setCellByHeader_(reqSheet, reqTable.headers, reqRow, '対応日時', now);
+  setCellByHeader_(reqSheet, reqTable.headers, reqRow, '備考',
+    String(req['備考'] || '') + (String(req['備考'] || '') ? ' / ' : '') + 'メールリンクで' + decision
+  );
+
+  var message = decision === '承認'
+    ? (typeLabel + 'を承認しました。apomi に反映されます。')
+    : (typeLabel + 'を却下しました。');
+  if (decision === '承認' && typeLabel === 'サロン掲載') {
+    message += ' 井口オンラインサロン側への会員追加もお願いします。';
+  }
+  return { ok: true, message: message, decision: decision, typeLabel: typeLabel, memberNo: memberNo };
+}
+
+function htmlDecision_(result) {
+  const ok = result && result.ok;
+  const msg = String((result && result.message) || (ok ? '完了しました' : 'エラー'));
+  const color = ok ? '#166534' : '#b91c1c';
+  const html = [
+    '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<title>apomi 申請処理</title></head><body style="font-family:sans-serif;padding:32px;line-height:1.6">',
+    '<h1 style="color:' + color + ';font-size:1.25rem">apomi</h1>',
+    '<p>' + msg.replace(/</g, '&lt;') + '</p>',
+    '<p style="color:#64748b;font-size:0.9rem">このタブは閉じて大丈夫です。</p>',
+    '</body></html>'
+  ].join('');
+  return HtmlService.createHtmlOutput(html);
 }
 
 function setPublished_(body, published, typeLabel) {
@@ -665,6 +894,8 @@ function mapUser_(r) {
     isPublished: toBool_(r['掲載中']),
     presidentMark: toBool_(r['社長マーク']),
     presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
+    salonListing: toBool_(r['サロン掲載']),
+    salonListingStatus: String(r['サロン掲載状態'] || 'なし'),
     snsLinks: extractSnsLinks_(r)
   };
 }
