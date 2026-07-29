@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  /** 最新ページ：掲載日から何日以内 */
+  /** 最新ページ：登録日から何日以内 */
   const LATEST_WITHIN_DAYS = 30;
   /** 検索結果の初回表示件数・追加読み込み単位 */
   const SEARCH_RESULT_PAGE_SIZE = 50;
@@ -27,7 +27,7 @@
     { id: "pres-1", label: "社長 No.1～No.100", type: "president", from: 1, to: 100 },
     { id: "pres-2", label: "社長 No.101～No.200", type: "president", from: 101, to: 200 },
     { id: "pres-3", label: "社長 No.201～No.300", type: "president", from: 201, to: 300 },
-    { id: "salon", label: "井口オンラインサロン", type: "salon" }
+    { id: "salon", label: "井口智明オンラインサロン", type: "salon" }
   ];
 
   const state = {
@@ -40,7 +40,7 @@
     settings: {},
     regionLinkUrl: "https://www.google.com",
     salonUrl: "https://example.com/salon",
-    salonLabel: "井口オンラインサロン",
+    salonLabel: "井口智明オンラインサロン",
     currentUser: null,
     identity: null,
     /** 未掲載時の必須プロフィール入力（初回 / 掲載停止） */
@@ -599,19 +599,20 @@
     const presidentBtn = $("#btn-president-badge");
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
+    const salonName = state.salonLabel || "井口智明オンラインサロン";
 
     if (salonBtn) {
       if (user?.salonListing) {
-        salonBtn.textContent = "サロン掲載済み（コミュニティを開く）";
+        salonBtn.textContent = salonName;
         salonBtn.disabled = false;
       } else if (salonStatus === "申請中") {
-        salonBtn.textContent = "サロン掲載：申請中";
+        salonBtn.textContent = `${salonName}：申請中`;
         salonBtn.disabled = true;
       } else if (salonStatus === "却下") {
-        salonBtn.textContent = "サロン掲載を再申請";
+        salonBtn.textContent = `${salonName}を再申請`;
         salonBtn.disabled = false;
       } else {
-        salonBtn.textContent = "井口オンラインサロン掲載を申請";
+        salonBtn.textContent = `${salonName}掲載を申請`;
         salonBtn.disabled = false;
       }
     }
@@ -795,12 +796,6 @@
   function updateConnectFilterBanner() {
     const el = $("#connect-filter-banner");
     if (!el) return;
-    const page = getConnectPage();
-    if (!hasActiveFilters() && page.type === "salon" && state.salonUrl) {
-      el.classList.remove("hidden");
-      el.innerHTML = `<button type="button" id="btn-open-salon-community" class="connect-salon-link">サロンコミュニティを開く <i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
-      return;
-    }
     if (!hasActiveFilters()) {
       el.classList.add("hidden");
       el.textContent = "";
@@ -870,8 +865,11 @@
         }
       }
       state.salonUrl = String(state.settings["サロンURL"] || state.salonUrl || "").trim() || state.salonUrl;
-      state.salonLabel =
+      let salonLabel =
         String(state.settings["サロンボタン名"] || state.salonLabel || "").trim() || state.salonLabel;
+      // 旧表記「〜表示」は落とす
+      if (salonLabel.endsWith("表示")) salonLabel = salonLabel.slice(0, -2).trim();
+      state.salonLabel = salonLabel || "井口智明オンラインサロン";
       if (state.currentUser) updateMypageActionLabels(state.currentUser);
 
       if (meRes?.data) {
@@ -1597,11 +1595,12 @@
 
     $("#btn-salon").addEventListener("click", async () => {
       const user = state.currentUser;
+      const salonName = state.salonLabel || "井口智明オンラインサロン";
       if (user?.salonListing) {
         openSalonCommunityUrl();
         return;
       }
-      if (!confirm("井口オンラインサロンへの掲載を申請しますか？\nオーナー確認後、apomi とサロンの両方に掲載されます。")) {
+      if (!confirm(`${salonName}への掲載を申請しますか？\nオーナー確認後、apomi とサロンの両方に掲載されます。`)) {
         return;
       }
       try {
@@ -1636,11 +1635,6 @@
         showToast(err.message || "申請に失敗しました");
       } finally {
         showLoading(false);
-      }
-    });
-    $("#connect-filter-banner")?.addEventListener("click", (e) => {
-      if (e.target.closest("#btn-open-salon-community")) {
-        openSalonCommunityUrl();
       }
     });
     $("#btn-stop-listing").addEventListener("click", async () => {
