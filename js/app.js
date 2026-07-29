@@ -803,30 +803,103 @@
     fillChips("#filter-age-chips", m["年代"], state.filters.ageGroup);
     fillSelect("#filter-industry", m["業種"], state.filters.industry);
     fillChips("#filter-job-chips", m["職種"], state.filters.jobTitle);
-    fillRegionLinks(m["地域リンク"]);
+    const regionItems = Array.isArray(m["地域リンク"]) ? m["地域リンク"] : [];
+    state.regionLinks = regionItems.length
+      ? regionItems
+      : [
+          { label: "北海道・東北", value: "https://example.com/region/hokkaido-tohoku" },
+          { label: "関東", value: "https://example.com/region/kanto" },
+          { label: "中部", value: "https://example.com/region/chubu" },
+          { label: "中国", value: "https://example.com/region/chugoku" },
+          { label: "四国", value: "https://example.com/region/shikoku" },
+          { label: "近畿", value: "https://example.com/region/kinki" },
+          { label: "九州・沖縄", value: "https://example.com/region/kyushu-okinawa" }
+        ];
+    const label = $("#region-link-label");
+    if (label) label.textContent = "地域を選ぶ";
   }
 
-  /** マスタ「地域リンク」：表示名＝地域ブロック名、値＝遷移先URL */
-  function fillRegionLinks(items) {
-    const list = $("#filter-region-links");
-    if (!list) return;
-    const defaults = [
-      { label: "北海道・東北", value: "https://example.com/region/hokkaido-tohoku" },
-      { label: "関東", value: "https://example.com/region/kanto" },
-      { label: "中部", value: "https://example.com/region/chubu" },
-      { label: "中国", value: "https://example.com/region/chugoku" },
-      { label: "四国", value: "https://example.com/region/shikoku" },
-      { label: "近畿", value: "https://example.com/region/kinki" },
-      { label: "九州・沖縄", value: "https://example.com/region/kyushu-okinawa" }
-    ];
-    const rows = Array.isArray(items) && items.length ? items : defaults;
-    state.regionLinks = rows;
-    list.innerHTML = rows
-      .map(
-        (r) =>
-          `<button type="button" class="region-link-item" data-region-url="${escapeHtml(r.value)}"><span>${escapeHtml(r.label || r.value)}</span><i class="fa-solid fa-arrow-up-right-from-square"></i></button>`
-      )
-      .join("");
+  /** 都道府県 → 地域ブロック名 */
+  const PREFECTURE_TO_REGION = {
+    北海道: "北海道・東北",
+    青森県: "北海道・東北",
+    岩手県: "北海道・東北",
+    宮城県: "北海道・東北",
+    秋田県: "北海道・東北",
+    山形県: "北海道・東北",
+    福島県: "北海道・東北",
+    茨城県: "関東",
+    栃木県: "関東",
+    群馬県: "関東",
+    埼玉県: "関東",
+    千葉県: "関東",
+    東京都: "関東",
+    神奈川県: "関東",
+    新潟県: "中部",
+    富山県: "中部",
+    石川県: "中部",
+    福井県: "中部",
+    山梨県: "中部",
+    長野県: "中部",
+    岐阜県: "中部",
+    静岡県: "中部",
+    愛知県: "中部",
+    三重県: "近畿",
+    滋賀県: "近畿",
+    京都府: "近畿",
+    大阪府: "近畿",
+    兵庫県: "近畿",
+    奈良県: "近畿",
+    和歌山県: "近畿",
+    鳥取県: "中国",
+    島根県: "中国",
+    岡山県: "中国",
+    広島県: "中国",
+    山口県: "中国",
+    徳島県: "四国",
+    香川県: "四国",
+    愛媛県: "四国",
+    高知県: "四国",
+    福岡県: "九州・沖縄",
+    佐賀県: "九州・沖縄",
+    長崎県: "九州・沖縄",
+    熊本県: "九州・沖縄",
+    大分県: "九州・沖縄",
+    宮崎県: "九州・沖縄",
+    鹿児島県: "九州・沖縄",
+    沖縄県: "九州・沖縄"
+  };
+
+  function resolveRegionFromLocation(location) {
+    const pref = String(location || "").trim();
+    if (!pref) return null;
+    return PREFECTURE_TO_REGION[pref] || null;
+  }
+
+  function resolveRegionUrl(regionName) {
+    const rows = state.regionLinks || [];
+    const hit = rows.find((r) => String(r.label || "").trim() === regionName);
+    return hit?.value || "";
+  }
+
+  function openRegionByCurrentLocation() {
+    const location = String(state.currentUser?.location || "").trim();
+    if (!location) {
+      showToast("現在地が未設定です。プロフィールで現在地を選んでください");
+      return;
+    }
+    const region = resolveRegionFromLocation(location);
+    if (!region) {
+      showToast(`現在地「${location}」に対応する地域が見つかりません`);
+      return;
+    }
+    const url = resolveRegionUrl(region);
+    if (!url) {
+      showToast(`「${region}」の遷移先URLがマスタ未設定です`);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+    scheduleTouchActivity();
   }
 
   function resetFiltersUI() {
@@ -1582,13 +1655,8 @@
       });
     });
 
-    $("#filter-region-links")?.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-region-url]");
-      if (!btn) return;
-      const url = btn.dataset.regionUrl || "";
-      if (!url) return;
-      window.open(url, "_blank", "noopener,noreferrer");
-      scheduleTouchActivity();
+    $("#btn-region-link")?.addEventListener("click", () => {
+      openRegionByCurrentLocation();
     });
 
     $("#btn-search").addEventListener("click", () => {

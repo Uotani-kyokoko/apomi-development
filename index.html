@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>apomi - ビジネスマッチング</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260730e">
+  <link rel="stylesheet" href="css/style.css?v=20260730f">
 </head>
 <body>
 
@@ -144,16 +144,11 @@
         </div>
       </div>
 
-      <!-- 地域は外部リンク（URLはマスタ「地域リンク」＝地域ブロックごと） -->
-      <div class="filter-card" data-filter-card="region">
-        <button type="button" class="filter-card-toggle">
-          <span id="region-link-label">地域を絞る</span>
-          <i class="fa-solid fa-chevron-down"></i>
-        </button>
-        <div class="filter-card-body">
-          <div class="region-link-list" id="filter-region-links"></div>
-        </div>
-      </div>
+      <!-- 地域は現在地からブロック判定 → マスタ「地域リンク」のURLへ -->
+      <button type="button" id="btn-region-link" class="filter-link-card">
+        <span id="region-link-label">地域を選ぶ</span>
+        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+      </button>
     </div>
 
     <div class="filter-footer">
@@ -269,11 +264,11 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/config.js?v=20260730e"></script>
-  <script src="js/auth.js?v=20260730e"></script>
-  <script src="js/sample-users-240.js?v=20260730e"></script>
-  <script src="js/mock-api.js?v=20260730e"></script>
-  <script src="js/gas-api.js?v=20260730e"></script>
-  <script src="js/app.js?v=20260730e"></script>
+  <script src="js/config.js?v=20260730f"></script>
+  <script src="js/auth.js?v=20260730f"></script>
+  <script src="js/sample-users-240.js?v=20260730f"></script>
+  <script src="js/mock-api.js?v=20260730f"></script>
+  <script src="js/gas-api.js?v=20260730f"></script>
+  <script src="js/app.js?v=20260730f"></script>
 </body>
 </html>
