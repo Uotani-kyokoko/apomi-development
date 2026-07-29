@@ -19,16 +19,8 @@
   /** このセッションでウェルカムを出したら再表示しない */
   let welcomeSplashShown = false;
 
-  const CONNECT_MENU = [
-    { id: "latest", label: "最新ユーザー", type: "latest" },
-    { id: "no-1", label: "No.1～No.100", type: "range", from: 1, to: 100 },
-    { id: "no-2", label: "No.101～No.200", type: "range", from: 101, to: 200 },
-    { id: "no-3", label: "No.201～No.300", type: "range", from: 201, to: 300 },
-    { id: "pres-1", label: "社長 No.1～No.100", type: "president", from: 1, to: 100 },
-    { id: "pres-2", label: "社長 No.101～No.200", type: "president", from: 101, to: 200 },
-    { id: "pres-3", label: "社長 No.201～No.300", type: "president", from: 201, to: 300 },
-    { id: "salon", label: "井口智明オンラインサロン", type: "salon" }
-  ];
+  /** 繋がるページの会員番号帯（1ページあたり） */
+  const CONNECT_BAND_SIZE = 100;
 
   const state = {
     isLoggedIn: false,
@@ -45,7 +37,7 @@
     identity: null,
     /** 未掲載時の必須プロフィール入力（初回 / 掲載停止） */
     editRequired: false,
-    /** 繋がるページ（CONNECT_MENU の id。salon 以外） */
+    /** 繋がるページ id（latest / no-N / pres-N / salon） */
     connectPageId: "latest",
     filters: {
       industry: "all",
@@ -126,8 +118,61 @@
     return (users || []).slice().sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
   }
 
+  function maxMemberNoAmong(users) {
+    let max = 0;
+    (users || []).forEach((u) => {
+      const n = memberNoNum(u.id);
+      if (n > max) max = n;
+    });
+    return max;
+  }
+
+  /**
+   * 会員数（最大会員番号）に応じて No.帯・社長帯を自動生成。
+   * 例: 最大301なら No.1～100 / 101～200 / 201～300 / 301～400
+   */
+  function buildConnectMenu(users = state.allUsers) {
+    const maxNo = Math.max(maxMemberNoAmong(users), 1);
+    const bandCount = Math.max(1, Math.ceil(maxNo / CONNECT_BAND_SIZE));
+    const menu = [{ id: "latest", label: "最新ユーザー", type: "latest" }];
+
+    for (let i = 0; i < bandCount; i++) {
+      const from = i * CONNECT_BAND_SIZE + 1;
+      const to = (i + 1) * CONNECT_BAND_SIZE;
+      menu.push({
+        id: `no-${i + 1}`,
+        label: `No.${from}～No.${to}`,
+        type: "range",
+        from,
+        to
+      });
+    }
+    for (let i = 0; i < bandCount; i++) {
+      const from = i * CONNECT_BAND_SIZE + 1;
+      const to = (i + 1) * CONNECT_BAND_SIZE;
+      menu.push({
+        id: `pres-${i + 1}`,
+        label: `社長 No.${from}～No.${to}`,
+        type: "president",
+        from,
+        to
+      });
+    }
+    menu.push({
+      id: "salon",
+      label: state.salonLabel || "井口智明オンラインサロン",
+      type: "salon"
+    });
+    return menu;
+  }
+
+  function getConnectMenu() {
+    return buildConnectMenu(state.allUsers);
+  }
+
   function getConnectPage(pageId = state.connectPageId) {
-    return CONNECT_MENU.find((p) => p.id === pageId) || CONNECT_MENU[0];
+    const menu = getConnectMenu();
+    return menu.find((p) => p.id === pageId) || menu[0];
   }
 
   /** Driveの画像URLを img で表示できる形式に変換 */
@@ -559,9 +604,9 @@
   function renderConnectMenu() {
     const list = $("#connect-menu-list");
     if (!list) return;
-    const salonLabel = state.salonLabel || "井口オンラインサロン";
-    list.innerHTML = CONNECT_MENU.map((item) => {
-      const label = item.type === "salon" ? salonLabel : item.label;
+    const menu = getConnectMenu();
+    list.innerHTML = menu.map((item) => {
+      const label = item.type === "salon" ? state.salonLabel || item.label : item.label;
       const active = item.id === state.connectPageId;
       const salonCls = item.type === "salon" ? " is-salon" : "";
       const activeCls = active ? " is-active" : "";
