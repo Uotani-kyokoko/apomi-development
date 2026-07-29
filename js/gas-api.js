@@ -159,7 +159,7 @@ const GasAPI = (() => {
       const memberNo = identity.memberNo || identity.member_no || '';
       if (!email && !memberNo) return { success: true, data: null };
       if (!USE_GAS) {
-        return { success: true, data: { lastLoginAt: formatNow(), status: 'オンライン' } };
+        return { success: true, data: { lastLoginAt: formatNow() } };
       }
       return get('touch', { email, memberNo });
     }

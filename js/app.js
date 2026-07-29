@@ -4,10 +4,8 @@
 (() => {
   "use strict";
 
-  /** 最終ログインからこの分数以内ならオンライン表示 */
-  const ONLINE_WITHIN_MINUTES = 30;
   /** 最新ページ：掲載日から何日以内 */
-  const LATEST_WITHIN_DAYS = 7;
+  const LATEST_WITHIN_DAYS = 30;
   /** 検索結果の初回表示件数・追加読み込み単位 */
   const SEARCH_RESULT_PAGE_SIZE = 50;
   /** 初回ログイン時のウェルカム文言（新規会員のみ） */
@@ -164,25 +162,16 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }
 
-  function isUserOnline(user) {
-    const last = parseSheetDate(user?.lastLoginAt);
-    if (!last) return false;
-    const diffMs = Date.now() - last.getTime();
-    return diffMs >= 0 && diffMs <= ONLINE_WITHIN_MINUTES * 60 * 1000;
-  }
-
-  /** 自分の最終ログインを画面上ですぐオンラインに反映 */
+  /** 自分の最終ログインを画面上に反映 */
   function applyMyActivity(lastLoginAt) {
     const stamp = lastLoginAt || formatLocalDateTime();
     if (!state.currentUser) return;
     state.currentUser.lastLoginAt = stamp;
-    state.currentUser.status = "オンライン";
     const idx = state.allUsers.findIndex((u) => u.id === state.currentUser.id);
     if (idx >= 0) {
       state.allUsers[idx] = {
         ...state.allUsers[idx],
-        lastLoginAt: stamp,
-        status: "オンライン"
+        lastLoginAt: stamp
       };
     }
     if (state.activeTab === "mypage") renderMyPage(state.currentUser);
@@ -197,7 +186,7 @@
     if (!state.isLoggedIn || !state.identity) return;
     const now = Date.now();
     if (!force && now - lastTouchAt < TOUCH_MIN_INTERVAL_MS) {
-      applyMyActivity(); // 画面上はオンライン維持
+      applyMyActivity(); // ローカルの最終ログインを更新
       return;
     }
     clearTimeout(touchTimer);
@@ -217,9 +206,6 @@
   function renderProfileCard(user) {
     const genderKey = normalizeGender(user.gender);
     const genderClass = genderKey === "female" ? "gender-female" : "gender-male";
-    const online = isUserOnline(user);
-    const statusClass = online ? "" : "offline";
-    const statusText = online ? "オンライン" : "オフライン";
     const avatar = normalizeAvatarUrl(user.avatarUrl, user.name);
 
     return `
@@ -237,7 +223,6 @@
           <div class="profile-meta-row">
             <span><i class="fa-solid fa-location-dot"></i>${escapeHtml(user.location || "-")}</span>
             <span><i class="fa-solid fa-rotate"></i>${escapeHtml(user.ageGroup || "-")}</span>
-            <span><span class="status-dot ${statusClass}"></span>${escapeHtml(statusText)}</span>
           </div>
           <div class="profile-section">
             <p class="profile-section-label">自己紹介</p>

@@ -162,7 +162,7 @@ function getMe_(p) {
 }
 
 /**
- * 最終ログイン日時・オンライン状態を更新（ログイン / 操作のたび）
+ * 最終ログイン日時を更新（ログイン / 操作のたび）
  * @returns {Object} mapUser_ 結果（lastLoginAt 更新済み）
  */
 function touchActivity_(body) {
@@ -180,11 +180,9 @@ function touchActivity_(body) {
   const now = formatDateTime_(new Date());
   const rowNumber = idx + 2;
   setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
-  setCellByHeader_(sheet, table.headers, rowNumber, 'オンライン状態', 'オンライン');
 
   const user = mapUser_(readObjects_(SHEET.USERS)[idx]);
   user.lastLoginAt = now;
-  user.status = 'オンライン';
   return user;
 }
 
@@ -265,7 +263,6 @@ function login_(body) {
   if (idx >= 0) {
     const rowNumber = idx + 2; // header = 1
     setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
-    setCellByHeader_(sheet, table.headers, rowNumber, 'オンライン状態', 'オンライン');
     if (googleId) setCellByHeader_(sheet, table.headers, rowNumber, 'GoogleID', googleId);
     if (name) setCellByHeader_(sheet, table.headers, rowNumber, '名前', name);
     if (picture) {
@@ -300,7 +297,6 @@ function login_(body) {
   setRowValue_(newRow, table.headers, '掲載中', false);
   setRowValue_(newRow, table.headers, '社長マーク', false);
   setRowValue_(newRow, table.headers, '社長マーク状態', 'なし');
-  setRowValue_(newRow, table.headers, 'オンライン状態', 'オンライン');
   setRowValue_(newRow, table.headers, '登録日時', now);
   setRowValue_(newRow, table.headers, '更新日時', now);
   setRowValue_(newRow, table.headers, '最終ログイン日時', now);
@@ -372,7 +368,7 @@ function updateProfile_(body) {
   const allowed = [
     '名前', '性別', '年代', '業種', '職種', '現在地', '出身地',
     '自己紹介', 'こんな人と繋がりたい', 'こんな人とは繋がりたくない',
-    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube', 'オンライン状態'
+    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube'
   ];
 
   const map = {
@@ -387,8 +383,7 @@ function updateProfile_(body) {
     wantMeet: 'こんな人と繋がりたい',
     avoidMeet: 'こんな人とは繋がりたくない',
     tags: 'タグ',
-    avatarUrl: 'プロフィール画像URL',
-    status: 'オンライン状態'
+    avatarUrl: 'プロフィール画像URL'
   };
 
   const profile = parsed.profile || parsed;
@@ -415,7 +410,6 @@ function updateProfile_(body) {
   const now = formatDateTime_(new Date());
   setCellByHeader_(sheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
-  setCellByHeader_(sheet, table.headers, rowNumber, 'オンライン状態', 'オンライン');
   return mapUser_(readObjects_(SHEET.USERS)[idx]);
 }
 
@@ -474,7 +468,6 @@ function uploadAvatar_(body) {
   setCellByHeader_(sheet, table.headers, rowNumber, 'プロフィール画像URL', avatarUrl);
   setCellByHeader_(sheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
-  setCellByHeader_(sheet, table.headers, rowNumber, 'オンライン状態', 'オンライン');
 
   return {
     avatarUrl: avatarUrl,
@@ -568,7 +561,6 @@ function requestPresidentMark_(body) {
   setCellByHeader_(userSheet, table.headers, rowNumber, '社長マーク状態', '申請中');
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
-  setCellByHeader_(userSheet, table.headers, rowNumber, 'オンライン状態', 'オンライン');
 
   const requestId = createRequest_(no, '社長マーク', '受付', String(body.note || ''));
   return {
@@ -597,8 +589,7 @@ function setPublished_(body, published, typeLabel) {
   setCellByHeader_(userSheet, table.headers, rowNumber, '掲載中', published);
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
-  setCellByHeader_(userSheet, table.headers, rowNumber, 'オンライン状態', 'オンライン');
-  // 掲載開始・再開時に掲載日を更新（最新7日判定用）。停止時は残す（再開まで最新に出ない）
+  // 掲載開始・再開時に掲載日を更新（最新30日判定用）。停止時は残す（再開まで最新に出ない）
   if (published) {
     setCellByHeader_(userSheet, table.headers, rowNumber, '掲載日', now);
   }
@@ -656,7 +647,6 @@ function mapUser_(r) {
     avoidMeet: String(r['こんな人とは繋がりたくない'] || ''),
     tags: tags,
     avatarUrl: String(r['プロフィール画像URL'] || ''),
-    status: String(r['オンライン状態'] || 'オフライン'),
     lastLoginAt: String(r['最終ログイン日時'] || ''),
     createdAt: String(r['登録日時'] || ''),
     // 掲載日が空なら登録日時で代用（既存データ互換）
