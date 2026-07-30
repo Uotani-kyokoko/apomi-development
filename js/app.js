@@ -419,6 +419,18 @@
     }, force ? 0 : 300);
   }
 
+  function isTruthyFlag(v) {
+    if (v === true || v === 1) return true;
+    const s = String(v ?? "")
+      .trim()
+      .toUpperCase();
+    return s === "TRUE" || s === "1" || s === "○" || s === "はい";
+  }
+
+  function isFemaleOnlyConnect(user) {
+    return isTruthyFlag(user?.femaleOnlyConnect) && normalizeGender(user?.gender) === "female";
+  }
+
   /* ---------- Profile Card（繋がる / マイページ共通） ---------- */
   function renderProfileCard(user) {
     const genderKey = normalizeGender(user.gender);
@@ -429,7 +441,7 @@
           ? "gender-other"
           : "gender-male";
     const presidentClass = user.presidentMark ? " is-president" : "";
-    const femaleOnlyClass = user.femaleOnlyConnect && genderKey === "female" ? " female-only" : "";
+    const femaleOnlyClass = isFemaleOnlyConnect(user) ? " female-only" : "";
     const avatar = normalizeAvatarUrl(user.avatarUrl, user.name);
 
     return `
@@ -1349,7 +1361,7 @@
     $("#edit-want").value = user.wantMeet || "";
     $("#edit-avoid").value = user.avoidMeet || "";
     const femaleOnlyEl = $("#edit-female-only");
-    if (femaleOnlyEl) femaleOnlyEl.checked = Boolean(user.femaleOnlyConnect);
+    if (femaleOnlyEl) femaleOnlyEl.checked = isFemaleOnlyConnect(user);
     updateFemaleOnlyOptionVisibility();
     editSnsUrls = getUserSnsUrls(user);
     if (!editSnsUrls.length) editSnsUrls = [""];
@@ -1595,7 +1607,13 @@
         email: state.identity?.email || state.currentUser?.email || "",
         profile: profilePayload
       });
-      state.currentUser = res.data || { ...state.currentUser, ...profilePayload };
+      // GAS未再デプロイ時でもフォーム値を落とさない
+      state.currentUser = {
+        ...state.currentUser,
+        ...profilePayload,
+        ...(res.data || {})
+      };
+      state.currentUser.femaleOnlyConnect = Boolean(profilePayload.femaleOnlyConnect);
       if (!state.currentUser.snsLinks) {
         state.currentUser.snsLinks = profilePayload.snsLinks || [];
       }

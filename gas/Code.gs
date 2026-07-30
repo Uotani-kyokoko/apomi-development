@@ -415,7 +415,7 @@ function updateProfile_(body) {
     }
     var value = profile[key];
     if (key === 'femaleOnlyConnect') {
-      value = !!value;
+      value = !!value ? true : false;
     }
     setCellByHeader_(sheet, table.headers, rowNumber, map[key], value);
   });

@@ -432,34 +432,49 @@ img {
   background: var(--other-avatar);
 }
 
-/* 女性限定：本文背景を性別ピンクに */
-.profile-card.female-only:not(.is-president) {
-  background: var(--female-header);
+/* 女性限定：本文背景を性別ピンクに（社長マークより優先） */
+.profile-card.female-only {
+  background: var(--female-header) !important;
   border-color: #ff9fd0;
 }
 
-.profile-card.female-only:not(.is-president) .profile-section-box {
+.profile-card.female-only .profile-card-body {
+  background: var(--female-header);
+}
+
+.profile-card.female-only .profile-section-box {
   background: rgba(255, 255, 255, 0.55);
 }
 
+.profile-card.female-only.is-president .profile-name,
+.profile-card.female-only.is-president .profile-section-label {
+  color: var(--text-primary);
+}
+
+.profile-card.female-only.is-president .profile-job-line,
+.profile-card.female-only.is-president .profile-meta-row,
+.profile-card.female-only.is-president .profile-meta-row i {
+  color: var(--text-secondary);
+}
+
 /* 社長マーク：本文は濃紺黒（Xアイコン #111 と区別）／帯・アバターは性別色を維持 */
-.profile-card.is-president {
+.profile-card.is-president:not(.female-only) {
   background: #1a2233;
   border-color: #243044;
 }
 
-.profile-card.is-president .profile-name,
-.profile-card.is-president .profile-section-label {
+.profile-card.is-president:not(.female-only) .profile-name,
+.profile-card.is-president:not(.female-only) .profile-section-label {
   color: #ffffff;
 }
 
-.profile-card.is-president .profile-job-line,
-.profile-card.is-president .profile-meta-row,
-.profile-card.is-president .profile-meta-row i {
+.profile-card.is-president:not(.female-only) .profile-job-line,
+.profile-card.is-president:not(.female-only) .profile-meta-row,
+.profile-card.is-president:not(.female-only) .profile-meta-row i {
   color: rgba(255, 255, 255, 0.78);
 }
 
-.profile-card.is-president .profile-section-box {
+.profile-card.is-president:not(.female-only) .profile-section-box {
   background: #243044;
   color: rgba(255, 255, 255, 0.82);
 }
