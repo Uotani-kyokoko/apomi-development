@@ -1326,6 +1326,7 @@
     const m = state.masters || {};
     fillChips("#edit-gender-chips", m["性別"], user.gender || "all");
     stripAllChip("#edit-gender-chips", user.gender);
+    updateGenderEditState(user);
     fillChips("#edit-age-chips", m["年代"], user.ageGroup || "all");
     stripAllChip("#edit-age-chips", user.ageGroup);
     fillChips("#edit-job-chips", m["職種"], user.jobTitle || "all");
@@ -1392,6 +1393,29 @@
     }
   }
 
+  function canEditGender(user = state.currentUser) {
+    return !String(user?.gender || "").trim();
+  }
+
+  function updateGenderEditState(user = state.currentUser) {
+    const grid = $("#edit-gender-chips");
+    const note = $("#edit-gender-note");
+    const editable = canEditGender(user);
+    if (grid) {
+      grid.dataset.locked = editable ? "false" : "true";
+      grid.querySelectorAll(".chip").forEach((chip) => {
+        chip.classList.toggle("is-disabled", !editable);
+        chip.setAttribute("aria-disabled", editable ? "false" : "true");
+        chip.tabIndex = editable ? 0 : -1;
+      });
+    }
+    if (note) {
+      note.textContent = editable
+        ? "※性別選択が可能なのは初回のみです"
+        : "※性別変更を希望する際はオーナーへ連絡してください。";
+    }
+  }
+
   function closeEditScreen(force = false) {
     if (!force && state.editRequired) {
       if (
@@ -1421,9 +1445,10 @@
   function collectEditForm() {
     syncEditSnsFromDom();
     const snsCheck = validateEditSnsUrls(editSnsUrls);
+    const editableGender = canEditGender(state.currentUser);
     return {
       name: ($("#edit-name").value || "").trim(),
-      gender: getSelectedChipValue("#edit-gender-chips"),
+      gender: editableGender ? getSelectedChipValue("#edit-gender-chips") : String(state.currentUser?.gender || "").trim(),
       ageGroup: getSelectedChipValue("#edit-age-chips"),
       industry: $("#edit-industry").value || "",
       jobTitle: getSelectedChipValue("#edit-job-chips"),
@@ -1797,6 +1822,7 @@
         const chip = e.target.closest(".chip");
         if (!chip) return;
         const grid = chip.parentElement;
+        if (id === "#edit-gender-chips" && grid?.dataset.locked === "true") return;
         grid.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
         chip.classList.add("selected");
       });

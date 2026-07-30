@@ -406,6 +406,10 @@ function updateProfile_(body) {
     if (profile[key] === undefined || profile[key] === null) return;
     // 名前など必須っぽい項目は空文字での上書きを防ぐ
     if ((key === 'name' || key === 'gender') && String(profile[key]).trim() === '') return;
+    if (key === 'gender') {
+      var existingGender = String(table.rows[idx]['性別'] || '').trim();
+      if (existingGender) return;
+    }
     setCellByHeader_(sheet, table.headers, rowNumber, map[key], profile[key]);
   });
 

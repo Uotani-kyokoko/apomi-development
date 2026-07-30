@@ -929,6 +929,20 @@ img {
   border-color: #e9d5ff;
 }
 
+.chip.is-disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+.chip.selected.is-disabled {
+  background: #eef2ff;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
 .filter-footer {
   position: absolute;
   bottom: 0;
