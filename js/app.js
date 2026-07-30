@@ -503,6 +503,18 @@
           </div>
           <h2 class="profile-name">${escapeHtml(user.name || "（名前未設定）")}</h2>
           <p class="profile-job-line">業種：${escapeHtml(user.industry || "-")}　職種：${escapeHtml(user.jobTitle || "-")}</p>
+          <div class="profile-meta-row">
+            <span><i class="fa-solid fa-location-dot"></i>${escapeHtml(user.location || "-")}</span>
+            <span><i class="fa-solid fa-rotate"></i>${escapeHtml(user.ageGroup || "-")}</span>
+          </div>
+          <div class="profile-section">
+            <p class="profile-section-label">自己紹介</p>
+            <div class="profile-section-box">${escapeHtml(user.bio || "未入力")}</div>
+          </div>
+          <div class="profile-section">
+            <p class="profile-section-label">こんな人と繋がりたい</p>
+            <div class="profile-section-box">${escapeHtml(user.wantMeet || "未入力")}</div>
+          </div>
           <div class="profile-section">
             <p class="profile-section-label">こんな人とは繋がりたくない</p>
             <div class="profile-section-box">${escapeHtml(user.avoidMeet || "未入力")}</div>
