@@ -11,6 +11,22 @@ const GasAPI = (() => {
   const FORCE_SAMPLE_USERS = false;
 
   const USE_GAS = Boolean(GAS_URL) && !FORCE_SAMPLE_USERS;
+  const REQUEST_TIMEOUT_MS = 28000;
+
+  async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        throw new Error('通信がタイムアウトしました。回線状況を確認して再読み込みしてください');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   async function get(action, params = {}) {
     const url = new URL(GAS_URL);
@@ -19,7 +35,7 @@ const GasAPI = (() => {
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
     });
-    const res = await fetch(url.toString(), {
+    const res = await fetchWithTimeout(url.toString(), {
       method: 'GET',
       redirect: 'follow',
       credentials: 'omit',
@@ -37,12 +53,18 @@ const GasAPI = (() => {
   }
 
   async function post(action, body = {}) {
-    const res = await fetch(GAS_URL, {
+    const res = await fetchWithTimeout(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, ...body })
     });
-    const json = await res.json();
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (err) {
+      throw new Error('GAS応答がJSONではありません（デプロイや権限を確認してください）');
+    }
     if (!json.success) throw new Error(json.error || 'APIエラー');
     return json;
   }

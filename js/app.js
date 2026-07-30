@@ -81,6 +81,8 @@
   /** 編集画面のSNS入力（URL配列） */
   let editSnsUrls = [];
   const TAG_MAX = 6;
+  /** ネストした showLoading 用 */
+  let loadingDepth = 0;
 
   function normalizeGender(gender) {
     const g = (gender || "").trim();
@@ -864,7 +866,19 @@
   function showLoading(show) {
     const el = $("#loading-overlay");
     if (!el) return;
-    el.classList.toggle("hidden", !show);
+    if (show) {
+      loadingDepth += 1;
+      el.classList.remove("hidden");
+      return;
+    }
+    loadingDepth = Math.max(0, loadingDepth - 1);
+    if (loadingDepth === 0) el.classList.add("hidden");
+  }
+
+  function forceHideLoading() {
+    loadingDepth = 0;
+    const el = $("#loading-overlay");
+    if (el) el.classList.add("hidden");
   }
 
   /** 申請フォーム（サロン / 社長マーク） */
@@ -1417,7 +1431,7 @@
         console.error(e2);
       }
     } finally {
-      showLoading(false);
+      forceHideLoading();
     }
   }
 
@@ -1948,12 +1962,9 @@
     switchTab("home");
     // テスト用 ?splash=1 はデータ読み込みを待たずすぐ出す
     if (shouldForceSplash()) {
-      showWelcomeSplashIfNeeded().finally(() => {
-        loadAllData();
-      });
-      return;
+      return showWelcomeSplashIfNeeded().finally(() => loadAllData());
     }
-    loadAllData();
+    return loadAllData();
   }
 
   async function completeLoginWithIdToken(idToken) {
@@ -1974,11 +1985,12 @@
       showToast("ログインしました");
       applyMyActivity(user.lastLoginAt);
       lastTouchAt = Date.now();
-      showApp();
+      await showApp();
     } catch (err) {
       console.error(err);
       showToast(err.message || "ログインに失敗しました");
-      showLoading(false);
+    } finally {
+      forceHideLoading();
     }
   }
 
