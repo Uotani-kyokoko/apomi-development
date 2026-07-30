@@ -428,10 +428,11 @@
         : genderKey === "other"
           ? "gender-other"
           : "gender-male";
+    const presidentClass = user.presidentMark ? " is-president" : "";
     const avatar = normalizeAvatarUrl(user.avatarUrl, user.name);
 
     return `
-      <article class="profile-card ${genderClass}" data-user-id="${escapeHtml(user.id)}" data-gender="${genderKey}">
+      <article class="profile-card ${genderClass}${presidentClass}" data-user-id="${escapeHtml(user.id)}" data-gender="${genderKey}">
         <div class="profile-card-band">
           <span class="profile-card-no">${escapeHtml(formatMemberNo(user.id))}</span>
         </div>

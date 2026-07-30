@@ -432,6 +432,41 @@ img {
   background: var(--other-avatar);
 }
 
+/* 社長マーク：黒背景・白文字（性別色より優先） */
+.profile-card.is-president {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+
+.profile-card.is-president .profile-card-band {
+  background: #000000;
+}
+
+.profile-card.is-president .profile-card-no {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.profile-card.is-president .profile-avatar {
+  border-color: #111111;
+  background: #333333;
+}
+
+.profile-card.is-president .profile-name,
+.profile-card.is-president .profile-section-label {
+  color: #ffffff;
+}
+
+.profile-card.is-president .profile-job-line,
+.profile-card.is-president .profile-meta-row,
+.profile-card.is-president .profile-meta-row i {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.profile-card.is-president .profile-section-box {
+  background: #1f1f1f;
+  color: rgba(255, 255, 255, 0.82);
+}
+
 .profile-sns {
   display: flex;
   gap: 8px;
