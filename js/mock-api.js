@@ -118,7 +118,7 @@ const MockAPI = (() => {
 
     async fetchSettings() {
       return delay({
-        アプリ名: "apomi",
+        アプリ名: "apomy",
         サロンURL: "https://example.com/salon",
         サロンボタン名: "井口智明オンラインサロン",
         オーナーメール: ""

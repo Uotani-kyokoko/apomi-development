@@ -1,5 +1,5 @@
 /**
- * apomi マッチングアプリ - フロントエンド
+ * apomy マッチングアプリ - フロントエンド
  */
 (() => {
   "use strict";
@@ -766,7 +766,7 @@
     range.classList.toggle("hidden", tabId !== "connect");
 
     if (tabId === "home") {
-      title.textContent = "apomi HOME";
+      title.textContent = "apomy HOME";
       title.classList.remove("hidden");
     } else if (tabId === "mypage") {
       title.textContent = "マイページ";
@@ -1112,7 +1112,7 @@
       maybeOpenRequiredEdit();
 
       if (state.allUsers.length > 0) {
-        console.log("[apomi] users loaded:", state.allUsers.length);
+        console.log("[apomy] users loaded:", state.allUsers.length);
       }
     } catch (err) {
       console.error(err);
@@ -1844,7 +1844,7 @@
         return;
       }
 
-      if (!confirm(`${salonName}への掲載を申請しますか？\nオーナー確認後、apomi とサロンの両方に掲載されます。`)) {
+      if (!confirm(`${salonName}への掲載を申請しますか？\nオーナー確認後、apomy とサロンの両方に掲載されます。`)) {
         return;
       }
       try {

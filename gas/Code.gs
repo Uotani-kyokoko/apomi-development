@@ -1,5 +1,5 @@
 /**
- * apomi - GAS API
+ * apomy - GAS API
  *
  * 【デプロイ手順】
  * 1. スプレッドシートを開く → 拡張機能 → Apps Script
@@ -61,7 +61,7 @@ function doGet(e) {
         data = touchActivity_(p);
         break;
       case 'ping':
-        data = { ok: true, message: 'apomi GAS is alive' };
+        data = { ok: true, message: 'apomy GAS is alive' };
         break;
       case 'approveRequest':
         return htmlDecision_(processOwnerDecision_(p, '承認'));
@@ -690,7 +690,7 @@ function notifyOwnerOfRequest_(info) {
     : '';
 
   var body = [
-    'apomi に新しい申請があります。',
+    'apomy に新しい申請があります。',
     '',
     '種別: ' + info.typeLabel,
     '申請ID: ' + info.requestId,
@@ -712,15 +712,15 @@ function notifyOwnerOfRequest_(info) {
     body.push('');
   }
   if (info.typeLabel === 'サロン掲載') {
-    body.push('承認すると apomi のサロン掲載一覧に表示されます。');
+    body.push('承認すると apomy のサロン掲載一覧に表示されます。');
     body.push('あわせて井口オンラインサロン側にも会員を追加してください。');
   } else {
-    body.push('承認すると apomi の社長マーク一覧に表示されます。');
+    body.push('承認すると apomy の社長マーク一覧に表示されます。');
   }
 
   MailApp.sendEmail({
     to: ownerEmail,
-    subject: '[apomi] ' + info.typeLabel + '申請 #' + info.memberNo + ' ' + info.name,
+    subject: '[apomy] ' + info.typeLabel + '申請 #' + info.memberNo + ' ' + info.name,
     body: body.filter(function (line, i, arr) {
       // 連続空行を少し抑える
       return !(line === '' && arr[i - 1] === '');
@@ -790,7 +790,7 @@ function processOwnerDecision_(p, decision) {
   );
 
   var message = decision === '承認'
-    ? (typeLabel + 'を承認しました。apomi に反映されます。')
+    ? (typeLabel + 'を承認しました。apomy に反映されます。')
     : (typeLabel + 'を却下しました。');
   if (decision === '承認' && typeLabel === 'サロン掲載') {
     message += ' 井口オンラインサロン側への会員追加もお願いします。';
@@ -805,8 +805,8 @@ function htmlDecision_(result) {
   const html = [
     '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    '<title>apomi 申請処理</title></head><body style="font-family:sans-serif;padding:32px;line-height:1.6">',
-    '<h1 style="color:' + color + ';font-size:1.25rem">apomi</h1>',
+    '<title>apomy 申請処理</title></head><body style="font-family:sans-serif;padding:32px;line-height:1.6">',
+    '<h1 style="color:' + color + ';font-size:1.25rem">apomy</h1>',
     '<p>' + msg.replace(/</g, '&lt;') + '</p>',
     '<p style="color:#64748b;font-size:0.9rem">このタブは閉じて大丈夫です。</p>',
     '</body></html>'
@@ -1061,7 +1061,7 @@ function testPing() {
 function authorizeMail() {
   const to = Session.getActiveUser().getEmail() || getOwnerEmail_();
   if (!to) throw new Error('送信先メールがありません（ログインユーザーまたは設定のオーナーメール）');
-  MailApp.sendEmail(to, '[apomi] メール送信テスト', 'メール送信権限の許可に成功しました。このメールは削除して大丈夫です。');
+  MailApp.sendEmail(to, '[apomy] メール送信テスト', 'メール送信権限の許可に成功しました。このメールは削除して大丈夫です。');
   Logger.log('送信しました: ' + to);
 }
 

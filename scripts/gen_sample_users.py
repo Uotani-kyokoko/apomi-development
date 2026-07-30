@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Generate 240 sample members for apomi."""
+"""Generate 240 sample members for apomy."""
 import csv
 import json
 import random
