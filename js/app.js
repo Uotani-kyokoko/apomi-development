@@ -429,10 +429,11 @@
           ? "gender-other"
           : "gender-male";
     const presidentClass = user.presidentMark ? " is-president" : "";
+    const femaleOnlyClass = user.femaleOnlyConnect && genderKey === "female" ? " female-only" : "";
     const avatar = normalizeAvatarUrl(user.avatarUrl, user.name);
 
     return `
-      <article class="profile-card ${genderClass}${presidentClass}" data-user-id="${escapeHtml(user.id)}" data-gender="${genderKey}">
+      <article class="profile-card ${genderClass}${presidentClass}${femaleOnlyClass}" data-user-id="${escapeHtml(user.id)}" data-gender="${genderKey}">
         <div class="profile-card-band">
           <span class="profile-card-no">${escapeHtml(formatMemberNo(user.id))}</span>
         </div>
@@ -1347,6 +1348,9 @@
     $("#edit-bio").value = user.bio || "";
     $("#edit-want").value = user.wantMeet || "";
     $("#edit-avoid").value = user.avoidMeet || "";
+    const femaleOnlyEl = $("#edit-female-only");
+    if (femaleOnlyEl) femaleOnlyEl.checked = Boolean(user.femaleOnlyConnect);
+    updateFemaleOnlyOptionVisibility();
     editSnsUrls = getUserSnsUrls(user);
     if (!editSnsUrls.length) editSnsUrls = [""];
     renderEditSnsList();
@@ -1415,6 +1419,23 @@
         ? "※性別選択が可能なのは初回のみです"
         : "※性別変更を希望する際はオーナーへ連絡してください。";
     }
+    updateFemaleOnlyOptionVisibility(user);
+  }
+
+  function getEditGenderValue(user = state.currentUser) {
+    if (canEditGender(user)) {
+      return String(getSelectedChipValue("#edit-gender-chips") || "").trim();
+    }
+    return String(user?.gender || "").trim();
+  }
+
+  function updateFemaleOnlyOptionVisibility(user = state.currentUser) {
+    const card = $("#edit-female-only-card");
+    const check = $("#edit-female-only");
+    if (!card) return;
+    const isFemale = getEditGenderValue(user) === "女性";
+    card.classList.toggle("hidden", !isFemale);
+    if (!isFemale && check) check.checked = false;
   }
 
   function closeEditScreen(force = false) {
@@ -1447,9 +1468,14 @@
     syncEditSnsFromDom();
     const snsCheck = validateEditSnsUrls(editSnsUrls);
     const editableGender = canEditGender(state.currentUser);
+    const gender = editableGender
+      ? getSelectedChipValue("#edit-gender-chips")
+      : String(state.currentUser?.gender || "").trim();
+    const femaleOnlyConnect =
+      gender === "女性" && Boolean($("#edit-female-only")?.checked);
     return {
       name: ($("#edit-name").value || "").trim(),
-      gender: editableGender ? getSelectedChipValue("#edit-gender-chips") : String(state.currentUser?.gender || "").trim(),
+      gender,
       ageGroup: getSelectedChipValue("#edit-age-chips"),
       industry: $("#edit-industry").value || "",
       jobTitle: getSelectedChipValue("#edit-job-chips"),
@@ -1459,6 +1485,7 @@
       bio: ($("#edit-bio").value || "").trim(),
       wantMeet: ($("#edit-want").value || "").trim(),
       avoidMeet: ($("#edit-avoid").value || "").trim(),
+      femaleOnlyConnect,
       snsLinks: snsCheck.ok ? snsCheck.urls : editSnsUrls.filter(Boolean),
       _snsError: snsCheck.ok ? "" : snsCheck.message
     };
@@ -1826,6 +1853,7 @@
         if (id === "#edit-gender-chips" && grid?.dataset.locked === "true") return;
         grid.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
         chip.classList.add("selected");
+        if (id === "#edit-gender-chips") updateFemaleOnlyOptionVisibility();
       });
     });
 

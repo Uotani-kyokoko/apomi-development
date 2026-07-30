@@ -305,6 +305,7 @@ function login_(body) {
   setRowValue_(newRow, table.headers, '自己紹介', '');
   setRowValue_(newRow, table.headers, 'こんな人と繋がりたい', '');
   setRowValue_(newRow, table.headers, 'こんな人とは繋がりたくない', '');
+  setRowValue_(newRow, table.headers, '女性限定', false);
   setRowValue_(newRow, table.headers, 'タグ', '');
   setRowValue_(newRow, table.headers, 'プロフィール画像URL', picture || '');
   setRowValue_(newRow, table.headers, '掲載中', false);
@@ -383,7 +384,8 @@ function updateProfile_(body) {
   const allowed = [
     '名前', '性別', '年代', '業種', '職種', '現在地', '出身地',
     '自己紹介', 'こんな人と繋がりたい', 'こんな人とは繋がりたくない',
-    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube'
+    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube',
+    '女性限定'
   ];
 
   const map = {
@@ -398,7 +400,8 @@ function updateProfile_(body) {
     wantMeet: 'こんな人と繋がりたい',
     avoidMeet: 'こんな人とは繋がりたくない',
     tags: 'タグ',
-    avatarUrl: 'プロフィール画像URL'
+    avatarUrl: 'プロフィール画像URL',
+    femaleOnlyConnect: '女性限定'
   };
 
   const profile = parsed.profile || parsed;
@@ -410,8 +413,22 @@ function updateProfile_(body) {
       var existingGender = String(table.rows[idx]['性別'] || '').trim();
       if (existingGender) return;
     }
-    setCellByHeader_(sheet, table.headers, rowNumber, map[key], profile[key]);
+    var value = profile[key];
+    if (key === 'femaleOnlyConnect') {
+      value = !!value;
+    }
+    setCellByHeader_(sheet, table.headers, rowNumber, map[key], value);
   });
+
+  // 女性以外は女性限定を必ずオフ
+  var genderNow = String(
+    (profile.gender !== undefined && profile.gender !== null && String(profile.gender).trim())
+      ? profile.gender
+      : (table.rows[idx]['性別'] || '')
+  ).trim();
+  if (genderNow !== '女性') {
+    setCellByHeader_(sheet, table.headers, rowNumber, '女性限定', false);
+  }
 
   if (profile.snsLinks || profile.sns) {
     var links = [];
@@ -884,6 +901,7 @@ function mapUser_(r) {
     bio: String(r['自己紹介'] || ''),
     wantMeet: String(r['こんな人と繋がりたい'] || ''),
     avoidMeet: String(r['こんな人とは繋がりたくない'] || ''),
+    femaleOnlyConnect: toBool_(r['女性限定']),
     tags: tags,
     avatarUrl: String(r['プロフィール画像URL'] || ''),
     lastLoginAt: String(r['最終ログイン日時'] || ''),

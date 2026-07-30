@@ -432,6 +432,16 @@ img {
   background: var(--other-avatar);
 }
 
+/* 女性限定：本文背景を性別ピンクに */
+.profile-card.female-only:not(.is-president) {
+  background: var(--female-header);
+  border-color: #ff9fd0;
+}
+
+.profile-card.female-only:not(.is-president) .profile-section-box {
+  background: rgba(255, 255, 255, 0.55);
+}
+
 /* 社長マーク：本文は濃紺黒（Xアイコン #111 と区別）／帯・アバターは性別色を維持 */
 .profile-card.is-president {
   background: #1a2233;
@@ -1090,6 +1100,26 @@ img {
   margin-top: 8px;
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+.edit-check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.edit-check-input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--female-header);
+  cursor: pointer;
 }
 
 .edit-avatar-preview-wrap {

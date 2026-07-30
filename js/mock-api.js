@@ -143,6 +143,10 @@ const MockAPI = (() => {
         bio: profile.bio ?? currentUser.bio,
         wantMeet: profile.wantMeet ?? currentUser.wantMeet,
         avoidMeet: profile.avoidMeet ?? currentUser.avoidMeet,
+        femaleOnlyConnect:
+          profile.femaleOnlyConnect !== undefined
+            ? Boolean(profile.femaleOnlyConnect) && (profile.gender ?? currentUser.gender) === "女性"
+            : currentUser.femaleOnlyConnect,
         avatarUrl: profile.avatarUrl ?? currentUser.avatarUrl,
         snsLinks: Array.isArray(profile.snsLinks)
           ? profile.snsLinks.map((u) => String(u || "").trim()).filter(Boolean).slice(0, 4)
