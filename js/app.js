@@ -355,22 +355,32 @@
   }
 
   function normalizeTagList(tags) {
+    const parts = [];
+    const pushSplit = (raw) => {
+      String(raw || "")
+        .split(/[,、|／\t]+/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .forEach((t) => parts.push(t));
+    };
     if (Array.isArray(tags)) {
-      return tags.map((t) => String(t || "").trim()).filter(Boolean);
+      tags.forEach((t) => pushSplit(t));
+    } else {
+      pushSplit(tags);
     }
-    const raw = String(tags || "").trim();
-    if (!raw) return [];
-    return raw.split(/[,、\t]/).map((t) => t.trim()).filter(Boolean);
+    return parts;
   }
 
   /** マスタで有効なタグだけ残す（削除・無効化済みは非表示） */
   function filterVisibleTags(tags) {
     const allowed = getActiveTagValueSet();
-    if (!allowed.size) return [];
+    const list = normalizeTagList(tags);
     const seen = new Set();
     const out = [];
-    normalizeTagList(tags).forEach((t) => {
-      if (!allowed.has(t) || seen.has(t)) return;
+    list.forEach((t) => {
+      if (seen.has(t)) return;
+      // マスタ未取得時は一旦すべて表示（読み込み直後の取りこぼし防止）
+      if (allowed.size && !allowed.has(t)) return;
       seen.add(t);
       out.push(t);
     });
@@ -493,23 +503,11 @@
           </div>
           <h2 class="profile-name">${escapeHtml(user.name || "（名前未設定）")}</h2>
           <p class="profile-job-line">業種：${escapeHtml(user.industry || "-")}　職種：${escapeHtml(user.jobTitle || "-")}</p>
-          <div class="profile-meta-row">
-            <span><i class="fa-solid fa-location-dot"></i>${escapeHtml(user.location || "-")}</span>
-            <span><i class="fa-solid fa-rotate"></i>${escapeHtml(user.ageGroup || "-")}</span>
-          </div>
-          ${renderTags(user.tags)}
-          <div class="profile-section">
-            <p class="profile-section-label">自己紹介</p>
-            <div class="profile-section-box">${escapeHtml(user.bio || "未入力")}</div>
-          </div>
-          <div class="profile-section">
-            <p class="profile-section-label">こんな人と繋がりたい</p>
-            <div class="profile-section-box">${escapeHtml(user.wantMeet || "未入力")}</div>
-          </div>
           <div class="profile-section">
             <p class="profile-section-label">こんな人とは繋がりたくない</p>
             <div class="profile-section-box">${escapeHtml(user.avoidMeet || "未入力")}</div>
           </div>
+          ${renderTags(user.tags)}
         </div>
       </article>
     `;
@@ -1682,6 +1680,11 @@
         ...(res.data || {})
       };
       state.currentUser.femaleOnlyConnect = Boolean(profilePayload.femaleOnlyConnect);
+      state.currentUser.tags = normalizeTagList(
+        Array.isArray(profilePayload.tags) && profilePayload.tags.length
+          ? profilePayload.tags
+          : res.data?.tags ?? profilePayload.tags
+      );
       if (!state.currentUser.snsLinks) {
         state.currentUser.snsLinks = profilePayload.snsLinks || [];
       }

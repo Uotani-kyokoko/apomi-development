@@ -890,9 +890,13 @@ function createRequest_(memberNo, type, status, note) {
 function normalizeTagsForSave_(raw) {
   var list = [];
   if (Array.isArray(raw)) {
-    list = raw;
+    raw.forEach(function (t) {
+      String(t || '').split(/[,、|／\t]+/).forEach(function (part) {
+        list.push(part);
+      });
+    });
   } else {
-    list = String(raw || '').split(/[,、\t]/);
+    list = String(raw || '').split(/[,、|／\t]+/);
   }
   var allowList = null;
   try {
@@ -900,7 +904,7 @@ function normalizeTagsForSave_(raw) {
     if (tagItems.length) {
       allowList = {};
       tagItems.forEach(function (item) {
-        if (item && item.value) allowList[String(item.value)] = true;
+        if (item && item.value) allowList[String(item.value).trim()] = true;
       });
     }
   } catch (err) {
@@ -915,13 +919,14 @@ function normalizeTagsForSave_(raw) {
     seen[v] = true;
     out.push(v);
   });
-  return out.slice(0, 6).join(',');
+  // 読点区切り（カンマだと Sheets で崩れることがある）
+  return out.slice(0, 6).join('、');
 }
 
 function mapUser_(r) {
   const tagsRaw = String(r['タグ'] || '').trim();
   const tags = tagsRaw
-    ? tagsRaw.split(/[,、\t]/).map(function (t) { return t.trim(); }).filter(Boolean)
+    ? tagsRaw.split(/[,、|／\t]+/).map(function (t) { return t.trim(); }).filter(Boolean)
     : [];
 
   return {
