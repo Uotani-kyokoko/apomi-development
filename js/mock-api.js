@@ -54,7 +54,7 @@ const MockAPI = (() => {
       };
       const matchList = (userValue, selected) => {
         const list = toList(selected);
-        if (!list.length) return false;
+        if (!list.length) return true; // 未選択＝条件なし
         return list.includes(String(userValue || "").trim());
       };
 
@@ -62,17 +62,10 @@ const MockAPI = (() => {
       if (filters.gender && filters.gender !== "all") {
         result = result.filter((u) => u.gender === filters.gender);
       }
-      const ages = toList(filters.ageGroup);
-      const industries = toList(filters.industry);
-      const jobs = toList(filters.jobTitle);
-      if (ages.length || industries.length || jobs.length) {
-        result = result.filter(
-          (u) =>
-            (ages.length && matchList(u.ageGroup, ages)) ||
-            (industries.length && matchList(u.industry, industries)) ||
-            (jobs.length && matchList(u.jobTitle, jobs))
-        );
-      }
+      // 同一項目内OR・項目間AND
+      result = result.filter((u) => matchList(u.ageGroup, filters.ageGroup));
+      result = result.filter((u) => matchList(u.industry, filters.industry));
+      result = result.filter((u) => matchList(u.jobTitle, filters.jobTitle));
       return delay(result);
     },
 

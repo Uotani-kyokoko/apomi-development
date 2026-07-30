@@ -139,17 +139,6 @@ function matchesFilterList_(userValue, selectedRaw) {
   return selected.indexOf(current) >= 0;
 }
 
-function matchesAnyFilterLists_(r, industry, jobTitle, ageGroup) {
-  var industries = parseFilterList_(industry);
-  var jobs = parseFilterList_(jobTitle);
-  var ages = parseFilterList_(ageGroup);
-  if (!industries.length && !jobs.length && !ages.length) return true;
-  if (ages.length && matchesFilterList_(r['年代'], ages.join('、'))) return true;
-  if (industries.length && matchesFilterList_(r['業種'], industries.join('、'))) return true;
-  if (jobs.length && matchesFilterList_(r['職種'], jobs.join('、'))) return true;
-  return false;
-}
-
 function getUsers_(p) {
   const rows = readObjects_(SHEET.USERS);
   const industry = p.industry || 'all';
@@ -162,8 +151,10 @@ function getUsers_(p) {
     .filter(function (r) {
       if (!includeUnpublished && !toBool_(r['掲載中'])) return false;
       if (gender !== 'all' && String(r['性別'] || '').trim() !== gender) return false;
-      // 年代・業種・職種は全体OR
-      if (!matchesAnyFilterLists_(r, industry, jobTitle, ageGroup)) return false;
+      // 同一項目内OR・項目間AND（＝考えうる組み合わせのいずれか）
+      if (!matchesFilterList_(r['業種'], industry)) return false;
+      if (!matchesFilterList_(r['職種'], jobTitle)) return false;
+      if (!matchesFilterList_(r['年代'], ageGroup)) return false;
       return true;
     })
     .map(mapUser_);
