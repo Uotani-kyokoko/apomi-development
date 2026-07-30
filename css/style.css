@@ -226,9 +226,12 @@ img {
 }
 
 .connect-menu-item.is-salon {
+  color: #7c3aed;
+}
+
+.connect-menu-item.is-salon-start {
   margin-top: 8px;
   border-top: 1px solid #e8eef5;
-  color: #7c3aed;
 }
 
 .connect-menu-item.is-locked {

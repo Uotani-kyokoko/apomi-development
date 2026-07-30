@@ -129,11 +129,34 @@
   }
 
   /**
-   * 会員数（最大会員番号）に応じて No.帯・社長帯を自動生成。
-   * 例: 最大301なら No.1～100 / 101～200 / 201～300 / 301～400
+   * 条件に合う会員がいる No.帯だけ返す（空帯は出さない）
+   */
+  function occupiedBands(users, predicate) {
+    const matched = (users || []).filter(predicate);
+    if (!matched.length) return [];
+    const maxNo = maxMemberNoAmong(matched);
+    const bandCount = Math.max(1, Math.ceil(maxNo / CONNECT_BAND_SIZE));
+    const bands = [];
+    for (let i = 0; i < bandCount; i++) {
+      const from = i * CONNECT_BAND_SIZE + 1;
+      const to = (i + 1) * CONNECT_BAND_SIZE;
+      const has = matched.some((u) => {
+        const n = memberNoNum(u.id);
+        return n >= from && n <= to;
+      });
+      if (!has) continue;
+      bands.push({ index: i + 1, from, to });
+    }
+    return bands;
+  }
+
+  /**
+   * 通常会員: 最大No.までの帯を表示
+   * 社長 / サロン: 該当会員がいる帯だけ表示
    */
   function buildConnectMenu(users = state.allUsers) {
-    const maxNo = Math.max(maxMemberNoAmong(users), 1);
+    const list = users || [];
+    const maxNo = Math.max(maxMemberNoAmong(list), 1);
     const bandCount = Math.max(1, Math.ceil(maxNo / CONNECT_BAND_SIZE));
     const menu = [{ id: "latest", label: "最新ユーザー", type: "latest" }];
 
@@ -148,22 +171,29 @@
         to
       });
     }
-    for (let i = 0; i < bandCount; i++) {
-      const from = i * CONNECT_BAND_SIZE + 1;
-      const to = (i + 1) * CONNECT_BAND_SIZE;
+
+    occupiedBands(list, (u) => u.presidentMark).forEach((b) => {
       menu.push({
-        id: `pres-${i + 1}`,
-        label: `社長 No.${from}～No.${to}`,
+        id: `pres-${b.index}`,
+        label: `社長 No.${b.from}～No.${b.to}`,
         type: "president",
-        from,
-        to
+        from: b.from,
+        to: b.to
       });
-    }
-    menu.push({
-      id: "salon",
-      label: state.salonLabel || "井口智明オンラインサロン",
-      type: "salon"
     });
+
+    const salonName = state.salonLabel || "井口智明オンラインサロン";
+    occupiedBands(list, (u) => u.salonListing).forEach((b, idx) => {
+      menu.push({
+        id: `salon-${b.index}`,
+        label: `${salonName} No.${b.from}～No.${b.to}`,
+        type: "salon",
+        from: b.from,
+        to: b.to,
+        salonFirst: idx === 0
+      });
+    });
+
     return menu;
   }
 
@@ -519,13 +549,9 @@
       el.textContent = `最新（${LATEST_WITHIN_DAYS}日以内）`;
       return;
     }
-    if (page.type === "range" || page.type === "president") {
-      const prefix = page.type === "president" ? "社長 " : "";
+    if (page.type === "range" || page.type === "president" || page.type === "salon") {
+      const prefix = page.type === "president" ? "社長 " : page.type === "salon" ? "サロン " : "";
       el.textContent = `${prefix}${formatMemberNo(page.from)} ~ ${formatMemberNo(page.to)}`;
-      return;
-    }
-    if (page.type === "salon") {
-      el.textContent = state.salonLabel || page.label;
       return;
     }
     el.textContent = page.label;
@@ -566,7 +592,11 @@
     }
     if (page.type === "salon") {
       return list
-        .filter((u) => u.salonListing)
+        .filter((u) => {
+          if (!u.salonListing) return false;
+          const n = memberNoNum(u.id);
+          return n >= page.from && n <= page.to;
+        })
         .sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
     }
     return list;
@@ -608,10 +638,10 @@
     if (!list) return;
     const menu = getConnectMenu();
     list.innerHTML = menu.map((item) => {
-      const label = item.type === "salon" ? state.salonLabel || item.label : item.label;
+      const label = item.label;
       const active = item.id === state.connectPageId;
       const locked = !canAccessConnectPage(item);
-      const salonCls = item.type === "salon" ? " is-salon" : "";
+      const salonCls = item.type === "salon" ? (item.salonFirst ? " is-salon is-salon-start" : " is-salon") : "";
       const activeCls = active ? " is-active" : "";
       const lockedCls = locked ? " is-locked" : "";
       return `<li><button type="button" class="connect-menu-item${activeCls}${salonCls}${lockedCls}" data-page-id="${escapeHtml(item.id)}">${escapeHtml(label)}</button></li>`;
@@ -633,10 +663,11 @@
     return true;
   }
 
-  /** 未許可ページに居る場合は最新へ戻す */
+  /** 未許可・存在しないページに居る場合は最新へ戻す */
   function ensureConnectPageAccess() {
-    const page = getConnectPage();
-    if (!canAccessConnectPage(page)) {
+    const menu = getConnectMenu();
+    const page = menu.find((p) => p.id === state.connectPageId);
+    if (!page || !canAccessConnectPage(page)) {
       state.connectPageId = "latest";
     }
   }
@@ -647,16 +678,20 @@
     scheduleTouchActivity();
   }
 
-  /** 繋がるタブの井口智明オンラインサロン一覧へ移動 */
+  /** 繋がるタブの井口智明オンラインサロン一覧へ移動（先頭の該当帯） */
   function goToSalonConnectPage() {
-    const page = getConnectPage("salon");
-    if (!canAccessConnectPage(page)) {
+    if (!canViewSalonPages()) {
       showToast("許可後に閲覧できます");
       return;
     }
-    state.connectPageId = "salon";
+    const first = getConnectMenu().find((p) => p.type === "salon");
+    if (!first) {
+      showToast("サロン掲載会員がまだいません");
+      return;
+    }
+    state.connectPageId = first.id;
     switchTab("connect");
-    showToast(state.salonLabel || "井口智明オンラインサロン");
+    showToast(first.label);
   }
 
   function selectConnectPage(pageId) {
@@ -670,7 +705,7 @@
     state.connectPageId = page.id;
     closeConnectMenu();
     refreshConnectList();
-    showToast(page.type === "salon" ? state.salonLabel || page.label : page.label);
+    showToast(page.label);
   }
 
   function renderMyPage(user) {
