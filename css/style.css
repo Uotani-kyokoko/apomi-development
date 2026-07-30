@@ -363,12 +363,13 @@ img {
   overflow: hidden;
   box-shadow: var(--shadow-md);
   border: 1px solid #f0f0f0;
+  position: relative;
 }
 
 .profile-card-band {
   height: 56px;
   position: relative;
-  z-index: 2;
+  z-index: 0;
 }
 
 .profile-card.gender-male .profile-card-band {
@@ -391,7 +392,8 @@ img {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.02em;
-  z-index: 3;
+  z-index: 5;
+  pointer-events: none;
 }
 
 .profile-card.gender-other .profile-card-no {
@@ -421,6 +423,8 @@ img {
   border: 3px solid var(--white);
   box-shadow: var(--shadow-sm);
   background: #e5e7eb;
+  position: relative;
+  z-index: 4;
 }
 
 .profile-card.gender-male .profile-avatar {

@@ -446,9 +446,8 @@
 
     return `
       <article class="profile-card ${genderClass}${presidentClass}${femaleOnlyClass}" data-user-id="${escapeHtml(user.id)}" data-gender="${genderKey}">
-        <div class="profile-card-band">
-          <span class="profile-card-no">${escapeHtml(formatMemberNo(user.id))}</span>
-        </div>
+        <div class="profile-card-band" aria-hidden="true"></div>
+        <span class="profile-card-no">${escapeHtml(formatMemberNo(user.id))}</span>
         <div class="profile-card-body">
           <div class="profile-top-row">
             <img class="profile-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(user.name)}" loading="lazy" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=93c5fd&color=1e3a8a';">
