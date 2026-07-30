@@ -649,11 +649,11 @@
   }
 
   function canViewPresidentPages(user = state.currentUser) {
-    return Boolean(user?.presidentMark);
+    return true;
   }
 
   function canViewSalonPages(user = state.currentUser) {
-    return Boolean(user?.salonListing);
+    return true;
   }
 
   function canAccessConnectPage(page, user = state.currentUser) {
@@ -680,10 +680,6 @@
 
   /** 繋がるタブの井口智明オンラインサロン一覧へ移動（先頭の該当帯） */
   function goToSalonConnectPage() {
-    if (!canViewSalonPages()) {
-      showToast("許可後に閲覧できます");
-      return;
-    }
     const first = getConnectMenu().find((p) => p.type === "salon");
     if (!first) {
       showToast("サロン掲載会員がまだいません");

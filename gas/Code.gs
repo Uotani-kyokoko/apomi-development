@@ -639,24 +639,10 @@ function listingMeta_(typeLabel) {
 function getOwnerEmail_() {
   try {
     const settings = getSettings_();
-    var email = String(settings['オーナーメール'] || '').trim();
-    if (email) return email;
+    return String(settings['オーナーメール'] || '').trim();
   } catch (e) {
-    // fall through
+    return '';
   }
-  // 誤って「マスタ」シート（区分=オーナーメール）に書いた場合も拾う
-  try {
-    const rows = readObjects_(SHEET.MASTERS);
-    for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i]['区分'] || '').trim() !== 'オーナーメール') continue;
-      if (rows[i]['有効'] !== '' && rows[i]['有効'] !== undefined && !toBool_(rows[i]['有効'])) continue;
-      var v = String(rows[i]['値'] || '').trim();
-      if (v) return v;
-    }
-  } catch (e2) {
-    // ignore
-  }
-  return '';
 }
 
 function getApprovalToken_() {
@@ -786,7 +772,6 @@ function processOwnerDecision_(p, decision) {
     // サロン掲載承認時は通常掲載もオン（両方に載せる前提）
     if (typeLabel === 'サロン掲載') {
       setCellByHeader_(userSheet, userTable.headers, userRow, '掲載中', true);
-      setCellByHeader_(userSheet, userTable.headers, userRow, '掲載日', now);
     }
   } else {
     setCellByHeader_(userSheet, userTable.headers, userRow, meta.flagCol, false);
@@ -843,10 +828,6 @@ function setPublished_(body, published, typeLabel) {
   setCellByHeader_(userSheet, table.headers, rowNumber, '掲載中', published);
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
-  // 掲載開始・再開時に掲載日を更新（最新30日判定用）。停止時は残す（再開まで最新に出ない）
-  if (published) {
-    setCellByHeader_(userSheet, table.headers, rowNumber, '掲載日', now);
-  }
 
   const requestId = createRequest_(no, typeLabel, '対応済', String(body.note || ''));
   return {
@@ -854,7 +835,7 @@ function setPublished_(body, published, typeLabel) {
     memberNo: no,
     isPublished: published,
     lastLoginAt: now,
-    publishedAt: published ? now : String(user['掲載日'] || '')
+    publishedAt: String(user['登録日時'] || '')
   };
 }
 
@@ -903,8 +884,8 @@ function mapUser_(r) {
     avatarUrl: String(r['プロフィール画像URL'] || ''),
     lastLoginAt: String(r['最終ログイン日時'] || ''),
     createdAt: String(r['登録日時'] || ''),
-    // 掲載日が空なら登録日時で代用（既存データ互換）
-    publishedAt: String(r['掲載日'] || r['登録日時'] || ''),
+    // 最新一覧は登録日時で判定（掲載日カラムは使わない）
+    publishedAt: String(r['登録日時'] || ''),
     isPublished: toBool_(r['掲載中']),
     presidentMark: toBool_(r['社長マーク']),
     presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
@@ -991,7 +972,7 @@ function setCellByHeader_(sheet, headers, rowNumber, colName, value) {
   sheet.getRange(rowNumber, i + 1).setValue(value);
 }
 
-/** ヘッダーが無ければ末尾に追加（掲載日など） */
+/** ヘッダーが無ければ末尾に追加 */
 function ensureHeader_(sheet, headers, colName) {
   if (headers.indexOf(colName) >= 0) return;
   const col = headers.length + 1;
@@ -1067,6 +1048,17 @@ function authorizeExternalRequest() {
 
 function testPing() {
   Logger.log(doGet({ parameter: { action: 'ping' } }).getContent());
+}
+
+/**
+ * 初回だけエディタから実行して、メール送信権限を許可する。
+ * 実行 → 権限を確認 → 許可。成功すると自分宛にテストメールが届く。
+ */
+function authorizeMail() {
+  const to = Session.getActiveUser().getEmail() || getOwnerEmail_();
+  if (!to) throw new Error('送信先メールがありません（ログインユーザーまたは設定のオーナーメール）');
+  MailApp.sendEmail(to, '[apomi] メール送信テスト', 'メール送信権限の許可に成功しました。このメールは削除して大丈夫です。');
+  Logger.log('送信しました: ' + to);
 }
 
 function testUsers() {
