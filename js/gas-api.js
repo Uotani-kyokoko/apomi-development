@@ -72,7 +72,13 @@ const GasAPI = (() => {
 
     async fetchUsers(filters = {}) {
       if (!USE_GAS) return MockAPI.fetchUsers(filters);
-      return get('users', filters);
+      const params = { ...filters };
+      ['industry', 'jobTitle', 'ageGroup'].forEach((key) => {
+        if (Array.isArray(params[key])) {
+          params[key] = params[key].filter(Boolean).join('、');
+        }
+      });
+      return get('users', params);
     },
 
     async fetchBanners() {

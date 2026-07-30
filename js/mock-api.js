@@ -46,19 +46,25 @@ const MockAPI = (() => {
 
   return {
     async fetchUsers(filters = {}) {
+      const toList = (v) => {
+        if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter((x) => x && x !== "all");
+        const raw = String(v || "").trim();
+        if (!raw || raw === "all") return [];
+        return raw.split(/[,、|／\t]+/).map((x) => x.trim()).filter(Boolean);
+      };
+      const matchList = (userValue, selected) => {
+        const list = toList(selected);
+        if (!list.length) return true;
+        return list.includes(String(userValue || "").trim());
+      };
+
       let result = users.slice();
-      if (filters.industry && filters.industry !== "all") {
-        result = result.filter((u) => u.industry === filters.industry);
-      }
       if (filters.gender && filters.gender !== "all") {
         result = result.filter((u) => u.gender === filters.gender);
       }
-      if (filters.jobTitle && filters.jobTitle !== "all") {
-        result = result.filter((u) => u.jobTitle === filters.jobTitle);
-      }
-      if (filters.ageGroup && filters.ageGroup !== "all") {
-        result = result.filter((u) => u.ageGroup === filters.ageGroup);
-      }
+      result = result.filter((u) => matchList(u.industry, filters.industry));
+      result = result.filter((u) => matchList(u.jobTitle, filters.jobTitle));
+      result = result.filter((u) => matchList(u.ageGroup, filters.ageGroup));
       return delay(result);
     },
 

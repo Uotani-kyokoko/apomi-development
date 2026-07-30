@@ -41,10 +41,10 @@
     /** 繋がるページ id（latest / no-N / pres-N / salon） */
     connectPageId: "latest",
     filters: {
-      industry: "all",
+      industry: [],
       gender: "all",
-      jobTitle: "all",
-      ageGroup: "all"
+      jobTitle: [],
+      ageGroup: []
     },
     /** 検索結果の表示件数（もっと見る用） */
     searchVisibleCount: SEARCH_RESULT_PAGE_SIZE
@@ -908,6 +908,22 @@
       .join("");
   }
 
+  function normalizeFilterList(value) {
+    if (Array.isArray(value)) {
+      return value.map((v) => String(v || "").trim()).filter((v) => v && v !== "all");
+    }
+    const raw = String(value || "").trim();
+    if (!raw || raw === "all") return [];
+    return raw.split(/[,、|／\t]+/).map((v) => v.trim()).filter(Boolean);
+  }
+
+  function matchesFilterList(userValue, selectedList) {
+    const selected = normalizeFilterList(selectedList);
+    if (!selected.length) return true;
+    const current = String(userValue || "").trim();
+    return selected.includes(current);
+  }
+
   function fillChips(containerId, options, selectedValue) {
     const el = $(containerId);
     if (!el) return;
@@ -955,9 +971,9 @@
   function applyMastersToFilterUI() {
     const m = state.masters || {};
     fillChips("#filter-gender-chips", m["性別"], state.filters.gender);
-    fillChips("#filter-age-chips", m["年代"], state.filters.ageGroup);
-    fillSelect("#filter-industry", m["業種"], state.filters.industry);
-    fillChips("#filter-job-chips", m["職種"], state.filters.jobTitle);
+    fillMultiChips("#filter-age-chips", m["年代"], normalizeFilterList(state.filters.ageGroup));
+    fillMultiChips("#filter-industry-chips", m["業種"], normalizeFilterList(state.filters.industry));
+    fillMultiChips("#filter-job-chips", m["職種"], normalizeFilterList(state.filters.jobTitle));
     const regionItems = Array.isArray(m["地域リンク"]) ? m["地域リンク"] : [];
     state.regionLinks = regionItems.length
       ? regionItems
@@ -1059,36 +1075,36 @@
 
   function resetFiltersUI() {
     state.filters = {
-      industry: "all",
+      industry: [],
       gender: "all",
-      jobTitle: "all",
-      ageGroup: "all"
+      jobTitle: [],
+      ageGroup: []
     };
-    const industry = $("#filter-industry");
-    if (industry) industry.value = "all";
     applyMastersToFilterUI();
     $$(".filter-card").forEach((c) => c.classList.remove("open"));
   }
 
   function filterUsersLocal(users, filters = {}) {
     const gender = filters.gender || "all";
-    const ageGroup = filters.ageGroup || "all";
-    const industry = filters.industry || "all";
-    const jobTitle = filters.jobTitle || "all";
+    const ageGroup = normalizeFilterList(filters.ageGroup);
+    const industry = normalizeFilterList(filters.industry);
+    const jobTitle = normalizeFilterList(filters.jobTitle);
 
     return (users || []).filter((u) => {
       if (gender !== "all" && String(u.gender || "").trim() !== gender) return false;
-      if (ageGroup !== "all" && String(u.ageGroup || "").trim() !== ageGroup) return false;
-      if (industry !== "all" && String(u.industry || "").trim() !== industry) return false;
-      if (jobTitle !== "all" && String(u.jobTitle || "").trim() !== jobTitle) return false;
+      if (!matchesFilterList(u.ageGroup, ageGroup)) return false;
+      if (!matchesFilterList(u.industry, industry)) return false;
+      if (!matchesFilterList(u.jobTitle, jobTitle)) return false;
       return true;
     });
   }
 
   function hasActiveFilters(filters = state.filters) {
-    return ["gender", "ageGroup", "industry", "jobTitle"].some(
-      (k) => filters[k] && filters[k] !== "all"
-    );
+    if (filters.gender && filters.gender !== "all") return true;
+    if (normalizeFilterList(filters.ageGroup).length) return true;
+    if (normalizeFilterList(filters.industry).length) return true;
+    if (normalizeFilterList(filters.jobTitle).length) return true;
+    return false;
   }
 
   function updateConnectFilterBanner() {
@@ -1101,9 +1117,9 @@
     }
     const parts = [];
     if (state.filters.gender !== "all") parts.push(state.filters.gender);
-    if (state.filters.ageGroup !== "all") parts.push(state.filters.ageGroup);
-    if (state.filters.industry !== "all") parts.push(state.filters.industry);
-    if (state.filters.jobTitle !== "all") parts.push(state.filters.jobTitle);
+    normalizeFilterList(state.filters.ageGroup).forEach((v) => parts.push(v));
+    normalizeFilterList(state.filters.industry).forEach((v) => parts.push(v));
+    normalizeFilterList(state.filters.jobTitle).forEach((v) => parts.push(v));
     el.textContent = `絞り込み: ${parts.join(" / ")}（全 ${state.users.length} 件・No.順）`;
     el.classList.remove("hidden");
   }
@@ -1866,13 +1882,19 @@
       });
     });
 
-    ["#filter-gender-chips", "#filter-age-chips", "#filter-job-chips"].forEach((id) => {
+    $("#filter-gender-chips")?.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      const grid = chip.parentElement;
+      grid.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
+      chip.classList.add("selected");
+    });
+
+    ["#filter-age-chips", "#filter-industry-chips", "#filter-job-chips"].forEach((id) => {
       $(id)?.addEventListener("click", (e) => {
         const chip = e.target.closest(".chip");
         if (!chip) return;
-        const grid = chip.parentElement;
-        grid.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
-        chip.classList.add("selected");
+        chip.classList.toggle("selected");
       });
     });
 
@@ -1883,9 +1905,9 @@
     $("#btn-search").addEventListener("click", () => {
       state.filters = {
         gender: getSelectedChipValue("#filter-gender-chips"),
-        ageGroup: getSelectedChipValue("#filter-age-chips"),
-        industry: $("#filter-industry").value || "all",
-        jobTitle: getSelectedChipValue("#filter-job-chips")
+        ageGroup: getSelectedChipValues("#filter-age-chips"),
+        industry: getSelectedChipValues("#filter-industry-chips"),
+        jobTitle: getSelectedChipValues("#filter-job-chips")
       };
       applyFilters();
     });

@@ -126,21 +126,34 @@ function doPost(e) {
 
 /* ========== Read APIs ========== */
 
+function parseFilterList_(raw) {
+  var s = String(raw || '').trim();
+  if (!s || s === 'all') return [];
+  return s.split(/[,、|／\t]+/).map(function (v) { return v.trim(); }).filter(Boolean);
+}
+
+function matchesFilterList_(userValue, selectedRaw) {
+  var selected = parseFilterList_(selectedRaw);
+  if (!selected.length) return true;
+  var current = String(userValue || '').trim();
+  return selected.indexOf(current) >= 0;
+}
+
 function getUsers_(p) {
   const rows = readObjects_(SHEET.USERS);
-  const industry = String(p.industry || 'all');
+  const industry = p.industry || 'all';
   const gender = String(p.gender || 'all');
-  const jobTitle = String(p.jobTitle || p.job_title || 'all');
-  const ageGroup = String(p.ageGroup || p.age_group || 'all');
+  const jobTitle = p.jobTitle || p.job_title || 'all';
+  const ageGroup = p.ageGroup || p.age_group || 'all';
   const includeUnpublished = String(p.includeUnpublished || '') === 'true';
 
   return rows
     .filter(function (r) {
       if (!includeUnpublished && !toBool_(r['掲載中'])) return false;
-      if (industry !== 'all' && String(r['業種'] || '').trim() !== industry) return false;
       if (gender !== 'all' && String(r['性別'] || '').trim() !== gender) return false;
-      if (jobTitle !== 'all' && String(r['職種'] || '').trim() !== jobTitle) return false;
-      if (ageGroup !== 'all' && String(r['年代'] || '').trim() !== ageGroup) return false;
+      if (!matchesFilterList_(r['業種'], industry)) return false;
+      if (!matchesFilterList_(r['職種'], jobTitle)) return false;
+      if (!matchesFilterList_(r['年代'], ageGroup)) return false;
       return true;
     })
     .map(mapUser_);
