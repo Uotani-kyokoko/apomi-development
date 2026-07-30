@@ -1089,13 +1089,17 @@
     const ageGroup = normalizeFilterList(filters.ageGroup);
     const industry = normalizeFilterList(filters.industry);
     const jobTitle = normalizeFilterList(filters.jobTitle);
+    const hasAnyList = ageGroup.length > 0 || industry.length > 0 || jobTitle.length > 0;
 
     return (users || []).filter((u) => {
+      // 性別は単一選択のため従来どおり必須条件
       if (gender !== "all" && String(u.gender || "").trim() !== gender) return false;
-      if (!matchesFilterList(u.ageGroup, ageGroup)) return false;
-      if (!matchesFilterList(u.industry, industry)) return false;
-      if (!matchesFilterList(u.jobTitle, jobTitle)) return false;
-      return true;
+      if (!hasAnyList) return true;
+      // 年代・業種・職種は全体OR（いずれかの条件に当てはまれば表示）
+      if (ageGroup.length && matchesFilterList(u.ageGroup, ageGroup)) return true;
+      if (industry.length && matchesFilterList(u.industry, industry)) return true;
+      if (jobTitle.length && matchesFilterList(u.jobTitle, jobTitle)) return true;
+      return false;
     });
   }
 
