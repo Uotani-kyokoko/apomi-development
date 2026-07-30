@@ -432,23 +432,10 @@ img {
   background: var(--other-avatar);
 }
 
-/* 社長マーク：黒背景・白文字（性別色より優先） */
+/* 社長マーク：本文は濃紺黒（Xアイコン #111 と区別）／帯・アバターは性別色を維持 */
 .profile-card.is-president {
-  background: #111111;
-  border-color: #1f1f1f;
-}
-
-.profile-card.is-president .profile-card-band {
-  background: #000000;
-}
-
-.profile-card.is-president .profile-card-no {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.profile-card.is-president .profile-avatar {
-  border-color: #111111;
-  background: #333333;
+  background: #1a2233;
+  border-color: #243044;
 }
 
 .profile-card.is-president .profile-name,
@@ -463,7 +450,7 @@ img {
 }
 
 .profile-card.is-president .profile-section-box {
-  background: #1f1f1f;
+  background: #243044;
   color: rgba(255, 255, 255, 0.82);
 }
 
