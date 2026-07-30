@@ -13,8 +13,8 @@
  * 【シート】会員 / バナー / 申請 / マスタ / 設定
  * 【会員シート追加列】女性限定（TRUE/FALSE）…女性とだけ繋がりたい
  * 【マスタ】区分=タグ の行でプロフィールタグ候補を管理（有効=FALSEで非表示）
- * 【設定キー】オーナーメール（申請通知先） / サロンURL / サロンボタン名
- * 【申請】マイページから サロン掲載・社長マーク → オーナーへメール（承認/却下リンク）
+ * 【設定キー】サロンURL / サロンボタン名
+ * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  */
 
 // コンテナバインド（スプレッドシートに紐付いたスクリプト）なら空文字のままでOK
@@ -612,6 +612,7 @@ function extractDriveFileId_(url) {
 /**
  * 社長マーク / サロン掲載の申請
  * typeLabel: '社長マーク' | 'サロン掲載'
+ * body: companyName, corporateNumber, evidenceUrl, imageBase64, mimeType, note
  */
 function requestListing_(body, typeLabel) {
   const memberNo = String(body.memberNo || body.member_no || '').trim();
@@ -635,19 +636,48 @@ function requestListing_(body, typeLabel) {
     throw new Error(typeLabel + 'はすでに申請中です。オーナーの確認をお待ちください');
   }
 
+  const companyName = String(body.companyName || body.company_name || '').trim();
+  const corporateNumber = String(body.corporateNumber || body.corporate_number || '').replace(/\D/g, '');
+  const evidenceUrl = String(body.evidenceUrl || body.corporateUrl || body.url || '').trim();
+  const imageBase64 = String(body.imageBase64 || '').trim();
+  const mimeType = String(body.mimeType || 'image/jpeg').trim();
+  const note = String(body.note || '').trim();
+
+  var evidenceImageUrl = '';
+  if (typeLabel === 'サロン掲載') {
+    if (!imageBase64) throw new Error('公式LINE加入が分かる画像をアップロードしてください');
+  } else {
+    if (!companyName) throw new Error('社名（正式名称）を入力してください');
+    if (!/^\d{13}$/.test(corporateNumber)) throw new Error('法人番号は13桁の数字で入力してください');
+    if (!evidenceUrl && !imageBase64) {
+      throw new Error('コーポレートサイトURLか名刺画像のどちらかを入力してください');
+    }
+    if (evidenceUrl && !/^https?:\/\//i.test(evidenceUrl)) {
+      throw new Error('コーポレートサイトURLは https:// から入力してください');
+    }
+  }
+
+  if (imageBase64) {
+    if (imageBase64.length > 120000) {
+      throw new Error('画像が大きすぎます。別の画像を選んでください');
+    }
+    evidenceImageUrl = saveApplicationImage_(no, typeLabel, imageBase64, mimeType);
+  }
+
   const now = formatDateTime_(new Date());
   setCellByHeader_(userSheet, table.headers, rowNumber, meta.statusCol, '申請中');
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
 
-  const requestId = createRequest_(no, typeLabel, '受付', String(body.note || ''));
-  notifyOwnerOfRequest_({
-    requestId: requestId,
-    typeLabel: typeLabel,
+  const requestId = createRequest_({
     memberNo: no,
-    name: String(user['名前'] || ''),
-    email: String(user['Googleメール'] || email),
-    note: String(body.note || '')
+    type: typeLabel,
+    status: '申請中',
+    companyName: typeLabel === '社長マーク' ? companyName : '',
+    corporateNumber: typeLabel === '社長マーク' ? corporateNumber : '',
+    evidenceUrl: typeLabel === '社長マーク' ? evidenceUrl : '',
+    evidenceImageUrl: evidenceImageUrl,
+    note: note
   });
 
   const out = {
@@ -657,6 +687,43 @@ function requestListing_(body, typeLabel) {
   };
   out[meta.statusKey] = '申請中';
   return out;
+}
+
+function saveApplicationImage_(memberNo, typeLabel, imageBase64, mimeType) {
+  const folder = getOrCreateApplicationFolder_();
+  const safeType = typeLabel === 'サロン掲載' ? 'salon' : 'president';
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMddHHmmss');
+  const fileName = 'apply_' + safeType + '_' + memberNo + '_' + stamp + '.jpg';
+  const blob = Utilities.newBlob(
+    Utilities.base64Decode(imageBase64),
+    mimeType || 'image/jpeg',
+    fileName
+  );
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return 'https://drive.google.com/file/d/' + file.getId() + '/view';
+}
+
+function getOrCreateApplicationFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const savedId = props.getProperty('APPLICATION_FOLDER_ID');
+  if (savedId) {
+    try {
+      return DriveApp.getFolderById(savedId);
+    } catch (e) {
+      // recreate
+    }
+  }
+  const name = 'apomy-applications';
+  const folders = DriveApp.getFoldersByName(name);
+  if (folders.hasNext()) {
+    const folder = folders.next();
+    props.setProperty('APPLICATION_FOLDER_ID', folder.getId());
+    return folder;
+  }
+  const created = DriveApp.createFolder(name);
+  props.setProperty('APPLICATION_FOLDER_ID', created.getId());
+  return created;
 }
 
 function listingMeta_(typeLabel) {
@@ -711,57 +778,8 @@ function getWebAppUrl_() {
 }
 
 function notifyOwnerOfRequest_(info) {
-  const ownerEmail = getOwnerEmail_();
-  if (!ownerEmail) {
-    // 設定未記入でも申請自体は通す（シートの申請一覧で確認可能）
-    return;
-  }
-  const webUrl = getWebAppUrl_();
-  const token = getApprovalToken_();
-  const approveUrl = webUrl
-    ? (webUrl + '?action=approveRequest&requestId=' + encodeURIComponent(info.requestId) + '&token=' + encodeURIComponent(token))
-    : '';
-  const rejectUrl = webUrl
-    ? (webUrl + '?action=rejectRequest&requestId=' + encodeURIComponent(info.requestId) + '&token=' + encodeURIComponent(token))
-    : '';
-
-  var body = [
-    'apomy に新しい申請があります。',
-    '',
-    '種別: ' + info.typeLabel,
-    '申請ID: ' + info.requestId,
-    '会員番号: ' + info.memberNo,
-    '名前: ' + info.name,
-    'メール: ' + info.email,
-    info.note ? ('備考: ' + info.note) : '',
-    ''
-  ];
-  if (approveUrl) {
-    body.push('【承認する】');
-    body.push(approveUrl);
-    body.push('');
-    body.push('【却下する】');
-    body.push(rejectUrl);
-    body.push('');
-  } else {
-    body.push('スプレッドシートの「申請」シートで状態を確認・更新してください。');
-    body.push('');
-  }
-  if (info.typeLabel === 'サロン掲載') {
-    body.push('承認すると apomy のサロン掲載一覧に表示されます。');
-    body.push('あわせて井口オンラインサロン側にも会員を追加してください。');
-  } else {
-    body.push('承認すると apomy の社長マーク一覧に表示されます。');
-  }
-
-  MailApp.sendEmail({
-    to: ownerEmail,
-    subject: '[apomy] ' + info.typeLabel + '申請 #' + info.memberNo + ' ' + info.name,
-    body: body.filter(function (line, i, arr) {
-      // 連続空行を少し抑える
-      return !(line === '' && arr[i - 1] === '');
-    }).join('\n')
-  });
+  // メール通知・承認リンクは廃止。オーナーは「申請」シートを手作業で確認する。
+  return;
 }
 
 /**
@@ -879,20 +897,38 @@ function setPublished_(body, published, typeLabel) {
   };
 }
 
-function createRequest_(memberNo, type, status, note) {
+function createRequest_(memberNoOrOpts, type, status, note) {
+  var opts = (memberNoOrOpts && typeof memberNoOrOpts === 'object')
+    ? memberNoOrOpts
+    : {
+        memberNo: memberNoOrOpts,
+        type: type,
+        status: status,
+        note: note
+      };
+
   const sheet = getSheet_(SHEET.REQUESTS);
   const table = readTable_(sheet);
   const now = new Date();
   const requestId = 'R' + Utilities.formatDate(now, 'Asia/Tokyo', 'yyyyMMdd-HHmmss');
 
+  // 新列が無ければ追加
+  ['社名', '法人番号', '証拠URL', '証拠画像URL'].forEach(function (col) {
+    ensureHeader_(sheet, table.headers, col);
+  });
+
   const newRow = buildEmptyRow_(table.headers);
   setRowValue_(newRow, table.headers, '申請ID', requestId);
-  setRowValue_(newRow, table.headers, '会員番号', memberNo);
-  setRowValue_(newRow, table.headers, '種別', type);
-  setRowValue_(newRow, table.headers, '状態', status);
-  setRowValue_(newRow, table.headers, '備考', note || '');
+  setRowValue_(newRow, table.headers, '会員番号', String(opts.memberNo || ''));
+  setRowValue_(newRow, table.headers, '種別', String(opts.type || ''));
+  setRowValue_(newRow, table.headers, '状態', String(opts.status || '申請中'));
+  setRowValue_(newRow, table.headers, '社名', String(opts.companyName || ''));
+  setRowValue_(newRow, table.headers, '法人番号', String(opts.corporateNumber || ''));
+  setRowValue_(newRow, table.headers, '証拠URL', String(opts.evidenceUrl || ''));
+  setRowValue_(newRow, table.headers, '証拠画像URL', String(opts.evidenceImageUrl || ''));
+  setRowValue_(newRow, table.headers, '備考', String(opts.note || ''));
   setRowValue_(newRow, table.headers, '申請日時', formatDateTime_(now));
-  if (status === '対応済') {
+  if (String(opts.status || '') === '対応済' || String(opts.status || '') === '承認' || String(opts.status || '') === '却下') {
     setRowValue_(newRow, table.headers, '対応日時', formatDateTime_(now));
   }
   sheet.appendRow(newRow);

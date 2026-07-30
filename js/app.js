@@ -789,7 +789,7 @@
         salonBtn.disabled = false;
       } else if (salonStatus === "申請中") {
         salonBtn.textContent = `${salonName}（申請中）`;
-        salonBtn.disabled = false;
+        salonBtn.disabled = true;
       } else if (salonStatus === "却下") {
         salonBtn.textContent = `${salonName}を再申請`;
         salonBtn.disabled = false;
@@ -865,6 +865,180 @@
     const el = $("#loading-overlay");
     if (!el) return;
     el.classList.toggle("hidden", !show);
+  }
+
+  /** 申請フォーム（サロン / 社長マーク） */
+  let applyType = ""; // salon | president
+  let applyImageBase64 = "";
+  let applyImageMime = "image/jpeg";
+
+  function isValidCorporateNumber(value) {
+    return /^\d{13}$/.test(String(value || "").replace(/\D/g, ""));
+  }
+
+  function resetApplyForm() {
+    applyImageBase64 = "";
+    applyImageMime = "image/jpeg";
+    const company = $("#apply-company-name");
+    const corpNo = $("#apply-corporate-number");
+    const url = $("#apply-corporate-url");
+    if (company) company.value = "";
+    if (corpNo) corpNo.value = "";
+    if (url) url.value = "";
+    const salonFile = $("#apply-salon-image-file");
+    const cardFile = $("#apply-card-image-file");
+    if (salonFile) salonFile.value = "";
+    if (cardFile) cardFile.value = "";
+    const salonStatus = $("#apply-salon-image-status");
+    const cardStatus = $("#apply-card-image-status");
+    if (salonStatus) salonStatus.textContent = "未選択";
+    if (cardStatus) cardStatus.textContent = "未選択";
+    const salonPrev = $("#apply-salon-image-preview");
+    const cardPrev = $("#apply-card-image-preview");
+    if (salonPrev) {
+      salonPrev.src = "";
+      salonPrev.classList.add("hidden");
+    }
+    if (cardPrev) {
+      cardPrev.src = "";
+      cardPrev.classList.add("hidden");
+    }
+  }
+
+  function openApplyScreen(type) {
+    applyType = type;
+    resetApplyForm();
+    const title = $("#apply-title");
+    const lead = $("#apply-lead");
+    const salonFields = $("#apply-salon-fields");
+    const presidentFields = $("#apply-president-fields");
+    const salonName = state.salonLabel || "井口智明オンラインサロン";
+
+    if (type === "salon") {
+      if (title) title.textContent = `${salonName}掲載申請`;
+      if (lead) {
+        lead.textContent =
+          "公式LINEに加入していることが分かる画像を添付して申請してください。オーナーが確認後に反映します。";
+      }
+      salonFields?.classList.remove("hidden");
+      presidentFields?.classList.add("hidden");
+    } else {
+      if (title) title.textContent = "社長マーク掲載申請";
+      if (lead) {
+        lead.textContent =
+          "社名・法人番号と、コーポレートサイトURLまたは名刺画像を提出してください。オーナーが確認後に反映します。";
+      }
+      salonFields?.classList.add("hidden");
+      presidentFields?.classList.remove("hidden");
+    }
+    $("#apply-screen")?.classList.remove("hidden");
+  }
+
+  function closeApplyScreen() {
+    $("#apply-screen")?.classList.add("hidden");
+    applyType = "";
+    resetApplyForm();
+  }
+
+  async function handleApplyImageChange(e, kind) {
+    const file = e.target.files && e.target.files[0];
+    const statusEl = $(kind === "salon" ? "#apply-salon-image-status" : "#apply-card-image-status");
+    const previewEl = $(kind === "salon" ? "#apply-salon-image-preview" : "#apply-card-image-preview");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("画像ファイルを選んでください");
+      e.target.value = "";
+      return;
+    }
+    try {
+      showLoading(true);
+      if (statusEl) statusEl.textContent = "画像を処理中…";
+      const compressed = await compressImageFile(file);
+      applyImageBase64 = compressed.base64;
+      applyImageMime = compressed.mimeType;
+      if (statusEl) statusEl.textContent = "画像を選択済み（送信時にアップロード）";
+      if (previewEl) {
+        previewEl.src = compressed.dataUrl;
+        previewEl.classList.remove("hidden");
+      }
+    } catch (err) {
+      console.error(err);
+      applyImageBase64 = "";
+      if (statusEl) statusEl.textContent = "画像の処理に失敗しました";
+      showToast(err.message || "画像の処理に失敗しました");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function submitApplyForm(e) {
+    e.preventDefault();
+    if (!applyType) return;
+
+    const payload = {
+      memberNo: state.identity?.memberNo || state.currentUser?.id || "",
+      email: state.identity?.email || state.currentUser?.email || ""
+    };
+
+    if (applyType === "salon") {
+      if (!applyImageBase64) {
+        showToast("公式LINE加入が分かる画像を選択してください");
+        return;
+      }
+      payload.imageBase64 = applyImageBase64;
+      payload.mimeType = applyImageMime;
+    } else {
+      const companyName = ($("#apply-company-name")?.value || "").trim();
+      const corporateNumber = ($("#apply-corporate-number")?.value || "").replace(/\D/g, "");
+      const evidenceUrl = ($("#apply-corporate-url")?.value || "").trim();
+      if (!companyName) {
+        showToast("社名（正式名称）を入力してください");
+        return;
+      }
+      if (!isValidCorporateNumber(corporateNumber)) {
+        showToast("法人番号は13桁の数字で入力してください");
+        return;
+      }
+      if (!evidenceUrl && !applyImageBase64) {
+        showToast("コーポレートサイトURLか名刺画像のどちらかを入力してください");
+        return;
+      }
+      if (evidenceUrl && !/^https?:\/\//i.test(evidenceUrl)) {
+        showToast("コーポレートサイトURLは https:// から入力してください");
+        return;
+      }
+      payload.companyName = companyName;
+      payload.corporateNumber = corporateNumber;
+      payload.evidenceUrl = evidenceUrl;
+      if (applyImageBase64) {
+        payload.imageBase64 = applyImageBase64;
+        payload.mimeType = applyImageMime;
+      }
+    }
+
+    showLoading(true);
+    try {
+      const res =
+        applyType === "salon"
+          ? await GasAPI.requestSalonListing(payload)
+          : await GasAPI.requestPresidentMark(payload);
+      if (state.currentUser) {
+        if (applyType === "salon") {
+          state.currentUser.salonListingStatus = res.data?.salonListingStatus || "申請中";
+        } else {
+          state.currentUser.presidentMarkStatus = res.data?.presidentMarkStatus || "申請中";
+        }
+      }
+      applyMyActivity(res.data?.lastLoginAt);
+      updateMypageActionLabels(state.currentUser);
+      closeApplyScreen();
+      showToast("申請を受け付けました。オーナー確認後に反映されます");
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || "申請に失敗しました");
+    } finally {
+      showLoading(false);
+    }
   }
 
   function showToast(message) {
@@ -2002,7 +2176,6 @@
 
     $("#btn-salon").addEventListener("click", async () => {
       const user = state.currentUser;
-      const salonName = state.salonLabel || "井口智明オンラインサロン";
       const salonStatus = String(user?.salonListingStatus || "なし");
 
       // 掲載許可済みのみ一覧へ。申請中は閲覧不可
@@ -2011,47 +2184,27 @@
         return;
       }
       if (salonStatus === "申請中") {
-        showToast("許可後に閲覧できます");
+        showToast("申請中です。オーナー確認後に閲覧できます");
         return;
       }
-
-      if (!confirm(`${salonName}への掲載を申請しますか？\nオーナー確認後、apomy とサロンの両方に掲載されます。`)) {
+      openApplyScreen("salon");
+    });
+    $("#btn-president-badge").addEventListener("click", () => {
+      const user = state.currentUser;
+      if (user?.presidentMark) {
+        showToast("すでに社長マーク掲載済みです");
         return;
       }
-      try {
-        showLoading(true);
-        const res = await GasAPI.requestSalonListing(state.identity || {});
-        if (state.currentUser) {
-          state.currentUser.salonListingStatus = res.data?.salonListingStatus || "申請中";
-        }
-        applyMyActivity(res.data?.lastLoginAt);
-        updateMypageActionLabels(state.currentUser);
-        showToast("サロン掲載申請を受け付けました。オーナーに通知しました");
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "申請に失敗しました");
-      } finally {
-        showLoading(false);
+      if (String(user?.presidentMarkStatus || "") === "申請中") {
+        showToast("申請中です。オーナーの確認をお待ちください");
+        return;
       }
+      openApplyScreen("president");
     });
-    $("#btn-president-badge").addEventListener("click", async () => {
-      if (!confirm("社長マークの掲載を申請しますか？\nオーナー確認後に反映されます。")) return;
-      try {
-        showLoading(true);
-        const res = await GasAPI.requestPresidentMark(state.identity || {});
-        if (state.currentUser) {
-          state.currentUser.presidentMarkStatus = res.data?.presidentMarkStatus || "申請中";
-        }
-        applyMyActivity(res.data?.lastLoginAt);
-        updateMypageActionLabels(state.currentUser);
-        showToast("社長マーク申請を受け付けました。オーナーに通知しました");
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "申請に失敗しました");
-      } finally {
-        showLoading(false);
-      }
-    });
+    $("#apply-back")?.addEventListener("click", closeApplyScreen);
+    $("#apply-form")?.addEventListener("submit", submitApplyForm);
+    $("#apply-salon-image-file")?.addEventListener("change", (e) => handleApplyImageChange(e, "salon"));
+    $("#apply-card-image-file")?.addEventListener("change", (e) => handleApplyImageChange(e, "card"));
     $("#btn-stop-listing").addEventListener("click", async () => {
       if (!confirm("掲載を停止しますか？")) return;
       try {

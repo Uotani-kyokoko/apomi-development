@@ -268,6 +268,75 @@
     </div>
   </div>
 
+  <!-- ===== 申請フォーム画面 ===== -->
+  <div id="apply-screen" class="edit-screen hidden">
+    <div class="edit-top">
+      <button type="button" id="apply-back" class="filter-back" aria-label="戻る">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <h2 id="apply-title" class="edit-title">申請</h2>
+      <span class="edit-top-spacer"></span>
+    </div>
+
+    <form id="apply-form" class="edit-body">
+      <p id="apply-lead" class="edit-help-text" style="margin:0"></p>
+
+      <div id="apply-salon-fields" class="hidden">
+        <div class="edit-card">
+          <p class="edit-label">サロン公式LINEに加入していることが分かる画像</p>
+          <p class="edit-help-text">トーク画面や友だち追加済みのスクリーンショットなどをアップロードしてください。</p>
+          <label class="edit-upload-btn" for="apply-salon-image-file">
+            <i class="fa-solid fa-image"></i>
+            画像を選択
+          </label>
+          <input id="apply-salon-image-file" type="file" accept="image/*" class="edit-file-input">
+          <p id="apply-salon-image-status" class="edit-help-text">未選択</p>
+          <div class="edit-avatar-preview-wrap">
+            <img id="apply-salon-image-preview" class="edit-avatar-preview hidden" alt="プレビュー">
+          </div>
+        </div>
+      </div>
+
+      <div id="apply-president-fields" class="hidden">
+        <div class="edit-card">
+          <label class="edit-label" for="apply-company-name">社名（正式名称）</label>
+          <input id="apply-company-name" type="text" class="edit-input" maxlength="80" placeholder="例）株式会社〇〇">
+        </div>
+        <div class="edit-card">
+          <label class="edit-label" for="apply-corporate-number">法人番号（13桁）</label>
+          <input id="apply-corporate-number" type="text" class="edit-input" inputmode="numeric" maxlength="13" placeholder="1234567890123">
+        </div>
+        <div class="edit-card">
+          <label class="edit-label" for="apply-corporate-url">コーポレートサイトURL</label>
+          <input id="apply-corporate-url" type="url" class="edit-input" inputmode="url" placeholder="https://...">
+          <p class="edit-help-text">名刺画像がない場合はURLを入力してください。</p>
+        </div>
+        <div class="edit-card">
+          <p class="edit-label">名刺画像（社長だと分かるもの）</p>
+          <p class="edit-help-text">コーポレートサイトURLがない場合は名刺画像をアップロードしてください。</p>
+          <label class="edit-upload-btn" for="apply-card-image-file">
+            <i class="fa-solid fa-image"></i>
+            画像を選択
+          </label>
+          <input id="apply-card-image-file" type="file" accept="image/*" class="edit-file-input">
+          <p id="apply-card-image-status" class="edit-help-text">未選択</p>
+          <div class="edit-avatar-preview-wrap">
+            <img id="apply-card-image-preview" class="edit-avatar-preview hidden" alt="プレビュー">
+          </div>
+        </div>
+      </div>
+
+      <div class="edit-footer-space"></div>
+    </form>
+
+    <div class="edit-footer">
+      <button type="submit" form="apply-form" id="btn-submit-apply" class="btn-search-gradient">
+        <i class="fa-solid fa-paper-plane"></i>
+        申請を送信する
+      </button>
+    </div>
+  </div>
+
   <!-- ローディング -->
   <div id="loading-overlay" class="loading-overlay hidden">
     <div class="loading-spinner" role="status" aria-label="読み込み中"></div>
@@ -280,8 +349,8 @@
   <script src="js/config.js?v=20260730h"></script>
   <script src="js/auth.js?v=20260730h"></script>
   <script src="js/sample-users-240.js?v=20260730h"></script>
-  <script src="js/mock-api.js?v=20260730w"></script>
-  <script src="js/gas-api.js?v=20260730t"></script>
-  <script src="js/app.js?v=20260730w"></script>
+  <script src="js/mock-api.js?v=20260730x"></script>
+  <script src="js/gas-api.js?v=20260730x"></script>
+  <script src="js/app.js?v=20260730x"></script>
 </body>
 </html>

@@ -140,14 +140,18 @@ const GasAPI = (() => {
 
     async requestPresidentMark(payload) {
       if (!USE_GAS) {
-        return { success: true, data: { presidentMarkStatus: '申請中' } };
+        return MockAPI.requestPresidentMark
+          ? MockAPI.requestPresidentMark(payload)
+          : { success: true, data: { presidentMarkStatus: '申請中' } };
       }
       return post('requestPresidentMark', payload);
     },
 
     async requestSalonListing(payload) {
       if (!USE_GAS) {
-        return { success: true, data: { salonListingStatus: '申請中' } };
+        return MockAPI.requestSalonListing
+          ? MockAPI.requestSalonListing(payload)
+          : { success: true, data: { salonListingStatus: '申請中' } };
       }
       return post('requestSalonListing', payload);
     },

@@ -189,6 +189,25 @@ const MockAPI = (() => {
       return delay({ avatarUrl: currentUser?.avatarUrl || "", memberNo: currentUser?.id || "" });
     },
 
+    async requestSalonListing(payload = {}) {
+      if (!payload.imageBase64) throw new Error("公式LINE加入が分かる画像をアップロードしてください");
+      if (currentUser) currentUser.salonListingStatus = "申請中";
+      return delay({ salonListingStatus: "申請中", memberNo: currentUser?.id || "" });
+    },
+
+    async requestPresidentMark(payload = {}) {
+      const companyName = String(payload.companyName || "").trim();
+      const corporateNumber = String(payload.corporateNumber || "").replace(/\D/g, "");
+      const evidenceUrl = String(payload.evidenceUrl || "").trim();
+      if (!companyName) throw new Error("社名（正式名称）を入力してください");
+      if (!/^\d{13}$/.test(corporateNumber)) throw new Error("法人番号は13桁の数字で入力してください");
+      if (!evidenceUrl && !payload.imageBase64) {
+        throw new Error("コーポレートサイトURLか名刺画像のどちらかを入力してください");
+      }
+      if (currentUser) currentUser.presidentMarkStatus = "申請中";
+      return delay({ presidentMarkStatus: "申請中", memberNo: currentUser?.id || "" });
+    },
+
     async loginWithGoogle(payload = {}) {
       if (payload.idToken) {
         try {
