@@ -11,6 +11,7 @@
  * 5. 発行された URL をフロントの GAS_URL に設定
  *
  * 【シート】会員 / バナー / 申請 / マスタ / 設定
+ * 【会員シート追加列】女性限定（TRUE/FALSE）…女性とだけ繋がりたい
  * 【設定キー】オーナーメール（申請通知先） / サロンURL / サロンボタン名
  * 【申請】マイページから サロン掲載・社長マーク → オーナーへメール（承認/却下リンク）
  */
@@ -377,6 +378,7 @@ function updateProfile_(body) {
 
   const sheet = getSheet_(SHEET.USERS);
   const table = readTable_(sheet);
+  ensureHeader_(sheet, table.headers, '女性限定');
   const idx = findUserIndex_(table.rows, memberNo, email);
   if (idx < 0) throw new Error('会員が見つかりません');
 
@@ -384,8 +386,7 @@ function updateProfile_(body) {
   const allowed = [
     '名前', '性別', '年代', '業種', '職種', '現在地', '出身地',
     '自己紹介', 'こんな人と繋がりたい', 'こんな人とは繋がりたくない',
-    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube',
-    '女性限定'
+    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube'
   ];
 
   const map = {
@@ -400,8 +401,7 @@ function updateProfile_(body) {
     wantMeet: 'こんな人と繋がりたい',
     avoidMeet: 'こんな人とは繋がりたくない',
     tags: 'タグ',
-    avatarUrl: 'プロフィール画像URL',
-    femaleOnlyConnect: '女性限定'
+    avatarUrl: 'プロフィール画像URL'
   };
 
   const profile = parsed.profile || parsed;
@@ -413,22 +413,22 @@ function updateProfile_(body) {
       var existingGender = String(table.rows[idx]['性別'] || '').trim();
       if (existingGender) return;
     }
-    var value = profile[key];
-    if (key === 'femaleOnlyConnect') {
-      value = !!value ? true : false;
-    }
-    setCellByHeader_(sheet, table.headers, rowNumber, map[key], value);
+    setCellByHeader_(sheet, table.headers, rowNumber, map[key], profile[key]);
   });
 
-  // 女性以外は女性限定を必ずオフ
-  var genderNow = String(
-    (profile.gender !== undefined && profile.gender !== null && String(profile.gender).trim())
-      ? profile.gender
-      : (table.rows[idx]['性別'] || '')
-  ).trim();
-  if (genderNow !== '女性') {
-    setCellByHeader_(sheet, table.headers, rowNumber, '女性限定', false);
+  // 女性限定は専用で必ず保存（列が無ければ上で自動追加済み）
+  var sheetGender = String(table.rows[idx]['性別'] || '').trim();
+  var incomingGender = String(profile.gender || '').trim();
+  var genderNow = sheetGender || incomingGender;
+  var femaleOnly = false;
+  if (genderNow === '女性') {
+    if (profile.femaleOnlyConnect !== undefined && profile.femaleOnlyConnect !== null) {
+      femaleOnly = toBool_(profile.femaleOnlyConnect);
+    } else {
+      femaleOnly = toBool_(table.rows[idx]['女性限定']);
+    }
   }
+  setCellByHeader_(sheet, table.headers, rowNumber, '女性限定', femaleOnly ? 'TRUE' : 'FALSE');
 
   if (profile.snsLinks || profile.sns) {
     var links = [];
