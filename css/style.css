@@ -368,6 +368,7 @@ img {
 .profile-card-band {
   height: 56px;
   position: relative;
+  z-index: 2;
 }
 
 .profile-card.gender-male .profile-card-band {
@@ -390,6 +391,7 @@ img {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: 0.02em;
+  z-index: 3;
 }
 
 .profile-card.gender-other .profile-card-no {
@@ -399,6 +401,7 @@ img {
 .profile-card-body {
   padding: 0 16px 16px;
   position: relative;
+  z-index: 1;
 }
 
 .profile-top-row {
@@ -432,14 +435,15 @@ img {
   background: var(--other-avatar);
 }
 
-/* 女性限定：本文背景を性別ピンクに（社長マークより優先） */
+/* 女性限定：帯（No.）はそのまま、本文だけピンク */
 .profile-card.female-only {
-  background: var(--female-header) !important;
+  background: var(--white);
   border-color: #ff9fd0;
 }
 
 .profile-card.female-only .profile-card-body {
   background: var(--female-header);
+  border-radius: 0 0 15px 15px;
 }
 
 .profile-card.female-only .profile-section-box {
@@ -461,6 +465,10 @@ img {
 .profile-card.is-president:not(.female-only) {
   background: #1a2233;
   border-color: #243044;
+}
+
+.profile-card.is-president:not(.female-only) .profile-card-body {
+  background: #1a2233;
 }
 
 .profile-card.is-president:not(.female-only) .profile-name,
