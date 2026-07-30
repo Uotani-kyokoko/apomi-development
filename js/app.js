@@ -80,6 +80,7 @@
 
   /** 編集画面のSNS入力（URL配列） */
   let editSnsUrls = [];
+  const TAG_MAX = 6;
 
   function normalizeGender(gender) {
     const g = (gender || "").trim();
@@ -345,10 +346,47 @@
     editSnsUrls = Array.from(document.querySelectorAll(".edit-sns-url")).map((el) => el.value.trim());
   }
 
+  function getActiveTagOptions() {
+    return uniqueOptions((state.masters || {})["タグ"] || []);
+  }
+
+  function getActiveTagValueSet() {
+    return new Set(getActiveTagOptions().map((o) => o.value));
+  }
+
+  function normalizeTagList(tags) {
+    if (Array.isArray(tags)) {
+      return tags.map((t) => String(t || "").trim()).filter(Boolean);
+    }
+    const raw = String(tags || "").trim();
+    if (!raw) return [];
+    return raw.split(/[,、\t]/).map((t) => t.trim()).filter(Boolean);
+  }
+
+  /** マスタで有効なタグだけ残す（削除・無効化済みは非表示） */
+  function filterVisibleTags(tags) {
+    const allowed = getActiveTagValueSet();
+    if (!allowed.size) return [];
+    const seen = new Set();
+    const out = [];
+    normalizeTagList(tags).forEach((t) => {
+      if (!allowed.has(t) || seen.has(t)) return;
+      seen.add(t);
+      out.push(t);
+    });
+    return out.slice(0, TAG_MAX);
+  }
+
+  function tagLabel(value) {
+    const hit = getActiveTagOptions().find((o) => o.value === value);
+    return hit?.label || value;
+  }
+
   function renderTags(tags) {
-    if (!tags || !tags.length) return "";
-    return `<div class="profile-tags">${tags
-      .map((t) => `<span class="profile-tag">${escapeHtml(t)}</span>`)
+    const visible = filterVisibleTags(tags);
+    if (!visible.length) return "";
+    return `<div class="profile-tags">${visible
+      .map((t) => `<span class="profile-tag">${escapeHtml(tagLabel(t))}</span>`)
       .join("")}</div>`;
   }
 
@@ -459,6 +497,7 @@
             <span><i class="fa-solid fa-location-dot"></i>${escapeHtml(user.location || "-")}</span>
             <span><i class="fa-solid fa-rotate"></i>${escapeHtml(user.ageGroup || "-")}</span>
           </div>
+          ${renderTags(user.tags)}
           <div class="profile-section">
             <p class="profile-section-label">自己紹介</p>
             <div class="profile-section-box">${escapeHtml(user.bio || "未入力")}</div>
@@ -875,6 +914,32 @@
   function getSelectedChipValue(containerId) {
     const selected = $(`${containerId} .chip.selected`);
     return selected ? selected.dataset.value : "all";
+  }
+
+  function fillMultiChips(containerId, options, selectedValues) {
+    const el = $(containerId);
+    if (!el) return;
+    const selected = new Set((selectedValues || []).map((v) => String(v)));
+    const opts = uniqueOptions(options);
+    el.innerHTML = opts
+      .map(
+        (o) =>
+          `<button type="button" class="chip${selected.has(o.value) ? " selected" : ""}" data-value="${escapeHtml(o.value)}">${escapeHtml(o.label || o.value)}</button>`
+      )
+      .join("");
+  }
+
+  function getSelectedChipValues(containerId) {
+    return Array.from(document.querySelectorAll(`${containerId} .chip.selected`))
+      .map((el) => String(el.dataset.value || "").trim())
+      .filter(Boolean);
+  }
+
+  function updateEditTagCount() {
+    const note = $("#edit-tag-count");
+    if (!note) return;
+    const count = getSelectedChipValues("#edit-tag-chips").length;
+    note.textContent = `${count} / ${TAG_MAX}`;
   }
 
   function applyMastersToFilterUI() {
@@ -1354,6 +1419,9 @@
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
 
+    fillMultiChips("#edit-tag-chips", getActiveTagOptions(), filterVisibleTags(user.tags));
+    updateEditTagCount();
+
     $("#edit-name").value = user.name || "";
     $("#edit-avatar").value = user.avatarUrl || "";
     $("#edit-bio").value = user.bio || "";
@@ -1496,6 +1564,7 @@
       bio: ($("#edit-bio").value || "").trim(),
       wantMeet: ($("#edit-want").value || "").trim(),
       avoidMeet: ($("#edit-avoid").value || "").trim(),
+      tags: filterVisibleTags(getSelectedChipValues("#edit-tag-chips")),
       femaleOnlyConnect,
       snsLinks: snsCheck.ok ? snsCheck.urls : editSnsUrls.filter(Boolean),
       _snsError: snsCheck.ok ? "" : snsCheck.message
@@ -1872,6 +1941,23 @@
         chip.classList.add("selected");
         if (id === "#edit-gender-chips") updateFemaleOnlyOptionVisibility();
       });
+    });
+
+    $("#edit-tag-chips")?.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      if (chip.classList.contains("selected")) {
+        chip.classList.remove("selected");
+        updateEditTagCount();
+        return;
+      }
+      const count = getSelectedChipValues("#edit-tag-chips").length;
+      if (count >= TAG_MAX) {
+        showToast(`タグは最大${TAG_MAX}つまでです`);
+        return;
+      }
+      chip.classList.add("selected");
+      updateEditTagCount();
     });
 
     $("#btn-salon").addEventListener("click", async () => {

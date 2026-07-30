@@ -668,7 +668,7 @@ img {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin: 10px 0 4px;
 }
 
 .profile-tag {
@@ -680,6 +680,16 @@ img {
   background: #fef9c3;
   border: 1.5px dashed #f59e0b;
   border-radius: 999px;
+}
+
+.profile-card.female-only .profile-tag {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.profile-card.is-president:not(.female-only) .profile-tag {
+  color: #fde68a;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(253, 230, 138, 0.55);
 }
 
 .empty-state {

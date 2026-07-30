@@ -112,6 +112,16 @@ const MockAPI = (() => {
           { value: "個人事業主", label: "個人事業主" },
           { value: "フリーランス", label: "フリーランス" },
           { value: "その他", label: "その他" }
+        ],
+        タグ: [
+          { value: "ビジネスマッチング", label: "ビジネスマッチング" },
+          { value: "カフェ会", label: "カフェ会" },
+          { value: "異業種交流会", label: "異業種交流会" },
+          { value: "オンライン交流会", label: "オンライン交流会" },
+          { value: "イベント", label: "イベント" },
+          { value: "勉強会", label: "勉強会" },
+          { value: "ランチ会", label: "ランチ会" },
+          { value: "飲み会", label: "飲み会" }
         ]
       });
     },
@@ -143,6 +153,9 @@ const MockAPI = (() => {
         bio: profile.bio ?? currentUser.bio,
         wantMeet: profile.wantMeet ?? currentUser.wantMeet,
         avoidMeet: profile.avoidMeet ?? currentUser.avoidMeet,
+        tags: Array.isArray(profile.tags)
+          ? profile.tags.map((t) => String(t || "").trim()).filter(Boolean).slice(0, 6)
+          : currentUser.tags,
         femaleOnlyConnect:
           profile.femaleOnlyConnect !== undefined
             ? Boolean(profile.femaleOnlyConnect) && (profile.gender ?? currentUser.gender) === "女性"

@@ -12,6 +12,7 @@
  *
  * 【シート】会員 / バナー / 申請 / マスタ / 設定
  * 【会員シート追加列】女性限定（TRUE/FALSE）…女性とだけ繋がりたい
+ * 【マスタ】区分=タグ の行でプロフィールタグ候補を管理（有効=FALSEで非表示）
  * 【設定キー】オーナーメール（申請通知先） / サロンURL / サロンボタン名
  * 【申請】マイページから サロン掲載・社長マーク → オーナーへメール（承認/却下リンク）
  */
@@ -413,7 +414,11 @@ function updateProfile_(body) {
       var existingGender = String(table.rows[idx]['性別'] || '').trim();
       if (existingGender) return;
     }
-    setCellByHeader_(sheet, table.headers, rowNumber, map[key], profile[key]);
+    var value = profile[key];
+    if (key === 'tags') {
+      value = normalizeTagsForSave_(profile[key]);
+    }
+    setCellByHeader_(sheet, table.headers, rowNumber, map[key], value);
   });
 
   // 女性限定は専用で必ず保存（列が無ければ上で自動追加済み）
@@ -881,6 +886,37 @@ function createRequest_(memberNo, type, status, note) {
 }
 
 /* ========== Mapping ========== */
+
+function normalizeTagsForSave_(raw) {
+  var list = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else {
+    list = String(raw || '').split(/[,、\t]/);
+  }
+  var allowList = null;
+  try {
+    var tagItems = (getMasters_()['タグ'] || []);
+    if (tagItems.length) {
+      allowList = {};
+      tagItems.forEach(function (item) {
+        if (item && item.value) allowList[String(item.value)] = true;
+      });
+    }
+  } catch (err) {
+    allowList = null;
+  }
+  var seen = {};
+  var out = [];
+  list.forEach(function (t) {
+    var v = String(t || '').trim();
+    if (!v || seen[v]) return;
+    if (allowList && !allowList[v]) return;
+    seen[v] = true;
+    out.push(v);
+  });
+  return out.slice(0, 6).join(',');
+}
 
 function mapUser_(r) {
   const tagsRaw = String(r['タグ'] || '').trim();
