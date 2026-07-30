@@ -573,6 +573,7 @@
   }
 
   function refreshConnectList() {
+    ensureConnectPageAccess();
     if (hasActiveFilters()) {
       // 検索時は No. 帯を無視し、全会員から条件一致 → No. 昇順で表示
       const matched = filterUsersLocal(state.allUsers, state.filters);
@@ -609,10 +610,35 @@
     list.innerHTML = menu.map((item) => {
       const label = item.type === "salon" ? state.salonLabel || item.label : item.label;
       const active = item.id === state.connectPageId;
+      const locked = !canAccessConnectPage(item);
       const salonCls = item.type === "salon" ? " is-salon" : "";
       const activeCls = active ? " is-active" : "";
-      return `<li><button type="button" class="connect-menu-item${activeCls}${salonCls}" data-page-id="${escapeHtml(item.id)}">${escapeHtml(label)}</button></li>`;
+      const lockedCls = locked ? " is-locked" : "";
+      return `<li><button type="button" class="connect-menu-item${activeCls}${salonCls}${lockedCls}" data-page-id="${escapeHtml(item.id)}">${escapeHtml(label)}</button></li>`;
     }).join("");
+  }
+
+  function canViewPresidentPages(user = state.currentUser) {
+    return Boolean(user?.presidentMark);
+  }
+
+  function canViewSalonPages(user = state.currentUser) {
+    return Boolean(user?.salonListing);
+  }
+
+  function canAccessConnectPage(page, user = state.currentUser) {
+    if (!page) return false;
+    if (page.type === "president") return canViewPresidentPages(user);
+    if (page.type === "salon") return canViewSalonPages(user);
+    return true;
+  }
+
+  /** 未許可ページに居る場合は最新へ戻す */
+  function ensureConnectPageAccess() {
+    const page = getConnectPage();
+    if (!canAccessConnectPage(page)) {
+      state.connectPageId = "latest";
+    }
   }
 
   function openSalonCommunityUrl() {
@@ -623,6 +649,11 @@
 
   /** 繋がるタブの井口智明オンラインサロン一覧へ移動 */
   function goToSalonConnectPage() {
+    const page = getConnectPage("salon");
+    if (!canAccessConnectPage(page)) {
+      showToast("許可後に閲覧できます");
+      return;
+    }
     state.connectPageId = "salon";
     switchTab("connect");
     showToast(state.salonLabel || "井口智明オンラインサロン");
@@ -631,6 +662,11 @@
   function selectConnectPage(pageId) {
     const page = getConnectPage(pageId);
     if (!page) return;
+    if (!canAccessConnectPage(page)) {
+      closeConnectMenu();
+      showToast("許可後に閲覧できます");
+      return;
+    }
     state.connectPageId = page.id;
     closeConnectMenu();
     refreshConnectList();
@@ -1740,9 +1776,13 @@
       const salonName = state.salonLabel || "井口智明オンラインサロン";
       const salonStatus = String(user?.salonListingStatus || "なし");
 
-      // 申請中・掲載済み → 繋がるタブのサロン一覧へ
-      if (user?.salonListing || salonStatus === "申請中") {
+      // 掲載許可済みのみ一覧へ。申請中は閲覧不可
+      if (user?.salonListing) {
         goToSalonConnectPage();
+        return;
+      }
+      if (salonStatus === "申請中") {
+        showToast("許可後に閲覧できます");
         return;
       }
 

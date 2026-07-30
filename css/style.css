@@ -231,6 +231,14 @@ img {
   color: #7c3aed;
 }
 
+.connect-menu-item.is-locked {
+  opacity: 0.5;
+}
+
+.connect-menu-item.is-locked.is-salon {
+  color: #7c3aed;
+}
+
 .app-main {
   flex: 1;
   padding: 14px 14px calc(var(--nav-height) + var(--safe-bottom) + 16px);
