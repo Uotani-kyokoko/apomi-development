@@ -44,7 +44,84 @@ const MockAPI = (() => {
     });
   }
 
+  function toDateKeyTokyo(value) {
+    if (!value) return "";
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    // Asia/Tokyo 近似（端末TZに依存しにくいよう +9h 固定ではなく locale で）
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).format(d);
+    } catch {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+  }
+
+  function addDaysKey(baseDate, days) {
+    const d = new Date(baseDate.getTime());
+    d.setDate(d.getDate() + days);
+    return toDateKeyTokyo(d);
+  }
+
+  function computeDashboardFromUsers(list) {
+    const users = Array.isArray(list) ? list : [];
+    const now = new Date();
+    const today = toDateKeyTokyo(now);
+    const yesterday = addDaysKey(now, -1);
+    const dayCounts = {};
+    for (let i = 0; i < 7; i++) {
+      dayCounts[addDaysKey(now, -6 + i)] = 0;
+    }
+
+    let yesterdayNew = 0;
+    let unpublished = 0;
+    let yesterdayReturning = 0;
+
+    users.forEach((u) => {
+      const createdKey = toDateKeyTokyo(u.createdAt || u.publishedAt);
+      const loginKey = toDateKeyTokyo(u.lastLoginAt);
+      if (u.isPublished === false) unpublished += 1;
+      if (createdKey === yesterday) yesterdayNew += 1;
+      if (loginKey === yesterday && createdKey && createdKey < yesterday) {
+        yesterdayReturning += 1;
+      }
+      if (createdKey && Object.prototype.hasOwnProperty.call(dayCounts, createdKey)) {
+        dayCounts[createdKey] += 1;
+      }
+    });
+
+    const newLast7Days = Object.keys(dayCounts)
+      .sort()
+      .map((key) => ({
+        date: key,
+        label: key.slice(5).replace("-", "/"),
+        count: dayCounts[key]
+      }));
+
+    return {
+      asOf: today,
+      totalRegistered: users.length,
+      yesterdayNew,
+      unpublished,
+      yesterdayReturning,
+      newLast7Days
+    };
+  }
+
   return {
+    computeDashboardFromUsers,
+
+    async fetchDashboard() {
+      return delay(computeDashboardFromUsers(allUsers));
+    },
+
     async fetchUsers(filters = {}) {
       const toList = (v) => {
         if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter((x) => x && x !== "all");

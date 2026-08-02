@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>apomy - ビジネスマッチング</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260730u">
+  <link rel="stylesheet" href="css/style.css?v=20260801a">
 </head>
 <body>
 
@@ -36,6 +36,41 @@
 
       <!-- ホームタブ -->
       <section id="tab-home" class="tab-panel active">
+        <section id="dashboard" class="dashboard" aria-label="ダッシュボード">
+          <div class="dashboard-head">
+            <h2 class="dashboard-title">いまの状況</h2>
+            <p id="dashboard-asof" class="dashboard-asof"></p>
+          </div>
+          <div class="dashboard-grid" role="list">
+            <article class="dash-card" role="listitem">
+              <p class="dash-label">現在登録人数</p>
+              <p class="dash-value" id="dash-total">—</p>
+              <p class="dash-unit">人</p>
+            </article>
+            <article class="dash-card" role="listitem">
+              <p class="dash-label">昨日の新規</p>
+              <p class="dash-value" id="dash-new">—</p>
+              <p class="dash-unit">人</p>
+            </article>
+            <article class="dash-card" role="listitem">
+              <p class="dash-label">掲載停止者</p>
+              <p class="dash-value" id="dash-unpublished">—</p>
+              <p class="dash-unit">人</p>
+            </article>
+            <article class="dash-card" role="listitem">
+              <p class="dash-label">再参加者</p>
+              <p class="dash-value" id="dash-returning">—</p>
+              <p class="dash-unit">人<small class="dash-note">昨日</small></p>
+            </article>
+          </div>
+          <div class="dash-chart-card">
+            <div class="dash-chart-head">
+              <p class="dash-chart-title">直近7日の新規</p>
+              <p id="dash-chart-total" class="dash-chart-total"></p>
+            </div>
+            <div id="dash-bars" class="dash-bars" aria-hidden="true"></div>
+          </div>
+        </section>
         <button id="search-open-btn" class="search-bar-btn" type="button">
           <i class="fa-solid fa-sliders"></i>
           <span>条件から絞り込む</span>
@@ -346,11 +381,11 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/config.js?v=20260730h"></script>
-  <script src="js/auth.js?v=20260730h"></script>
-  <script src="js/sample-users-240.js?v=20260730h"></script>
-  <script src="js/mock-api.js?v=20260730x"></script>
-  <script src="js/gas-api.js?v=20260730z"></script>
-  <script src="js/app.js?v=20260730z"></script>
+  <script src="js/config.js?v=20260801a"></script>
+  <script src="js/auth.js?v=20260801a"></script>
+  <script src="js/sample-users-240.js?v=20260801a"></script>
+  <script src="js/mock-api.js?v=20260801a"></script>
+  <script src="js/gas-api.js?v=20260801a"></script>
+  <script src="js/app.js?v=20260801b"></script>
 </body>
 </html>

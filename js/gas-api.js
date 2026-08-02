@@ -128,6 +128,21 @@ const GasAPI = (() => {
       return get('settings');
     },
 
+    async fetchDashboard() {
+      if (!USE_GAS) return MockAPI.fetchDashboard();
+      try {
+        return await get('dashboard');
+      } catch (err) {
+        // 旧デプロイ時は未掲載込み一覧からフロント集計
+        console.warn('[apomy] dashboard API fallback', err);
+        const res = await get('users', { includeUnpublished: 'true' });
+        return {
+          success: true,
+          data: MockAPI.computeDashboardFromUsers(res.data || [])
+        };
+      }
+    },
+
     async loginWithGoogle(payload = {}) {
       const idToken = payload.idToken || '';
       const decoded = idToken ? decodeJwtPayload(idToken) : {};

@@ -62,6 +62,9 @@ function doGet(e) {
       case 'touch':
         data = touchActivity_(p);
         break;
+      case 'dashboard':
+        data = getDashboard_();
+        break;
       case 'ping':
         data = { ok: true, message: 'apomy GAS is alive' };
         break;
@@ -158,6 +161,73 @@ function getUsers_(p) {
       return true;
     })
     .map(mapUser_);
+}
+
+/**
+ * ホームダッシュボード用集計（Asia/Tokyo）
+ * - 登録人数: 会員シート全件
+ * - 昨日の新規: 登録日時が昨日
+ * - 掲載停止者: 掲載中=FALSE
+ * - 再参加者: 昨日ログインがあり、登録日が昨日より前（既存会員の再訪）
+ * - newLast7Days: 直近7日の新規登録（棒グラフ用）
+ */
+function getDashboard_() {
+  const rows = readObjects_(SHEET.USERS);
+  const today = tokyoDateKey_(new Date());
+  const yesterday = tokyoDateKey_(addDays_(new Date(), -1));
+
+  var totalRegistered = rows.length;
+  var yesterdayNew = 0;
+  var unpublished = 0;
+  var yesterdayReturning = 0;
+  var dayCounts = {};
+  var i;
+  for (i = 0; i < 7; i++) {
+    dayCounts[tokyoDateKey_(addDays_(new Date(), -6 + i))] = 0;
+  }
+
+  rows.forEach(function (r) {
+    const createdKey = tokyoDateKey_(parseDate_(r['登録日時']));
+    const loginKey = tokyoDateKey_(parseDate_(r['最終ログイン日時']));
+    if (!toBool_(r['掲載中'])) unpublished += 1;
+    if (createdKey === yesterday) yesterdayNew += 1;
+    if (loginKey === yesterday && createdKey && createdKey < yesterday) {
+      yesterdayReturning += 1;
+    }
+    if (createdKey && dayCounts.hasOwnProperty(createdKey)) {
+      dayCounts[createdKey] += 1;
+    }
+  });
+
+  const newLast7Days = Object.keys(dayCounts).sort().map(function (key) {
+    return {
+      date: key,
+      label: key.slice(5).replace('-', '/'), // MM/DD
+      count: dayCounts[key]
+    };
+  });
+
+  return {
+    asOf: today,
+    totalRegistered: totalRegistered,
+    yesterdayNew: yesterdayNew,
+    unpublished: unpublished,
+    yesterdayReturning: yesterdayReturning,
+    newLast7Days: newLast7Days
+  };
+}
+
+function addDays_(date, days) {
+  const d = new Date(date.getTime());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function tokyoDateKey_(d) {
+  if (!d || Object.prototype.toString.call(d) !== '[object Date]' || isNaN(d.getTime())) {
+    return '';
+  }
+  return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd');
 }
 
 function getBanners_() {

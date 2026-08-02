@@ -47,7 +47,9 @@
       ageGroup: []
     },
     /** 検索結果の表示件数（もっと見る用） */
-    searchVisibleCount: SEARCH_RESULT_PAGE_SIZE
+    searchVisibleCount: SEARCH_RESULT_PAGE_SIZE,
+    /** ホームダッシュボード集計 */
+    dashboard: null
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -527,6 +529,82 @@
     `;
   }
 
+  function formatDashNumber(n) {
+    const num = Number(n);
+    if (!Number.isFinite(num)) return "—";
+    return num.toLocaleString("ja-JP");
+  }
+
+  function renderDashboard(stats) {
+    const data = stats || state.dashboard;
+    const asof = $("#dashboard-asof");
+    const total = $("#dash-total");
+    const neu = $("#dash-new");
+    const unpublished = $("#dash-unpublished");
+    const returning = $("#dash-returning");
+    const bars = $("#dash-bars");
+    const chartTotal = $("#dash-chart-total");
+
+    if (!data) {
+      if (total) total.textContent = "—";
+      if (neu) neu.textContent = "—";
+      if (unpublished) unpublished.textContent = "—";
+      if (returning) returning.textContent = "—";
+      if (asof) asof.textContent = "";
+      if (bars) bars.innerHTML = "";
+      if (chartTotal) chartTotal.textContent = "";
+      return;
+    }
+
+    if (total) total.textContent = formatDashNumber(data.totalRegistered);
+    if (neu) neu.textContent = formatDashNumber(data.yesterdayNew);
+    if (unpublished) unpublished.textContent = formatDashNumber(data.unpublished);
+    if (returning) returning.textContent = formatDashNumber(data.yesterdayReturning);
+    if (asof) {
+      asof.textContent = data.asOf ? `${String(data.asOf).replace(/-/g, "/")} 時点` : "";
+    }
+
+    const series = Array.isArray(data.newLast7Days) ? data.newLast7Days : [];
+    const max = Math.max(1, ...series.map((d) => Number(d.count) || 0));
+    const sum7 = series.reduce((acc, d) => acc + (Number(d.count) || 0), 0);
+    if (chartTotal) chartTotal.textContent = `合計 ${formatDashNumber(sum7)}人`;
+    if (bars) {
+      bars.innerHTML = series
+        .map((d) => {
+          const count = Number(d.count) || 0;
+          const pct = Math.round((count / max) * 100);
+          const zeroCls = count === 0 ? " is-zero" : "";
+          return `
+            <div class="dash-bar-col">
+              <span class="dash-bar-count">${count}</span>
+              <div class="dash-bar-track">
+                <div class="dash-bar${zeroCls}" style="height:${Math.max(count === 0 ? 3 : 8, pct)}%"></div>
+              </div>
+              <span class="dash-bar-label">${escapeHtml(d.label || "")}</span>
+            </div>
+          `;
+        })
+        .join("");
+    }
+  }
+
+  async function loadDashboardStats() {
+    try {
+      const res = await GasAPI.fetchDashboard();
+      state.dashboard = res.data || null;
+      renderDashboard(state.dashboard);
+    } catch (err) {
+      console.error(err);
+      try {
+        const mock = await MockAPI.fetchDashboard();
+        state.dashboard = mock.data || null;
+        renderDashboard(state.dashboard);
+      } catch (e2) {
+        console.error(e2);
+      }
+    }
+  }
+
   function renderBanners(banners) {
     const container = $("#banner-list");
     if (!banners.length) {
@@ -860,6 +938,8 @@
       renderMyPage(state.currentUser);
     } else if (tabId === "home") {
       renderBanners(state.banners);
+      renderDashboard(state.dashboard);
+      loadDashboardStats();
     }
   }
 
@@ -1247,13 +1327,14 @@
       showToast("現在地が未設定です。プロフィールで現在地を選んでください");
       return;
     }
-    if (location === "海外") {
-      showToast("海外在住向けの地域リンクはありません");
+    // 47都道府県以外（海外など）は地域検索対象外
+    if (!Object.prototype.hasOwnProperty.call(PREFECTURE_TO_REGION, location)) {
+      showToast("日本在住者のみのサービスとなります。");
       return;
     }
     const region = resolveRegionFromLocation(location);
     if (!region) {
-      showToast(`現在地「${location}」に対応する地域が見つかりません`);
+      showToast("日本在住者のみのサービスとなります。");
       return;
     }
     const url = resolveRegionUrl(region);
@@ -1330,7 +1411,8 @@
           ? GasAPI.fetchCurrentUser(identity)
           : Promise.reject(new Error('ログイン情報がありません')),
         GasAPI.fetchMasters(),
-        GasAPI.fetchSettings()
+        GasAPI.fetchSettings(),
+        GasAPI.fetchDashboard()
       ]);
 
       const bannersRes = results[0].status === "fulfilled" ? results[0].value : null;
@@ -1338,6 +1420,7 @@
       const meRes = results[2].status === "fulfilled" ? results[2].value : null;
       const mastersRes = results[3].status === "fulfilled" ? results[3].value : null;
       const settingsRes = results[4].status === "fulfilled" ? results[4].value : null;
+      const dashboardRes = results[5].status === "fulfilled" ? results[5].value : null;
 
       // GAS失敗時はモックにフォールバック（画面が空にならないようにする）
       if (!usersRes) {
@@ -1403,6 +1486,17 @@
       }
 
       applyMastersToFilterUI();
+      if (dashboardRes?.data) {
+        state.dashboard = dashboardRes.data;
+      } else {
+        try {
+          const mockDash = await MockAPI.fetchDashboard();
+          state.dashboard = mockDash.data || null;
+        } catch {
+          state.dashboard = null;
+        }
+      }
+      renderDashboard(state.dashboard);
       renderBanners(state.banners);
       refreshConnectList();
       renderMyPage(state.currentUser);
@@ -1424,6 +1518,13 @@
         state.banners = mockBanners.data || [];
         state.masters = mockMasters.data || {};
         applyMastersToFilterUI();
+        try {
+          const mockDash = await MockAPI.fetchDashboard();
+          state.dashboard = mockDash.data || null;
+        } catch {
+          state.dashboard = null;
+        }
+        renderDashboard(state.dashboard);
         renderBanners(state.banners);
         refreshConnectList();
         renderMyPage(state.currentUser);
