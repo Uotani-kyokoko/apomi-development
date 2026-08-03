@@ -12,7 +12,9 @@
  *
  * 【シート】会員 / バナー / 申請 / マスタ / 設定
  * 【会員シート追加列】女性限定（TRUE/FALSE）…女性とだけ繋がりたい
+ * 【会員シート追加列】年間経費（非公開）…人脈拡大の為の年間経費。一覧には出さない
  * 【マスタ】区分=タグ の行でプロフィールタグ候補を管理（有効=FALSEで非表示）
+ * 【マスタ】区分=年間経費 の行で年間経費の選択肢を管理
  * 【設定キー】サロンURL / サロンボタン名
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  */
@@ -160,7 +162,12 @@ function getUsers_(p) {
       if (!matchesFilterList_(r['年代'], ageGroup)) return false;
       return true;
     })
-    .map(mapUser_);
+    .map(function (r) {
+      var user = mapUser_(r);
+      // 非公開項目は一覧から除外
+      delete user.annualSpend;
+      return user;
+    });
 }
 
 /**
@@ -392,6 +399,7 @@ function login_(body) {
   setRowValue_(newRow, table.headers, 'こんな人と繋がりたい', '');
   setRowValue_(newRow, table.headers, 'こんな人とは繋がりたくない', '');
   setRowValue_(newRow, table.headers, '女性限定', false);
+  setRowValue_(newRow, table.headers, '年間経費', '');
   setRowValue_(newRow, table.headers, 'タグ', '');
   setRowValue_(newRow, table.headers, 'プロフィール画像URL', picture || '');
   setRowValue_(newRow, table.headers, '掲載中', false);
@@ -464,6 +472,7 @@ function updateProfile_(body) {
   const sheet = getSheet_(SHEET.USERS);
   const table = readTable_(sheet);
   ensureHeader_(sheet, table.headers, '女性限定');
+  ensureHeader_(sheet, table.headers, '年間経費');
   const idx = findUserIndex_(table.rows, memberNo, email);
   if (idx < 0) throw new Error('会員が見つかりません');
 
@@ -471,7 +480,7 @@ function updateProfile_(body) {
   const allowed = [
     '名前', '性別', '年代', '業種', '職種', '現在地', '出身地',
     '自己紹介', 'こんな人と繋がりたい', 'こんな人とは繋がりたくない',
-    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube'
+    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube', '年間経費'
   ];
 
   const map = {
@@ -486,7 +495,8 @@ function updateProfile_(body) {
     wantMeet: 'こんな人と繋がりたい',
     avoidMeet: 'こんな人とは繋がりたくない',
     tags: 'タグ',
-    avatarUrl: 'プロフィール画像URL'
+    avatarUrl: 'プロフィール画像URL',
+    annualSpend: '年間経費'
   };
 
   const profile = parsed.profile || parsed;
@@ -1063,6 +1073,7 @@ function mapUser_(r) {
     wantMeet: String(r['こんな人と繋がりたい'] || ''),
     avoidMeet: String(r['こんな人とは繋がりたくない'] || ''),
     femaleOnlyConnect: toBool_(r['女性限定']),
+    annualSpend: String(r['年間経費'] || ''),
     tags: tags,
     avatarUrl: String(r['プロフィール画像URL'] || ''),
     lastLoginAt: String(r['最終ログイン日時'] || ''),

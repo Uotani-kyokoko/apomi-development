@@ -1481,8 +1481,15 @@
       }
 
       if (!mastersRes) {
-        const mockMasters = await MockAPI.fetchMasters();
-        state.masters = mockMasters.data || {};
+        console.error("masters failed", results[3].reason);
+        if (GasAPI.isLive) {
+          // 本番でモックマスタ（サンプルタグ）を混ぜない
+          state.masters = state.masters && typeof state.masters === "object" ? state.masters : {};
+          showToast("マスタの取得に失敗しました。しばらくして再読み込みしてください");
+        } else {
+          const mockMasters = await MockAPI.fetchMasters();
+          state.masters = mockMasters.data || {};
+        }
       } else {
         state.masters = mastersRes.data || {};
       }
@@ -1550,14 +1557,16 @@
     } catch (err) {
       console.error(err);
       showToast("データの読み込みに失敗しました: " + (err.message || ""));
-      // 最後の手段: モック全表示
+      // 最後の手段: モック全表示（本番マスタは上書きしない）
       try {
         const mockUsers = await MockAPI.fetchUsers({});
         const mockBanners = await MockAPI.fetchBanners();
-        const mockMasters = await MockAPI.fetchMasters();
         state.allUsers = mockUsers.data || [];
         state.banners = mockBanners.data || [];
-        state.masters = mockMasters.data || {};
+        if (!GasAPI.isLive) {
+          const mockMasters = await MockAPI.fetchMasters();
+          state.masters = mockMasters.data || {};
+        }
         applyMastersToFilterUI();
         try {
           const mockDash = await MockAPI.fetchDashboard();
@@ -1616,6 +1625,40 @@
     const fromMaster = uniqueOptions(m["都道府県"] || m["現在地"] || []);
     if (fromMaster.length) return fromMaster;
     return PREFECTURES.map((p) => ({ value: p, label: p }));
+  }
+
+  const DEFAULT_ANNUAL_SPEND_OPTIONS = [
+    "年間0円",
+    "年間5,000円未満",
+    "年間10,000円未満",
+    "年間10,000円以上",
+    "年間48,000円以上",
+    "年間90,000円以上"
+  ];
+
+  function getAnnualSpendOptions() {
+    const fromMaster = uniqueOptions((state.masters || {})["年間経費"] || []);
+    if (fromMaster.length) return fromMaster;
+    return DEFAULT_ANNUAL_SPEND_OPTIONS.map((v) => ({ value: v, label: v }));
+  }
+
+  function fillAnnualSpendSelect(selectedValue) {
+    const el = $("#edit-annual-spend");
+    if (!el) return;
+    const opts = [{ value: "", label: "選択してください" }, ...getAnnualSpendOptions()];
+    const current = selectedValue || "";
+    el.innerHTML = opts
+      .map(
+        (o) =>
+          `<option value="${escapeHtml(o.value)}"${o.value === current ? " selected" : ""}>${escapeHtml(o.label || o.value)}</option>`
+      )
+      .join("");
+    if (current && !opts.some((o) => o.value === current)) {
+      el.insertAdjacentHTML(
+        "beforeend",
+        `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>`
+      );
+    }
   }
 
   function fillPrefectureSelect(selectId, selectedValue) {
@@ -1781,6 +1824,7 @@
 
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
+    fillAnnualSpendSelect(user.annualSpend || "");
 
     fillMultiChips("#edit-tag-chips", getActiveTagOptions(), filterVisibleTags(user.tags));
     updateEditTagCount();
@@ -1928,6 +1972,7 @@
       wantMeet: ($("#edit-want").value || "").trim(),
       avoidMeet: ($("#edit-avoid").value || "").trim(),
       tags: filterVisibleTags(getSelectedChipValues("#edit-tag-chips")),
+      annualSpend: ($("#edit-annual-spend")?.value || "").trim(),
       femaleOnlyConnect,
       snsLinks: snsCheck.ok ? snsCheck.urls : editSnsUrls.filter(Boolean),
       _snsError: snsCheck.ok ? "" : snsCheck.message

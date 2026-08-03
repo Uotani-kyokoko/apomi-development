@@ -197,15 +197,15 @@ const MockAPI = (() => {
           { value: "フリーランス", label: "フリーランス" },
           { value: "その他", label: "その他" }
         ],
-        タグ: [
-          { value: "ビジネスマッチング", label: "ビジネス\nマッチング" },
-          { value: "カフェ会", label: "カフェ会" },
-          { value: "異業種交流会", label: "異業種交流会" },
-          { value: "オンライン交流会", label: "オンライン\n交流会" },
-          { value: "イベント", label: "イベント\n（飲み会など）" },
-          { value: "勉強会", label: "勉強会" },
-          { value: "ランチ会", label: "ランチ会" },
-          { value: "飲み会", label: "飲み会" }
+        // タグ候補はスプシ「マスタ」のみ。モックに固定タグは持たない
+        タグ: [],
+        年間経費: [
+          { value: "年間0円", label: "年間0円" },
+          { value: "年間5,000円未満", label: "年間5,000円未満" },
+          { value: "年間10,000円未満", label: "年間10,000円未満" },
+          { value: "年間10,000円以上", label: "年間10,000円以上" },
+          { value: "年間48,000円以上", label: "年間48,000円以上" },
+          { value: "年間90,000円以上", label: "年間90,000円以上" }
         ]
       });
     },
@@ -240,6 +240,8 @@ const MockAPI = (() => {
         tags: Array.isArray(profile.tags)
           ? profile.tags.map((t) => String(t || "").trim()).filter(Boolean).slice(0, 6)
           : currentUser.tags,
+        annualSpend:
+          profile.annualSpend !== undefined ? String(profile.annualSpend || "") : currentUser.annualSpend,
         femaleOnlyConnect:
           profile.femaleOnlyConnect !== undefined
             ? Boolean(profile.femaleOnlyConnect) && (profile.gender ?? currentUser.gender) === "女性"
