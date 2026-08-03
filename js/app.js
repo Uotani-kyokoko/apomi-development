@@ -370,10 +370,26 @@
     return String(fallbackLabel || value || "").replace(/\\n/g, "\n");
   }
 
-  function formatChipLabelHtml(label) {
-    return escapeHtml(String(label || ""))
-      .replace(/\\n/g, "<br>")
-      .replace(/\n/g, "<br>");
+  function getTagDisplayLines(value, fallbackLabel) {
+    const key = String(value || "").trim();
+    if (TAG_LABEL_LINES[key]) return TAG_LABEL_LINES[key].slice();
+    return String(getTagDisplayLabel(value, fallbackLabel) || key)
+      .replace(/\\n/g, "\n")
+      .split(/\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  /** 1行目通常、2行目以降は小さく・途中改行なし */
+  function formatTagChipHtml(value, fallbackLabel) {
+    const lines = getTagDisplayLines(value, fallbackLabel);
+    if (!lines.length) return escapeHtml(String(value || ""));
+    if (lines.length === 1) return escapeHtml(lines[0]);
+    const [first, ...rest] = lines;
+    return (
+      `<span class="chip-main">${escapeHtml(first)}</span>` +
+      rest.map((line) => `<span class="chip-sub">${escapeHtml(line)}</span>`).join("")
+    );
   }
 
   function getActiveTagValueSet() {
@@ -422,7 +438,7 @@
     const visible = filterVisibleTags(tags);
     if (!visible.length) return "";
     return `<div class="profile-tags">${visible
-      .map((t) => `<span class="profile-tag">${formatChipLabelHtml(tagLabel(t))}</span>`)
+      .map((t) => `<span class="profile-tag">${formatTagChipHtml(t, tagLabel(t))}</span>`)
       .join("")}</div>`;
   }
 
@@ -1241,7 +1257,7 @@
     el.innerHTML = opts
       .map((o) => {
         const label = allowBreak
-          ? formatChipLabelHtml(getTagDisplayLabel(o.value, o.label))
+          ? formatTagChipHtml(o.value, o.label)
           : escapeHtml(o.label || o.value);
         return `<button type="button" class="chip${selected.has(o.value) ? " selected" : ""}${allowBreak ? " chip-multiline" : ""}" data-value="${escapeHtml(o.value)}">${label}</button>`;
       })
