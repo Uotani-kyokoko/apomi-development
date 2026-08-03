@@ -102,6 +102,21 @@
     return "unknown";
   }
 
+  /** 性別マスタの「その他」系を LGBTQ に揃える */
+  function canonicalGenderLabel(value) {
+    const g = String(value || "").trim();
+    if (!g) return g;
+    if (g === "その他" || g === "その他(LGBTQ)" || g.includes("LGBT")) return "LGBTQ";
+    return g;
+  }
+
+  function mapGenderMasterOptions(options) {
+    return uniqueOptions(options || []).map((o) => {
+      const value = canonicalGenderLabel(o.value);
+      return { value, label: value };
+    });
+  }
+
   function escapeHtml(str) {
     const div = document.createElement("div");
     div.textContent = str ?? "";
@@ -1279,7 +1294,7 @@
 
   function applyMastersToFilterUI() {
     const m = state.masters || {};
-    fillChips("#filter-gender-chips", m["性別"], state.filters.gender);
+    fillChips("#filter-gender-chips", mapGenderMasterOptions(m["性別"]), canonicalGenderLabel(state.filters.gender) || "all");
     fillMultiChips("#filter-age-chips", m["年代"], normalizeFilterList(state.filters.ageGroup));
     fillMultiChips("#filter-industry-chips", m["業種"], normalizeFilterList(state.filters.industry));
     fillMultiChips("#filter-job-chips", m["職種"], normalizeFilterList(state.filters.jobTitle));
@@ -1405,8 +1420,12 @@
     const jobTitle = normalizeFilterList(filters.jobTitle);
 
     return (users || []).filter((u) => {
-      // 性別は単一選択のため必須条件
-      if (gender !== "all" && String(u.gender || "").trim() !== gender) return false;
+      // 性別は単一選択のため必須条件（その他 ↔ LGBTQ は同一扱い）
+      if (gender !== "all") {
+        const want = canonicalGenderLabel(gender);
+        const got = canonicalGenderLabel(u.gender);
+        if (want !== got) return false;
+      }
       // 同一項目内はOR、項目をまたぐとAND
       // ≒ 考えうる組み合わせ（年代×業種×職種）のいずれかに一致
       if (!matchesFilterList(u.ageGroup, ageGroup)) return false;
@@ -1648,10 +1667,11 @@
     const opts = [{ value: "", label: "選択してください" }, ...getAnnualSpendOptions()];
     const current = selectedValue || "";
     el.innerHTML = opts
-      .map(
-        (o) =>
-          `<option value="${escapeHtml(o.value)}"${o.value === current ? " selected" : ""}>${escapeHtml(o.label || o.value)}</option>`
-      )
+      .map((o) => {
+        // 年間経費はマスタの「値」をそのまま表示・保存する
+        const text = o.value === "" ? o.label || "選択してください" : o.value;
+        return `<option value="${escapeHtml(o.value)}"${o.value === current ? " selected" : ""}>${escapeHtml(text)}</option>`;
+      })
       .join("");
     if (current && !opts.some((o) => o.value === current)) {
       el.insertAdjacentHTML(
@@ -1808,7 +1828,7 @@
     state.editRequired = required;
 
     const m = state.masters || {};
-    fillChips("#edit-gender-chips", m["性別"], user.gender || "all");
+    fillChips("#edit-gender-chips", mapGenderMasterOptions(m["性別"]), canonicalGenderLabel(user.gender) || "all");
     stripAllChip("#edit-gender-chips", user.gender);
     updateGenderEditState(user);
     fillChips("#edit-age-chips", m["年代"], user.ageGroup || "all");

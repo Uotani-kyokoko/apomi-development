@@ -8,6 +8,7 @@
 地域リンク,https://example.com/region/kyushu-okinawa,九州・沖縄,7,TRUE
 性別,男性,男性,1,TRUE
 性別,女性,女性,2,TRUE
+性別,LGBTQ,LGBTQ,3,TRUE
 年代,20代,20代,1,TRUE
 年代,30代,30代,2,TRUE
 年代,40代,40代,3,TRUE
