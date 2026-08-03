@@ -73,13 +73,42 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--white);
-  padding: 24px;
+  background: #fff;
+  padding: 32px 28px calc(32px + env(safe-area-inset-bottom, 0px));
+}
+
+.login-inner {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+}
+
+.login-catch {
+  margin: 0 0 28px;
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  font-size: clamp(0.78rem, 3.4vw, 0.92rem);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.55;
+  color: #111827;
+}
+
+.login-logo {
+  display: block;
+  width: min(78vw, 280px);
+  height: auto;
+  margin: 0 0 48px;
+  object-fit: contain;
 }
 
 .google-btn-host {
   display: flex;
   justify-content: center;
+  width: 100%;
   min-height: 44px;
 }
 
