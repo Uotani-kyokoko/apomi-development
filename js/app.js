@@ -603,7 +603,14 @@
             <img class="profile-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(user.name)}" loading="lazy" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=93c5fd&color=1e3a8a';">
             <div class="profile-sns">${renderSns(user)}</div>
           </div>
-          <h2 class="profile-name">${escapeHtml(user.name || "（名前未設定）")}</h2>
+          <div class="profile-name-row">
+            <h2 class="profile-name">${escapeHtml(user.name || "（名前未設定）")}</h2>
+            ${
+              user.presidentMark && String(user.companyName || "").trim()
+                ? `<span class="profile-company">${escapeHtml(String(user.companyName).trim())}</span>`
+                : ""
+            }
+          </div>
           <p class="profile-job-line">業種：${escapeHtml(user.industry || "-")}　職種：${escapeHtml(user.jobTitle || "-")}</p>
           <div class="profile-meta-row">
             <span><i class="fa-solid fa-location-dot"></i>${escapeHtml(user.location || "-")}</span>
@@ -1895,6 +1902,17 @@
     updateEditTagCount();
 
     $("#edit-name").value = user.name || "";
+    const companyCard = $("#edit-company-card");
+    const companyInput = $("#edit-company-name");
+    if (companyCard && companyInput) {
+      if (user.presidentMark) {
+        companyCard.classList.remove("hidden");
+        companyInput.value = user.companyName || "";
+      } else {
+        companyCard.classList.add("hidden");
+        companyInput.value = "";
+      }
+    }
     $("#edit-avatar").value = user.avatarUrl || "";
     $("#edit-bio").value = user.bio || "";
     $("#edit-want").value = user.wantMeet || "";
@@ -2038,6 +2056,9 @@
       avoidMeet: ($("#edit-avoid").value || "").trim(),
       tags: filterVisibleTags(getSelectedChipValues("#edit-tag-chips")),
       annualSpend: ($("#edit-annual-spend")?.value || "").trim(),
+      companyName: state.currentUser?.presidentMark
+        ? ($("#edit-company-name")?.value || "").trim()
+        : String(state.currentUser?.companyName || "").trim(),
       femaleOnlyConnect,
       snsLinks: snsCheck.ok ? snsCheck.urls : editSnsUrls.filter(Boolean),
       _snsError: snsCheck.ok ? "" : snsCheck.message

@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260803r">
+  <link rel="stylesheet" href="css/style.css?v=20260803s">
 </head>
 <body>
 
@@ -221,6 +221,12 @@
         <input id="edit-name" name="name" type="text" class="edit-input" required maxlength="40">
       </div>
 
+      <div id="edit-company-card" class="edit-card hidden">
+        <label class="edit-label" for="edit-company-name">社名</label>
+        <input id="edit-company-name" name="companyName" type="text" class="edit-input" maxlength="80" placeholder="例）株式会社〇〇">
+        <p class="edit-help-text">社長マーク掲載者のみ表示・編集できます。</p>
+      </div>
+
       <div class="edit-card">
         <p class="edit-label">性別</p>
         <div class="chip-grid" id="edit-gender-chips"></div>
@@ -406,6 +412,6 @@
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260803h"></script>
   <script src="js/gas-api.js?v=20260803f"></script>
-  <script src="js/app.js?v=20260803q"></script>
+  <script src="js/app.js?v=20260803s"></script>
 </body>
 </html>

@@ -247,6 +247,10 @@ const MockAPI = (() => {
           : currentUser.tags,
         annualSpend:
           profile.annualSpend !== undefined ? String(profile.annualSpend || "") : currentUser.annualSpend,
+        companyName:
+          profile.companyName !== undefined && currentUser.presidentMark
+            ? String(profile.companyName || "")
+            : currentUser.companyName,
         femaleOnlyConnect:
           profile.femaleOnlyConnect !== undefined
             ? Boolean(profile.femaleOnlyConnect) && (profile.gender ?? currentUser.gender) === "女性"

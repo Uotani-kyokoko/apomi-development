@@ -401,6 +401,7 @@ function login_(body) {
   setRowValue_(newRow, table.headers, 'こんな人とは繋がりたくない', '');
   setRowValue_(newRow, table.headers, '女性限定', false);
   setRowValue_(newRow, table.headers, '年間経費', '');
+  setRowValue_(newRow, table.headers, '社名', '');
   setRowValue_(newRow, table.headers, 'タグ', '');
   setRowValue_(newRow, table.headers, 'プロフィール画像URL', picture || '');
   setRowValue_(newRow, table.headers, '掲載中', false);
@@ -474,6 +475,7 @@ function updateProfile_(body) {
   const table = readTable_(sheet);
   ensureHeader_(sheet, table.headers, '女性限定');
   ensureHeader_(sheet, table.headers, '年間経費');
+  ensureHeader_(sheet, table.headers, '社名');
   const idx = findUserIndex_(table.rows, memberNo, email);
   if (idx < 0) throw new Error('会員が見つかりません');
 
@@ -481,7 +483,7 @@ function updateProfile_(body) {
   const allowed = [
     '名前', '性別', '年代', '業種', '職種', '現在地', '出身地',
     '自己紹介', 'こんな人と繋がりたい', 'こんな人とは繋がりたくない',
-    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube', '年間経費'
+    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube', '年間経費', '社名'
   ];
 
   const map = {
@@ -497,12 +499,16 @@ function updateProfile_(body) {
     avoidMeet: 'こんな人とは繋がりたくない',
     tags: 'タグ',
     avatarUrl: 'プロフィール画像URL',
-    annualSpend: '年間経費'
+    annualSpend: '年間経費',
+    companyName: '社名'
   };
 
   const profile = parsed.profile || parsed;
+  const isPresident = toBool_(table.rows[idx]['社長マーク']);
   Object.keys(map).forEach(function (key) {
     if (profile[key] === undefined || profile[key] === null) return;
+    // 社名は社長マーク会員のみ更新可
+    if (key === 'companyName' && !isPresident) return;
     // 名前など必須っぽい項目は空文字での上書きを防ぐ
     if ((key === 'name' || key === 'gender') && String(profile[key]).trim() === '') return;
     if (key === 'gender') {
@@ -749,6 +755,11 @@ function requestListing_(body, typeLabel) {
   setCellByHeader_(userSheet, table.headers, rowNumber, meta.statusCol, '申請中');
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
+  // 社長マーク申請時は会員シートの社名も更新
+  if (typeLabel === '社長マーク' && companyName) {
+    ensureHeader_(userSheet, table.headers, '社名');
+    setCellByHeader_(userSheet, table.headers, rowNumber, '社名', companyName);
+  }
 
   const requestId = createRequest_({
     memberNo: no,
@@ -911,6 +922,14 @@ function processOwnerDecision_(p, decision) {
     // サロン掲載承認時は通常掲載もオン（両方に載せる前提）
     if (typeLabel === 'サロン掲載') {
       setCellByHeader_(userSheet, userTable.headers, userRow, '掲載中', true);
+    }
+    // 社長マーク承認時は申請の社名を会員へ反映（未設定時・更新）
+    if (typeLabel === '社長マーク') {
+      var approvedCompany = String(req['社名'] || '').trim();
+      if (approvedCompany) {
+        ensureHeader_(userSheet, userTable.headers, '社名');
+        setCellByHeader_(userSheet, userTable.headers, userRow, '社名', approvedCompany);
+      }
     }
   } else {
     setCellByHeader_(userSheet, userTable.headers, userRow, meta.flagCol, false);
@@ -1075,6 +1094,7 @@ function mapUser_(r) {
     avoidMeet: String(r['こんな人とは繋がりたくない'] || ''),
     femaleOnlyConnect: toBool_(r['女性限定']),
     annualSpend: String(r['年間経費'] || ''),
+    companyName: String(r['社名'] || ''),
     tags: tags,
     avatarUrl: String(r['プロフィール画像URL'] || ''),
     lastLoginAt: String(r['最終ログイン日時'] || ''),

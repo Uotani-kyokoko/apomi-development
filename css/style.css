@@ -647,6 +647,7 @@ img {
 }
 
 .profile-card.female-only.is-president .profile-name,
+.profile-card.female-only.is-president .profile-company,
 .profile-card.female-only.is-president .profile-section-label {
   color: var(--text-primary);
 }
@@ -670,6 +671,10 @@ img {
 .profile-card.is-president:not(.female-only) .profile-name,
 .profile-card.is-president:not(.female-only) .profile-section-label {
   color: #ffffff;
+}
+
+.profile-card.is-president:not(.female-only) .profile-company {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .profile-card.is-president:not(.female-only) .profile-job-line,
@@ -785,11 +790,26 @@ img {
   margin-top: 4px;
 }
 
+.profile-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+}
+
 .profile-name {
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin: 0;
+}
+
+.profile-company {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.3;
 }
 
 .profile-job-line {
