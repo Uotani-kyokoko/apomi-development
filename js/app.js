@@ -2207,6 +2207,53 @@
     setupGoogleButton();
   }
 
+  /** 開発者用: セッション破棄してログイン画面へ */
+  function logoutToLogin() {
+    try {
+      Session.clear();
+    } catch (err) {
+      console.warn(err);
+    }
+    try {
+      window.google?.accounts?.id?.disableAutoSelect?.();
+    } catch (err) {
+      console.warn(err);
+    }
+    state.currentUser = null;
+    state.allUsers = [];
+    state.users = [];
+    state.banners = [];
+    state.dashboard = null;
+    state.identity = null;
+    state.isLoggedIn = false;
+    state.editRequired = false;
+    showToast("ログアウトしました");
+    showLogin();
+  }
+
+  /** ヘッダー右上タイトルを連続タップで開発者ログアウト */
+  function bindDevLogoutOnHeaderTitle() {
+    const title = $("#header-title");
+    if (!title || title.dataset.devLogoutBound === "1") return;
+    title.dataset.devLogoutBound = "1";
+    let taps = 0;
+    let resetTimer = null;
+    const NEED = 6;
+    const WINDOW_MS = 2500;
+    title.addEventListener("click", (e) => {
+      e.preventDefault();
+      taps += 1;
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => {
+        taps = 0;
+      }, WINDOW_MS);
+      if (taps < NEED) return;
+      taps = 0;
+      if (resetTimer) clearTimeout(resetTimer);
+      logoutToLogin();
+    });
+  }
+
   function showApp() {
     state.isLoggedIn = true;
     $("#login-screen").classList.add("hidden");
@@ -2308,6 +2355,8 @@
   }
 
   function bindEvents() {
+    bindDevLogoutOnHeaderTitle();
+
     document.addEventListener("click", (e) => {
       const guarded = e.target.closest("a.sns-link[data-sns-guard='female-only']");
       if (!guarded) return;

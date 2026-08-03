@@ -162,6 +162,8 @@ img {
   font-weight: 700;
   letter-spacing: 0.04em;
   margin-left: auto;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .app-header.is-connect .header-title {
