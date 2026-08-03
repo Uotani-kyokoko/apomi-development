@@ -490,14 +490,14 @@
     }
     const visible = filterVisibleTags(tags);
     const parts = [];
+    visible.forEach((t) => {
+      parts.push(`<span class="profile-tag">${formatTagChipHtml(t, tagLabel(t))}</span>`);
+    });
     if (showSalonBadge) {
       parts.push(
         `<span class="profile-tag profile-tag-salon">${escapeHtml(SALON_BADGE_LABEL)}</span>`
       );
     }
-    visible.forEach((t) => {
-      parts.push(`<span class="profile-tag">${formatTagChipHtml(t, tagLabel(t))}</span>`);
-    });
     if (!parts.length) return "";
     return `<div class="profile-tags">${parts.join("")}</div>`;
   }
