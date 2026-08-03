@@ -88,11 +88,11 @@ img {
 }
 
 .login-catch {
-  margin: 0 0 28px;
+  margin: 0 0 12px;
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
-  font-size: clamp(0.78rem, 3.4vw, 0.92rem);
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-size: clamp(0.88rem, 3.6vw, 1rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
   line-height: 1.55;
   color: #111827;
 }
