@@ -198,11 +198,11 @@ const MockAPI = (() => {
           { value: "その他", label: "その他" }
         ],
         タグ: [
-          { value: "ビジネスマッチング", label: "ビジネスマッチング" },
+          { value: "ビジネスマッチング", label: "ビジネス\nマッチング" },
           { value: "カフェ会", label: "カフェ会" },
           { value: "異業種交流会", label: "異業種交流会" },
-          { value: "オンライン交流会", label: "オンライン交流会" },
-          { value: "イベント", label: "イベント" },
+          { value: "オンライン交流会", label: "オンライン\n交流会" },
+          { value: "イベント", label: "イベント\n（飲み会など）" },
           { value: "勉強会", label: "勉強会" },
           { value: "ランチ会", label: "ランチ会" },
           { value: "飲み会", label: "飲み会" }

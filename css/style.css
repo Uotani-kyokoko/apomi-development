@@ -833,14 +833,19 @@ img {
 }
 
 .profile-tag {
-  display: inline-block;
-  padding: 3px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px 10px;
   font-size: 0.72rem;
   font-weight: 500;
   color: #4b5563;
   background: #f3f4f6;
   border: 1px solid #e5e7eb;
-  border-radius: 999px;
+  border-radius: 12px;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .profile-card.female-only .profile-tag {
@@ -1153,6 +1158,15 @@ img {
   background: #f3f4f6;
   border: 1.5px solid transparent;
   text-align: center;
+}
+
+.chip.chip-multiline {
+  white-space: normal;
+  line-height: 1.25;
+  min-height: 3.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chip.selected {

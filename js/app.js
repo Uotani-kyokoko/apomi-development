@@ -351,7 +351,29 @@
   }
 
   function getActiveTagOptions() {
-    return uniqueOptions((state.masters || {})["タグ"] || []);
+    return uniqueOptions((state.masters || {})["タグ"] || []).map((o) => ({
+      value: o.value,
+      label: getTagDisplayLabel(o.value, o.label)
+    }));
+  }
+
+  /** 編集画面などで見やすいよう、指定タグは改行表示 */
+  const TAG_LABEL_LINES = {
+    ビジネスマッチング: ["ビジネス", "マッチング"],
+    オンライン交流会: ["オンライン", "交流会"],
+    イベント: ["イベント", "（飲み会など）"]
+  };
+
+  function getTagDisplayLabel(value, fallbackLabel) {
+    const key = String(value || "").trim();
+    if (TAG_LABEL_LINES[key]) return TAG_LABEL_LINES[key].join("\n");
+    return String(fallbackLabel || value || "").replace(/\\n/g, "\n");
+  }
+
+  function formatChipLabelHtml(label) {
+    return escapeHtml(String(label || ""))
+      .replace(/\\n/g, "<br>")
+      .replace(/\n/g, "<br>");
   }
 
   function getActiveTagValueSet() {
@@ -400,7 +422,7 @@
     const visible = filterVisibleTags(tags);
     if (!visible.length) return "";
     return `<div class="profile-tags">${visible
-      .map((t) => `<span class="profile-tag">${escapeHtml(tagLabel(t))}</span>`)
+      .map((t) => `<span class="profile-tag">${formatChipLabelHtml(tagLabel(t))}</span>`)
       .join("")}</div>`;
   }
 
@@ -1215,11 +1237,14 @@
     if (!el) return;
     const selected = new Set((selectedValues || []).map((v) => String(v)));
     const opts = uniqueOptions(options);
+    const allowBreak = containerId === "#edit-tag-chips";
     el.innerHTML = opts
-      .map(
-        (o) =>
-          `<button type="button" class="chip${selected.has(o.value) ? " selected" : ""}" data-value="${escapeHtml(o.value)}">${escapeHtml(o.label || o.value)}</button>`
-      )
+      .map((o) => {
+        const label = allowBreak
+          ? formatChipLabelHtml(getTagDisplayLabel(o.value, o.label))
+          : escapeHtml(o.label || o.value);
+        return `<button type="button" class="chip${selected.has(o.value) ? " selected" : ""}${allowBreak ? " chip-multiline" : ""}" data-value="${escapeHtml(o.value)}">${label}</button>`;
+      })
       .join("");
   }
 
