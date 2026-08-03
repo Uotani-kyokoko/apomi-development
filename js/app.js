@@ -479,12 +479,27 @@
     return hit?.label || value;
   }
 
-  function renderTags(tags) {
+  const SALON_BADGE_LABEL = "井口の囲炉裏";
+
+  function renderTags(userOrTags) {
+    let tags = userOrTags;
+    let showSalonBadge = false;
+    if (userOrTags && typeof userOrTags === "object" && !Array.isArray(userOrTags)) {
+      tags = userOrTags.tags;
+      showSalonBadge = isTruthyFlag(userOrTags.salonListing);
+    }
     const visible = filterVisibleTags(tags);
-    if (!visible.length) return "";
-    return `<div class="profile-tags">${visible
-      .map((t) => `<span class="profile-tag">${formatTagChipHtml(t, tagLabel(t))}</span>`)
-      .join("")}</div>`;
+    const parts = [];
+    if (showSalonBadge) {
+      parts.push(
+        `<span class="profile-tag profile-tag-salon">${escapeHtml(SALON_BADGE_LABEL)}</span>`
+      );
+    }
+    visible.forEach((t) => {
+      parts.push(`<span class="profile-tag">${formatTagChipHtml(t, tagLabel(t))}</span>`);
+    });
+    if (!parts.length) return "";
+    return `<div class="profile-tags">${parts.join("")}</div>`;
   }
 
   function parseSheetDate(value) {
@@ -606,7 +621,7 @@
             <p class="profile-section-label">こんな人とは繋がりたくない</p>
             <div class="profile-section-box">${escapeHtml(user.avoidMeet || "未入力")}</div>
           </div>
-          ${renderTags(user.tags)}
+          ${renderTags(user)}
         </div>
       </article>
     `;

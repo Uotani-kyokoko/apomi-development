@@ -87,9 +87,14 @@ const MockAPI = (() => {
     users.forEach((u) => {
       const createdKey = toDateKeyTokyo(u.createdAt || u.publishedAt);
       const loginKey = toDateKeyTokyo(u.lastLoginAt);
-      if (u.isPublished === false) unpublished += 1;
+      if (u.isPublished === false && loginKey === yesterday) unpublished += 1;
       if (createdKey === yesterday) yesterdayNew += 1;
-      if (loginKey === yesterday && createdKey && createdKey < yesterday) {
+      if (
+        loginKey === yesterday &&
+        createdKey &&
+        createdKey < yesterday &&
+        u.isPublished !== false
+      ) {
         yesterdayReturning += 1;
       }
       if (createdKey && Object.prototype.hasOwnProperty.call(dayCounts, createdKey)) {
@@ -164,7 +169,7 @@ const MockAPI = (() => {
         性別: [
           { value: "男性", label: "男性" },
           { value: "女性", label: "女性" },
-          { value: "その他(LGBTQ)", label: "その他(LGBTQ)" }
+          { value: "LGBTQ", label: "LGBTQ" }
         ],
         年代: [
           { value: "20代", label: "20代" },
