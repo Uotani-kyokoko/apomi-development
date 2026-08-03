@@ -72,7 +72,7 @@
     instagram: { label: "Instagram", icon: "fa-brands fa-instagram", cls: "sns-instagram" },
     facebook: { label: "Facebook", icon: "fa-brands fa-facebook-f", cls: "sns-facebook" },
     x: { label: "X", icon: "fa-brands fa-x-twitter", cls: "sns-x" },
-    line: { label: "公式LINE", icon: "fa-brands fa-line", cls: "sns-line" },
+    line: { label: "LINE", icon: "fa-brands fa-line", cls: "sns-line" },
     youtube: { label: "YouTube", icon: "fa-brands fa-youtube", cls: "sns-youtube" },
     home: { label: "ホーム", icon: "fa-solid fa-globe", cls: "sns-home" },
     litlink: { label: "lit.link", icon: "fa-solid fa-link", cls: "sns-litlink" },
@@ -242,16 +242,30 @@
     return raw;
   }
 
+  function isOfficialLineUrl(url) {
+    const raw = String(url || "").trim();
+    if (!raw) return false;
+    try {
+      const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+      const host = u.hostname.replace(/^www\./, "").toLowerCase();
+      // 公式LINE短縮URL（lin.ee）は不可。line.me は可
+      return host === "lin.ee" || host.endsWith(".lin.ee");
+    } catch {
+      return /(^|\.)lin\.ee(\/|$)/i.test(raw);
+    }
+  }
+
   function detectSnsType(url) {
     const raw = String(url || "").trim().toLowerCase();
     if (!raw) return null;
+    if (isOfficialLineUrl(raw)) return null;
     try {
       const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
       const host = u.hostname.replace(/^www\./, "");
       if (host.includes("instagram.com") || host === "instagr.am") return "instagram";
       if (host.includes("facebook.com") || host === "fb.com" || host === "fb.me") return "facebook";
       if (host === "x.com" || host.includes("twitter.com")) return "x";
-      if (host.includes("line.me") || host === "lin.ee" || host.includes("page.line.me")) return "line";
+      if (host.includes("line.me") || host.includes("page.line.me")) return "line";
       if (host.includes("youtube.com") || host === "youtu.be") return "youtube";
       if (host === "lit.link" || host.endsWith(".lit.link")) return "litlink";
       if (host.includes("canva.com")) return "canva";
@@ -304,12 +318,22 @@
       .sort((a, b) => SNS_PRIORITY.indexOf(a.type) - SNS_PRIORITY.indexOf(b.type));
   }
 
+  function shouldBlockSnsOpen(targetUser) {
+    if (!isFemaleOnlyConnect(targetUser)) return false;
+    // 男性閲覧者のみブロック（女性・LGBTQ・未設定は遷移可）
+    return normalizeGender(state.currentUser?.gender) === "male";
+  }
+
   function renderSns(user) {
     const items = sortSnsByPriority(getUserSnsUrls(user));
     if (!items.length) return "";
+    const blocked = shouldBlockSnsOpen(user);
     return items
       .map(({ type, url }) => {
         const meta = SNS_META[type] || SNS_META.home;
+        if (blocked) {
+          return `<a href="${escapeHtml(url)}" class="sns-link ${meta.cls}" data-sns-guard="female-only" aria-label="${escapeHtml(meta.label)}"><i class="${meta.icon}"></i></a>`;
+        }
         return `<a href="${escapeHtml(url)}" class="sns-link ${meta.cls}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(meta.label)}"><i class="${meta.icon}"></i></a>`;
       })
       .join("");
@@ -322,6 +346,12 @@
       const url = String(raw || "").trim();
       if (!url) continue;
       const normalized = normalizeSnsUrl(url);
+      if (isOfficialLineUrl(normalized)) {
+        return {
+          ok: false,
+          message: `公式LINE（lin.ee）は登録できません。line.me のURLを入力してください: ${url}`
+        };
+      }
       const type = detectSnsType(normalized);
       if (!type) {
         return { ok: false, message: `対応していないURLです: ${url}` };
@@ -2263,6 +2293,14 @@
   }
 
   function bindEvents() {
+    document.addEventListener("click", (e) => {
+      const guarded = e.target.closest("a.sns-link[data-sns-guard='female-only']");
+      if (!guarded) return;
+      e.preventDefault();
+      e.stopPropagation();
+      showToast("こちらのユーザーは女性のみのつながりを求めております");
+    });
+
     $$(".nav-item").forEach((item) => {
       item.addEventListener("click", () => switchTab(item.dataset.tab));
     });
