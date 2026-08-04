@@ -22,7 +22,11 @@
  */
 
 // コンテナバインド（スプレッドシートに紐付いたスクリプト）なら空文字のままでOK
-const SPREADSHEET_ID = '';
+const SPREADSHEET_ID = '1Asat_NahAxVEIwfF0nlDl7BgNGU3M2InXIGJ_2FZXl8';
+
+// 保存先フォルダを固定したい場合は Drive のフォルダ ID を入れる
+const AVATAR_FOLDER_ID = '1leOZAJ8EZI9cZO3E_Eo6MyHabidRDnNm';
+const APPLICATION_FOLDER_ID = '16LAv_PthEplEv6GJo_DoU-NkF0pCBZAr';
 
 const SHEET = {
   USERS: '会員',
@@ -651,7 +655,7 @@ function driveAvatarDisplayUrl_(fileId) {
 
 function getOrCreateAvatarFolder_() {
   const props = PropertiesService.getScriptProperties();
-  const savedId = props.getProperty('AVATAR_FOLDER_ID');
+  const savedId = getConfiguredFolderId_('AVATAR_FOLDER_ID', AVATAR_FOLDER_ID);
   if (savedId) {
     try {
       return DriveApp.getFolderById(savedId);
@@ -814,7 +818,7 @@ function saveApplicationImage_(memberNo, typeLabel, imageBase64, mimeType) {
 
 function getOrCreateApplicationFolder_() {
   const props = PropertiesService.getScriptProperties();
-  const savedId = props.getProperty('APPLICATION_FOLDER_ID');
+  const savedId = getConfiguredFolderId_('APPLICATION_FOLDER_ID', APPLICATION_FOLDER_ID);
   if (savedId) {
     try {
       return DriveApp.getFolderById(savedId);
@@ -1151,6 +1155,18 @@ function getSpreadsheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error('スプレッドシートに紐付けてください（または SPREADSHEET_ID を設定）');
   return ss;
+}
+
+function getConfiguredFolderId_(propertyKey, defaultId) {
+  const props = PropertiesService.getScriptProperties();
+  const configured = String(props.getProperty(propertyKey) || '').trim();
+  if (configured) return configured;
+  const fallback = String(defaultId || '').trim();
+  if (fallback) {
+    props.setProperty(propertyKey, fallback);
+    return fallback;
+  }
+  return '';
 }
 
 function getSheet_(name) {
