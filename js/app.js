@@ -1020,6 +1020,103 @@
     } else {
       title.classList.add("hidden");
     }
+    updateInstallButtonVisibility();
+  }
+
+  /* ---------- PWA インストール（マイページ右） ---------- */
+  let deferredInstallPrompt = null;
+
+  function isAppInstalled() {
+    try {
+      if (window.matchMedia("(display-mode: standalone)").matches) return true;
+      if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
+    } catch {
+      /* ignore */
+    }
+    // iOS Safari
+    if (typeof navigator.standalone === "boolean" && navigator.standalone) return true;
+    return false;
+  }
+
+  function isIosDevice() {
+    const ua = navigator.userAgent || "";
+    if (/iPad|iPhone|iPod/.test(ua)) return true;
+    // iPadOS 13+
+    return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  }
+
+  function canShowInstallButton() {
+    if (isAppInstalled()) return false;
+    if (deferredInstallPrompt) return true;
+    if (isIosDevice()) return true;
+    return false;
+  }
+
+  function updateInstallButtonVisibility() {
+    const btn = $("#btn-install-app");
+    if (!btn) return;
+    const show = state.activeTab === "mypage" && canShowInstallButton();
+    btn.classList.toggle("hidden", !show);
+  }
+
+  function openInstallGuide() {
+    const overlay = $("#install-guide-overlay");
+    if (!overlay) return;
+    overlay.classList.remove("hidden");
+    overlay.setAttribute("aria-hidden", "false");
+  }
+
+  function closeInstallGuide() {
+    const overlay = $("#install-guide-overlay");
+    if (!overlay) return;
+    overlay.classList.add("hidden");
+    overlay.setAttribute("aria-hidden", "true");
+  }
+
+  async function handleInstallAppClick() {
+    if (deferredInstallPrompt) {
+      try {
+        deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        updateInstallButtonVisibility();
+        if (choice?.outcome === "accepted") {
+          showToast("ホーム画面に追加しました");
+        }
+      } catch (err) {
+        console.warn(err);
+        showToast("インストールを開始できませんでした");
+      }
+      return;
+    }
+    if (isIosDevice()) {
+      openInstallGuide();
+      return;
+    }
+    showToast("このブラウザではインストールできません");
+  }
+
+  function bindInstallAppEvents() {
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      updateInstallButtonVisibility();
+    });
+    window.addEventListener("appinstalled", () => {
+      deferredInstallPrompt = null;
+      closeInstallGuide();
+      updateInstallButtonVisibility();
+      showToast("ホーム画面に追加しました");
+    });
+    $("#btn-install-app")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleInstallAppClick();
+    });
+    $("#install-guide-close")?.addEventListener("click", closeInstallGuide);
+    $("#install-guide-overlay")?.addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeInstallGuide();
+    });
   }
 
   function switchTab(tabId) {
@@ -2377,6 +2474,7 @@
 
   function bindEvents() {
     bindDevLogoutOnHeaderTitle();
+    bindInstallAppEvents();
 
     document.addEventListener("click", (e) => {
       const guarded = e.target.closest("a.sns-link[data-sns-guard='female-only']");

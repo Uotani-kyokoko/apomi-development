@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260803s">
+  <link rel="stylesheet" href="css/style.css?v=20260804a">
 </head>
 <body>
 
@@ -43,6 +43,10 @@
       </button>
       <h1 id="header-title" class="header-title">apomy HOME</h1>
       <span id="header-range" class="header-range hidden">No.00001 ~ No.00100</span>
+      <button type="button" id="btn-install-app" class="header-install-btn hidden" aria-label="ホーム画面に追加">
+        <i class="fa-solid fa-download"></i>
+        <span>インストール</span>
+      </button>
     </header>
 
     <main class="app-main">
@@ -406,12 +410,26 @@
   <!-- トースト通知 -->
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <!-- iOS ホーム画面追加案内 -->
+  <div id="install-guide-overlay" class="install-guide-overlay hidden" aria-hidden="true">
+    <div class="install-guide-card" role="dialog" aria-modal="true" aria-labelledby="install-guide-title">
+      <h3 id="install-guide-title" class="install-guide-title">ホーム画面に追加</h3>
+      <ol class="install-guide-steps">
+        <li>画面下部の <strong>共有</strong>（□↑）をタップ</li>
+        <li><strong>ホーム画面に追加</strong> を選ぶ</li>
+        <li>右上の <strong>追加</strong> をタップ</li>
+      </ol>
+      <p class="install-guide-note">Safari で開いているときだけ追加できます。</p>
+      <button type="button" id="install-guide-close" class="install-guide-close">閉じる</button>
+    </div>
+  </div>
+
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="js/config.js?v=20260803f"></script>
   <script src="js/auth.js?v=20260803f"></script>
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260803h"></script>
   <script src="js/gas-api.js?v=20260803f"></script>
-  <script src="js/app.js?v=20260803s"></script>
+  <script src="js/app.js?v=20260804a"></script>
 </body>
 </html>
