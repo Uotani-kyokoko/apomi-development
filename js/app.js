@@ -727,15 +727,20 @@
     });
   }
 
-  function renderBannerCardsHtml(banners) {
+  function renderBannerCardsHtml(banners, options = {}) {
+    const compact = Boolean(options.compact);
     return (banners || [])
       .map(
         (b) => `
-        <a href="${escapeHtml(b.linkUrl || "#")}" class="banner-card" target="_blank" rel="noopener noreferrer">
+        <a href="${escapeHtml(b.linkUrl || "#")}" class="banner-card${compact ? " is-compact" : ""}" target="_blank" rel="noopener noreferrer">
           <div class="banner-inner">
             <div class="banner-text">
               <h3>${escapeHtml(b.title)}</h3>
-              <p>${escapeHtml(b.description)}</p>
+              ${
+                compact || !b.description
+                  ? ""
+                  : `<p>${escapeHtml(b.description)}</p>`
+              }
             </div>
             ${
               b.imageUrl
@@ -760,17 +765,29 @@
     container.innerHTML = renderBannerCardsHtml(list);
   }
 
+  function updateConnectBannerDockVisibility() {
+    const dock = $("#connect-banner-dock");
+    const jump = $("#connect-jump");
+    if (!dock) return;
+    const list = filterBannersByPlace(state.banners, "繋がる");
+    const onConnect = state.activeTab === "connect";
+    const show = onConnect && list.length > 0;
+    dock.classList.toggle("hidden", !show);
+    document.body.classList.toggle("has-connect-banner-dock", show);
+    jump?.classList.toggle("has-banner-dock", show);
+  }
+
   function renderConnectBanners(banners) {
     const container = $("#connect-banner-list");
     if (!container) return;
     const list = filterBannersByPlace(banners || state.banners, "繋がる");
     if (!list.length) {
       container.innerHTML = "";
-      container.classList.add("is-empty");
+      updateConnectBannerDockVisibility();
       return;
     }
-    container.classList.remove("is-empty");
-    container.innerHTML = renderBannerCardsHtml(list);
+    container.innerHTML = renderBannerCardsHtml(list, { compact: true });
+    updateConnectBannerDockVisibility();
   }
 
   function renderAllBanners() {
@@ -1073,6 +1090,7 @@
     const el = $("#connect-jump");
     if (!el) return;
     el.classList.toggle("hidden", state.activeTab !== "connect");
+    updateConnectBannerDockVisibility();
   }
 
   function jumpConnectList(where) {
