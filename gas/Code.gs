@@ -305,7 +305,10 @@ function getMasters_() {
     })
     .forEach(function (r) {
       const cat = String(r['区分'] || '');
-      const value = String(r['値'] || '').trim();
+      var value = String(r['値'] || '').trim();
+      var label = String(r['表示名'] || r['値'] || '').trim();
+      // 値空でも表示名があれば採用（長文ポリシーなど）
+      if (!value && label) value = label;
       if (!cat || !value) return;
       if (!grouped[cat]) grouped[cat] = [];
       // 同じ「値」の重複行は除外
@@ -315,7 +318,7 @@ function getMasters_() {
       if (exists) return;
       grouped[cat].push({
         value: value,
-        label: String(r['表示名'] || r['値'] || '')
+        label: label || value
       });
     });
   return grouped;

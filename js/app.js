@@ -2036,7 +2036,9 @@
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
     fillAnnualSpendSelect(user.annualSpend || "");
-    fillPrivacyPolicySection(Boolean(user.isNew));
+    // 初回登録、または未掲載の必須入力（掲載停止後の再掲載含む）で表示
+    const showPrivacy = Boolean(user.isNew) || (required && user.isPublished === false);
+    fillPrivacyPolicySection(showPrivacy);
 
     fillMultiChips("#edit-tag-chips", getActiveTagOptions(), filterVisibleTags(user.tags));
     updateEditTagCount();
@@ -2115,9 +2117,19 @@
 
   function getPrivacyPolicyParagraphs() {
     const items = uniqueOptions((state.masters || {})["プライバシーポリシー"] || []);
-    return items
-      .map((o) => String(o.label || o.value || "").trim())
-      .filter(Boolean);
+    const chunks = [];
+    items.forEach((o) => {
+      const text = String(o.label || o.value || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .trim();
+      if (!text) return;
+      // 空行区切りがあれば段落に分割
+      const parts = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length) chunks.push(...parts);
+      else chunks.push(text);
+    });
+    return chunks;
   }
 
   function fillPrivacyPolicySection(show) {
