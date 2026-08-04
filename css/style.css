@@ -586,6 +586,15 @@ img {
   gap: 14px;
 }
 
+.connect-banner-list {
+  margin-top: 16px;
+  padding-bottom: 8px;
+}
+
+.connect-banner-list.is-empty {
+  display: none;
+}
+
 .banner-card {
   display: block;
   border: 2.5px solid var(--purple-border);

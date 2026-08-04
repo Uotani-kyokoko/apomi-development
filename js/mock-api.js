@@ -12,21 +12,24 @@ const MockAPI = (() => {
       title: "Webブラウザ版 GLOOK リリース！",
       description: "いつでもどこでもマッチング",
       imageUrl: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&h=300&fit=crop",
-      linkUrl: "https://example.com/glook"
+      linkUrl: "https://example.com/glook",
+      place: "ホーム"
     },
     {
       id: "b2",
       title: "オンラインサロン開催中",
       description: "経営者限定の交流イベント",
       imageUrl: "https://images.unsplash.com/photo-1521737711862-ece3cc7dabbc?w=600&h=300&fit=crop",
-      linkUrl: "https://example.com/salon"
+      linkUrl: "https://example.com/salon",
+      place: "両方"
     },
     {
       id: "b3",
       title: "社長マーク掲載キャンペーン",
       description: "先着50名様に特別バッジをプレゼント",
       imageUrl: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=300&fit=crop",
-      linkUrl: "https://example.com/badge"
+      linkUrl: "https://example.com/badge",
+      place: "繋がる"
     }
   ];
 

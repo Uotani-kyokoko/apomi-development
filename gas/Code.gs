@@ -13,8 +13,10 @@
  * 【シート】会員 / バナー / 申請 / マスタ / 設定
  * 【会員シート追加列】女性限定（TRUE/FALSE）…女性とだけ繋がりたい
  * 【会員シート追加列】年間経費（非公開）…人脈拡大の為の年間経費。一覧には出さない
+ * 【バナー】場所=ホーム / 繋がる / 両方（空欄はホーム）
  * 【マスタ】区分=タグ の行でプロフィールタグ候補を管理（有効=FALSEで非表示）
  * 【マスタ】区分=年間経費 の行で年間経費の選択肢を管理
+ * 【マスタ】区分=プライバシーポリシー の行で初回同意文を管理
  * 【設定キー】サロンURL / サロンボタン名
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  */
@@ -258,9 +260,19 @@ function getBanners_() {
         title: String(r['タイトル'] || ''),
         description: String(r['説明'] || ''),
         imageUrl: String(r['画像URL'] || ''),
-        linkUrl: String(r['リンクURL'] || '')
+        linkUrl: String(r['リンクURL'] || ''),
+        place: normalizeBannerPlace_(r['場所'])
       };
     });
+}
+
+/** バナー掲載場所: ホーム / 繋がる / 両方（空欄はホーム） */
+function normalizeBannerPlace_(raw) {
+  var place = String(raw || '').trim();
+  if (!place || place === 'ホーム' || place === 'home' || place === 'Home') return 'ホーム';
+  if (place === '繋がる' || place === 'connect' || place === 'Connect') return '繋がる';
+  if (place === '両方' || place === 'both' || place === 'Both' || place === 'ALL' || place === 'すべて') return '両方';
+  return 'ホーム';
 }
 
 function getMe_(p) {

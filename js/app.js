@@ -710,27 +710,72 @@
     }
   }
 
-  function renderBanners(banners) {
-    const container = $("#banner-list");
-    if (!banners.length) {
-      container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-image"></i><p>バナーがありません</p></div>`;
-      return;
-    }
-    container.innerHTML = banners
+  function normalizeBannerPlace(place) {
+    const p = String(place || "").trim();
+    if (!p || p === "ホーム" || /^home$/i.test(p)) return "ホーム";
+    if (p === "繋がる" || /^connect$/i.test(p)) return "繋がる";
+    if (p === "両方" || p === "すべて" || /^both$/i.test(p) || /^all$/i.test(p)) return "両方";
+    return "ホーム";
+  }
+
+  function filterBannersByPlace(banners, place) {
+    const want = normalizeBannerPlace(place);
+    return (banners || []).filter((b) => {
+      const bp = normalizeBannerPlace(b.place);
+      if (bp === "両方") return true;
+      return bp === want;
+    });
+  }
+
+  function renderBannerCardsHtml(banners) {
+    return (banners || [])
       .map(
         (b) => `
-        <a href="${escapeHtml(b.linkUrl)}" class="banner-card" target="_blank" rel="noopener noreferrer">
+        <a href="${escapeHtml(b.linkUrl || "#")}" class="banner-card" target="_blank" rel="noopener noreferrer">
           <div class="banner-inner">
             <div class="banner-text">
               <h3>${escapeHtml(b.title)}</h3>
               <p>${escapeHtml(b.description)}</p>
             </div>
-            <img class="banner-thumb" src="${escapeHtml(b.imageUrl)}" alt="">
+            ${
+              b.imageUrl
+                ? `<img class="banner-thumb" src="${escapeHtml(b.imageUrl)}" alt="">`
+                : ""
+            }
           </div>
         </a>
       `
       )
       .join("");
+  }
+
+  function renderBanners(banners) {
+    const container = $("#banner-list");
+    if (!container) return;
+    const list = filterBannersByPlace(banners || state.banners, "ホーム");
+    if (!list.length) {
+      container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-image"></i><p>バナーがありません</p></div>`;
+      return;
+    }
+    container.innerHTML = renderBannerCardsHtml(list);
+  }
+
+  function renderConnectBanners(banners) {
+    const container = $("#connect-banner-list");
+    if (!container) return;
+    const list = filterBannersByPlace(banners || state.banners, "繋がる");
+    if (!list.length) {
+      container.innerHTML = "";
+      container.classList.add("is-empty");
+      return;
+    }
+    container.classList.remove("is-empty");
+    container.innerHTML = renderBannerCardsHtml(list);
+  }
+
+  function renderAllBanners() {
+    renderBanners(state.banners);
+    renderConnectBanners(state.banners);
   }
 
   function renderUserList(users) {
@@ -1176,7 +1221,7 @@
     } else if (tabId === "mypage") {
       renderMyPage(state.currentUser);
     } else if (tabId === "home") {
-      renderBanners(state.banners);
+      renderAllBanners();
       renderDashboard(state.dashboard);
       loadDashboardStats();
     }
@@ -1750,7 +1795,7 @@
         }
       }
       renderDashboard(state.dashboard);
-      renderBanners(state.banners);
+      renderAllBanners();
       refreshConnectList();
       renderMyPage(state.currentUser);
 
@@ -1780,7 +1825,7 @@
           state.dashboard = null;
         }
         renderDashboard(state.dashboard);
-        renderBanners(state.banners);
+        renderAllBanners();
         refreshConnectList();
         renderMyPage(state.currentUser);
       } catch (e2) {
