@@ -390,7 +390,7 @@ function login_(body) {
   setRowValue_(newRow, table.headers, 'Googleメール', email);
   setRowValue_(newRow, table.headers, 'GoogleID', googleId);
   setRowValue_(newRow, table.headers, '名前', name || email.split('@')[0]);
-  setRowValue_(newRow, table.headers, '性別', '男性');
+  setRowValue_(newRow, table.headers, '性別', '');
   setRowValue_(newRow, table.headers, '年代', '30代');
   setRowValue_(newRow, table.headers, '業種', 'その他');
   setRowValue_(newRow, table.headers, '職種', 'その他');
@@ -513,7 +513,8 @@ function updateProfile_(body) {
     if ((key === 'name' || key === 'gender') && String(profile[key]).trim() === '') return;
     if (key === 'gender') {
       var existingGender = String(table.rows[idx]['性別'] || '').trim();
-      if (existingGender) return;
+      // 掲載後は性別固定。未掲載（初回含む）は変更可
+      if (existingGender && toBool_(table.rows[idx]['掲載中'])) return;
     }
     var value = profile[key];
     if (key === 'tags') {

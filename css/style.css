@@ -1559,6 +1559,35 @@ img {
   cursor: pointer;
 }
 
+.privacy-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 14px;
+  margin: 0 0 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: #374151;
+  word-break: break-word;
+}
+
+.privacy-scroll p {
+  margin: 0 0 0.75em;
+  white-space: pre-wrap;
+}
+
+.privacy-scroll p:last-child {
+  margin-bottom: 0;
+}
+
+.privacy-scroll .privacy-empty {
+  color: #9ca3af;
+  margin: 0;
+}
+
 .edit-avatar-preview-wrap {
   margin-top: 10px;
   display: flex;

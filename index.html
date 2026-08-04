@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260804b">
+  <link rel="stylesheet" href="css/style.css?v=20260804c">
 </head>
 <body>
 
@@ -328,6 +328,15 @@
         <p class="edit-help-text">他の会員には表示されません。選択肢はオーナーがマスタで追加できます。</p>
       </div>
 
+      <div id="edit-privacy-card" class="edit-card hidden">
+        <p class="edit-label">プライバシーポリシー</p>
+        <div id="edit-privacy-body" class="privacy-scroll" role="region" aria-label="プライバシーポリシー本文"></div>
+        <label class="edit-check-label" for="edit-privacy-agree">
+          <input id="edit-privacy-agree" type="checkbox" class="edit-check-input">
+          <span>プライバシーポリシーに同意します</span>
+        </label>
+      </div>
+
       <div id="edit-female-only-card" class="edit-card hidden">
         <label class="edit-check-label" for="edit-female-only">
           <input id="edit-female-only" type="checkbox" class="edit-check-input">
@@ -443,6 +452,6 @@
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260803h"></script>
   <script src="js/gas-api.js?v=20260803f"></script>
-  <script src="js/app.js?v=20260804b"></script>
+  <script src="js/app.js?v=20260804c"></script>
 </body>
 </html>

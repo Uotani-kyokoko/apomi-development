@@ -2016,6 +2016,11 @@
     const m = state.masters || {};
     fillChips("#edit-gender-chips", mapGenderMasterOptions(m["性別"]), canonicalGenderLabel(user.gender) || "all");
     stripAllChip("#edit-gender-chips", user.gender);
+    // 新規は性別未選択にして自分で選ばせる（デフォルト男性を強制しない）
+    if (user.isNew && !String(user.gender || "").trim()) {
+      const genderGrid = $("#edit-gender-chips");
+      genderGrid?.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
+    }
     updateGenderEditState(user);
     fillChips("#edit-age-chips", m["年代"], user.ageGroup || "all");
     stripAllChip("#edit-age-chips", user.ageGroup);
@@ -2031,6 +2036,7 @@
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
     fillAnnualSpendSelect(user.annualSpend || "");
+    fillPrivacyPolicySection(Boolean(user.isNew));
 
     fillMultiChips("#edit-tag-chips", getActiveTagOptions(), filterVisibleTags(user.tags));
     updateEditTagCount();
@@ -2102,7 +2108,37 @@
   }
 
   function canEditGender(user = state.currentUser) {
+    // 初回（新規）または性別未設定なら選択可
+    if (user?.isNew) return true;
     return !String(user?.gender || "").trim();
+  }
+
+  function getPrivacyPolicyParagraphs() {
+    const items = uniqueOptions((state.masters || {})["プライバシーポリシー"] || []);
+    return items
+      .map((o) => String(o.label || o.value || "").trim())
+      .filter(Boolean);
+  }
+
+  function fillPrivacyPolicySection(show) {
+    const card = $("#edit-privacy-card");
+    const body = $("#edit-privacy-body");
+    const agree = $("#edit-privacy-agree");
+    if (!card || !body) return;
+    if (!show) {
+      card.classList.add("hidden");
+      if (agree) agree.checked = false;
+      body.innerHTML = "";
+      return;
+    }
+    const paragraphs = getPrivacyPolicyParagraphs();
+    if (paragraphs.length) {
+      body.innerHTML = paragraphs.map((t) => `<p>${escapeHtml(t)}</p>`).join("");
+    } else {
+      body.innerHTML = `<p class="privacy-empty">プライバシーポリシーがまだ設定されていません。オーナーがマスタ（区分＝プライバシーポリシー）に追加できます。</p>`;
+    }
+    if (agree) agree.checked = false;
+    card.classList.remove("hidden");
   }
 
   function updateGenderEditState(user = state.currentUser) {
@@ -2283,6 +2319,13 @@
     if (!profile.gender || profile.gender === "all") {
       showToast("性別を選択してください");
       return;
+    }
+    const privacyCard = $("#edit-privacy-card");
+    if (privacyCard && !privacyCard.classList.contains("hidden")) {
+      if (!$("#edit-privacy-agree")?.checked) {
+        showToast("プライバシーポリシーに同意してください");
+        return;
+      }
     }
     if (!profile.location) {
       showToast("現在地を選択してください");
