@@ -10,7 +10,7 @@
  */
 const AppConfig = {
   // ← ここを自分のクライアントIDに変更
-  GOOGLE_CLIENT_ID: '535734954314-he5g9elg6qo4r9qq87uifneoqhd27r4c.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '199162935519-fbh7rfches1td8dcehesacq7qdbjtgpg.apps.googleusercontent.com',
 
   SESSION_KEY: 'apomi_session'
 };
