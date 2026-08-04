@@ -1085,6 +1085,46 @@ img {
   z-index: 200;
 }
 
+/* 繋がる一覧ジャンプ */
+.connect-jump {
+  position: fixed;
+  right: max(12px, calc(50% - 240px + 12px));
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 18px);
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connect-jump.hidden {
+  display: none !important;
+}
+
+.connect-jump-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.72);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.connect-jump-btn i {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.connect-jump-btn:active {
+  transform: scale(0.96);
+  background: rgba(30, 41, 59, 0.9);
+}
+
 .nav-item {
   flex: 1;
   display: flex;

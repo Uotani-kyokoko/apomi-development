@@ -1021,6 +1021,43 @@
       title.classList.add("hidden");
     }
     updateInstallButtonVisibility();
+    updateConnectJumpVisibility();
+  }
+
+  function updateConnectJumpVisibility() {
+    const el = $("#connect-jump");
+    if (!el) return;
+    el.classList.toggle("hidden", state.activeTab !== "connect");
+  }
+
+  function jumpConnectList(where) {
+    const cards = $$("#user-list .profile-card");
+    if (!cards.length) {
+      showToast("表示中の一覧がありません");
+      return;
+    }
+    let target = null;
+    if (where === "top") {
+      target = cards[0];
+    } else if (where === "bottom") {
+      target = cards[cards.length - 1];
+    } else {
+      target = cards[Math.floor(cards.length / 2)];
+    }
+    if (!target) return;
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: where === "middle" ? "center" : where === "bottom" ? "end" : "start"
+    });
+  }
+
+  function bindConnectJumpEvents() {
+    $("#connect-jump")?.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-jump]");
+      if (!btn) return;
+      e.preventDefault();
+      jumpConnectList(btn.getAttribute("data-jump"));
+    });
   }
 
   /* ---------- PWA インストール（マイページ右） ---------- */
@@ -2475,6 +2512,7 @@
   function bindEvents() {
     bindDevLogoutOnHeaderTitle();
     bindInstallAppEvents();
+    bindConnectJumpEvents();
 
     document.addEventListener("click", (e) => {
       const guarded = e.target.closest("a.sns-link[data-sns-guard='female-only']");

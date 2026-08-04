@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260804a">
+  <link rel="stylesheet" href="css/style.css?v=20260804b">
 </head>
 <body>
 
@@ -130,6 +130,19 @@
         <span>マイページ</span>
       </button>
     </nav>
+
+    <!-- 繋がる：一覧ジャンプ -->
+    <div id="connect-jump" class="connect-jump hidden" aria-label="一覧ジャンプ">
+      <button type="button" class="connect-jump-btn" data-jump="top" aria-label="最上部へ">
+        <i class="fa-solid fa-chevron-up"></i>
+      </button>
+      <button type="button" class="connect-jump-btn" data-jump="middle" aria-label="中央へ">
+        <i class="fa-solid fa-equals"></i>
+      </button>
+      <button type="button" class="connect-jump-btn" data-jump="bottom" aria-label="最下部へ">
+        <i class="fa-solid fa-chevron-down"></i>
+      </button>
+    </div>
   </div>
 
   <!-- 繋がる：ページ切替メニュー -->
@@ -430,6 +443,6 @@
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260803h"></script>
   <script src="js/gas-api.js?v=20260803f"></script>
-  <script src="js/app.js?v=20260804a"></script>
+  <script src="js/app.js?v=20260804b"></script>
 </body>
 </html>
