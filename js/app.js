@@ -759,7 +759,7 @@
     if (!container) return;
     const list = filterBannersByPlace(banners || state.banners, "ホーム");
     if (!list.length) {
-      container.innerHTML = `<div class="empty-state"><i class="fa-solid fa-image"></i><p>バナーがありません</p></div>`;
+      container.innerHTML = "";
       return;
     }
     container.innerHTML = renderBannerCardsHtml(list);
@@ -1742,8 +1742,8 @@
       }
 
       if (!bannersRes) {
-        const mockBanners = await MockAPI.fetchBanners();
-        state.banners = mockBanners.data || [];
+        console.error("banners failed", results[0].reason);
+        state.banners = [];
       } else {
         state.banners = bannersRes.data || [];
       }
@@ -1825,15 +1825,17 @@
     } catch (err) {
       console.error(err);
       showToast("データの読み込みに失敗しました: " + (err.message || ""));
-      // 最後の手段: モック全表示（本番マスタは上書きしない）
+      // 最後の手段: モック全表示（本番のバナー・マスタは上書きしない）
       try {
         const mockUsers = await MockAPI.fetchUsers({});
-        const mockBanners = await MockAPI.fetchBanners();
         state.allUsers = mockUsers.data || [];
-        state.banners = mockBanners.data || [];
         if (!GasAPI.isLive) {
+          const mockBanners = await MockAPI.fetchBanners();
           const mockMasters = await MockAPI.fetchMasters();
+          state.banners = mockBanners.data || [];
           state.masters = mockMasters.data || {};
+        } else {
+          state.banners = [];
         }
         applyMastersToFilterUI();
         try {
