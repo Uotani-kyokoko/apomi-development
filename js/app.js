@@ -2305,8 +2305,14 @@
     fillChips("#edit-age-chips", m["年代"], user.ageGroup || "all");
     stripAllChip("#edit-age-chips", user.ageGroup);
     // 初回登録は業種・職種を空欄スタート（既存会員は保存値を表示）
-    const industryForEdit = user.isNew ? "" : String(user.industry || "").trim();
-    const jobForEdit = user.isNew ? "" : String(user.jobTitle || "").trim();
+    // all / すべては無視して「選択してください」にする
+    const normalizeEditSelectValue = (raw) => {
+      const v = String(raw || "").trim();
+      if (!v || v === "all" || v === "すべて") return "";
+      return v;
+    };
+    const industryForEdit = user.isNew ? "" : normalizeEditSelectValue(user.industry);
+    const jobForEdit = user.isNew ? "" : normalizeEditSelectValue(user.jobTitle);
     fillEditRequiredSelect("#edit-industry", getMasterCategoryOptions(m, "業種"), industryForEdit);
     fillEditRequiredSelect("#edit-job", getMasterCategoryOptions(m, "職種"), jobForEdit);
 
