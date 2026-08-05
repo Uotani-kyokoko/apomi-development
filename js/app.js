@@ -1595,21 +1595,52 @@
     const seen = new Set();
     const out = [];
     (options || []).forEach((o) => {
-      const value = String(o.value || "").trim();
+      // {value,label} でも文字列単体でも受け付ける
+      const value = String(
+        o && typeof o === "object" ? o.value ?? o.label ?? "" : o || ""
+      ).trim();
       if (!value || seen.has(value)) return;
       seen.add(value);
-      out.push({ value, label: o.label || value });
+      const label =
+        o && typeof o === "object"
+          ? String(o.label || o.value || value).trim()
+          : value;
+      out.push({ value, label: label || value });
     });
     return out;
   }
 
+  /** マスタ区分のゆれ（空白など）を吸収してオプション取得 */
+  function getMasterCategoryOptions(masters, categoryName) {
+    const m = masters || {};
+    const want = String(categoryName || "").trim();
+    if (!want) return [];
+    if (Array.isArray(m[want])) return uniqueOptions(m[want]);
+    const hitKey = Object.keys(m).find((k) => String(k || "").trim() === want);
+    if (hitKey && Array.isArray(m[hitKey])) return uniqueOptions(m[hitKey]);
+    return [];
+  }
+
   function fillEditRequiredSelect(selectId, options, selectedValue) {
-    fillSelect(selectId, options, selectedValue || "all");
     const el = $(selectId);
     if (!el) return;
-    const allOpt = el.querySelector('option[value="all"]');
-    if (allOpt) allOpt.remove();
-    if (!selectedValue) el.selectedIndex = 0;
+    const current = String(selectedValue || "").trim();
+    let opts = uniqueOptions(options);
+    // マスタに無い既存値でも選べる／表示できるように残す
+    if (current && !opts.some((o) => o.value === current)) {
+      opts = [{ value: current, label: current }, ...opts];
+    }
+    const rows = opts.length
+      ? [{ value: "", label: "選択してください" }, ...opts]
+      : [{ value: "", label: "選択肢がありません（マスタを確認）" }];
+    el.innerHTML = rows
+      .map(
+        (o) =>
+          `<option value="${escapeHtml(o.value)}"${o.value === current ? " selected" : ""}>${escapeHtml(o.label || o.value)}</option>`
+      )
+      .join("");
+    if (current) el.value = current;
+    else el.selectedIndex = 0;
   }
 
   function fillSelect(selectId, options, selectedValue) {
@@ -2269,8 +2300,8 @@
     updateGenderEditState(user);
     fillChips("#edit-age-chips", m["年代"], user.ageGroup || "all");
     stripAllChip("#edit-age-chips", user.ageGroup);
-    fillEditRequiredSelect("#edit-industry", m["業種"], user.industry || "");
-    fillEditRequiredSelect("#edit-job", m["職種"], user.jobTitle || "");
+    fillEditRequiredSelect("#edit-industry", getMasterCategoryOptions(m, "業種"), user.industry || "");
+    fillEditRequiredSelect("#edit-job", getMasterCategoryOptions(m, "職種"), user.jobTitle || "");
 
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
@@ -2601,6 +2632,14 @@
     }
     if (!profile.location) {
       showToast("現在地を選択してください");
+      return;
+    }
+    if (!profile.industry) {
+      showToast("業種を選択してください");
+      return;
+    }
+    if (!profile.jobTitle) {
+      showToast("職種を選択してください");
       return;
     }
     if (profile._snsError) {
