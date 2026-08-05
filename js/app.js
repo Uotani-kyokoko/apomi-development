@@ -2127,6 +2127,39 @@
     openEditScreen({ required: true });
   }
 
+  function canEditDisplayName(user) {
+    if (!user) return false;
+    // 初回登録中、または名前未設定（途中離脱の再開）のみ編集可
+    if (user.isNew) return true;
+    return !String(user.name || "").trim();
+  }
+
+  function applyEditNameFieldState(user) {
+    const input = $("#edit-name");
+    const noteFirst = $("#edit-name-note-first");
+    const noteLocked = $("#edit-name-note-locked");
+    if (!input) return;
+    const editable = canEditDisplayName(user);
+    if (editable) {
+      input.classList.remove("hidden");
+      input.disabled = false;
+      input.required = true;
+      input.value = "";
+      input.placeholder = "お名前（フルネーム）を入力";
+      noteFirst?.classList.remove("hidden");
+      noteLocked?.classList.add("hidden");
+    } else {
+      // 登録後は値を出さず、ラベル＋問い合わせ案内のみ
+      input.value = "";
+      input.required = false;
+      input.disabled = true;
+      input.classList.add("hidden");
+      input.placeholder = "";
+      noteFirst?.classList.add("hidden");
+      noteLocked?.classList.remove("hidden");
+    }
+  }
+
   function openEditScreen(options = {}) {
     const user = state.currentUser;
     if (!user) {
@@ -2167,7 +2200,7 @@
     fillMultiChips("#edit-tag-chips", getActiveTagOptions(), filterVisibleTags(user.tags));
     updateEditTagCount();
 
-    $("#edit-name").value = user.name || "";
+    applyEditNameFieldState(user);
     const companyCard = $("#edit-company-card");
     const companyInput = $("#edit-company-name");
     if (companyCard && companyInput) {
@@ -2351,8 +2384,12 @@
       : String(state.currentUser?.gender || "").trim();
     const femaleOnlyConnect =
       gender === "女性" && Boolean($("#edit-female-only")?.checked);
+    const editableName = canEditDisplayName(state.currentUser);
+    const name = editableName
+      ? ($("#edit-name").value || "").trim()
+      : String(state.currentUser?.name || "").trim();
     return {
-      name: ($("#edit-name").value || "").trim(),
+      name,
       gender,
       ageGroup: getSelectedChipValue("#edit-age-chips"),
       industry: $("#edit-industry").value || "",
@@ -2452,7 +2489,7 @@
     e.preventDefault();
     const profile = collectEditForm();
     if (!profile.name) {
-      showToast("名前を入力してください");
+      showToast("お名前（フルネーム）を入力してください");
       return;
     }
     if (!profile.gender || profile.gender === "all") {

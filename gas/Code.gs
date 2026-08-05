@@ -392,7 +392,7 @@ function login_(body) {
     const rowNumber = idx + 2; // header = 1
     setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
     if (googleId) setCellByHeader_(sheet, table.headers, rowNumber, 'GoogleID', googleId);
-    if (name) setCellByHeader_(sheet, table.headers, rowNumber, '名前', name);
+    // 名前は初回プロフィール登録でのみ設定（Google表示名で上書きしない）
     if (picture) {
       const currentAvatar = String(table.rows[idx]['プロフィール画像URL'] || '');
       if (!currentAvatar) {
@@ -410,7 +410,8 @@ function login_(body) {
   setRowValue_(newRow, table.headers, '会員番号', memberNo);
   setRowValue_(newRow, table.headers, 'Googleメール', email);
   setRowValue_(newRow, table.headers, 'GoogleID', googleId);
-  setRowValue_(newRow, table.headers, '名前', name || email.split('@')[0]);
+  // 名前は空のまま。初回プロフィール登録で本人入力させる
+  setRowValue_(newRow, table.headers, '名前', '');
   setRowValue_(newRow, table.headers, '性別', '');
   setRowValue_(newRow, table.headers, '年代', '30代');
   setRowValue_(newRow, table.headers, '業種', 'その他');
@@ -532,6 +533,11 @@ function updateProfile_(body) {
     if (key === 'companyName' && !isPresident) return;
     // 名前など必須っぽい項目は空文字での上書きを防ぐ
     if ((key === 'name' || key === 'gender') && String(profile[key]).trim() === '') return;
+    if (key === 'name') {
+      var existingName = String(table.rows[idx]['名前'] || '').trim();
+      // 一度登録した名前は変更不可（初回のみ入力）
+      if (existingName) return;
+    }
     if (key === 'gender') {
       var existingGender = String(table.rows[idx]['性別'] || '').trim();
       // 掲載後は性別固定。未掲載（初回含む）は変更可

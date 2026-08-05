@@ -238,9 +238,11 @@
     </div>
 
     <form id="edit-form" class="edit-body">
-      <div class="edit-card">
-        <label class="edit-label" for="edit-name">名前</label>
-        <input id="edit-name" name="name" type="text" class="edit-input" required maxlength="40">
+      <div class="edit-card" id="edit-name-card">
+        <label class="edit-label" for="edit-name">お名前(フルネーム)</label>
+        <input id="edit-name" name="name" type="text" class="edit-input" maxlength="40" autocomplete="name">
+        <p id="edit-name-note-first" class="edit-help-text hidden">※お名前の入力が可能なのは初回のみ</p>
+        <p id="edit-name-note-locked" class="edit-help-text hidden">※変更点あれば公式LINEに問い合わせて下さい</p>
       </div>
 
       <div id="edit-company-card" class="edit-card hidden">
