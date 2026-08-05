@@ -1583,7 +1583,22 @@
     setTimeout(() => toast.classList.remove("show"), 2500);
   }
 
-  function openFilterScreen() {
+  async function refreshMastersFromServer() {
+    try {
+      const res = await GasAPI.fetchMasters();
+      if (res?.data && typeof res.data === "object") {
+        state.masters = res.data;
+        applyMastersToFilterUI();
+        return true;
+      }
+    } catch (err) {
+      console.warn("masters refresh failed", err);
+    }
+    return false;
+  }
+
+  async function openFilterScreen() {
+    await refreshMastersFromServer();
     $("#filter-screen").classList.remove("hidden");
   }
 
@@ -2283,7 +2298,7 @@
     }
   }
 
-  function openEditScreen(options = {}) {
+  async function openEditScreen(options = {}) {
     const user = state.currentUser;
     if (!user) {
       showToast("プロフィールを読み込めませんでした");
@@ -2292,6 +2307,14 @@
 
     const required = Boolean(options.required) || needsProfileSetup(user);
     state.editRequired = required;
+
+    // マスタ変更をすぐ反映するため、編集画面を開くたびに再取得
+    showLoading(true);
+    try {
+      await refreshMastersFromServer();
+    } finally {
+      forceHideLoading();
+    }
 
     const m = state.masters || {};
     fillChips("#edit-gender-chips", mapGenderMasterOptions(m["性別"]), canonicalGenderLabel(user.gender) || "all");
