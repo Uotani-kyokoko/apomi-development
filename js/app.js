@@ -1603,6 +1603,15 @@
     return out;
   }
 
+  function fillEditRequiredSelect(selectId, options, selectedValue) {
+    fillSelect(selectId, options, selectedValue || "all");
+    const el = $(selectId);
+    if (!el) return;
+    const allOpt = el.querySelector('option[value="all"]');
+    if (allOpt) allOpt.remove();
+    if (!selectedValue) el.selectedIndex = 0;
+  }
+
   function fillSelect(selectId, options, selectedValue) {
     const el = $(selectId);
     if (!el) return;
@@ -2260,14 +2269,8 @@
     updateGenderEditState(user);
     fillChips("#edit-age-chips", m["年代"], user.ageGroup || "all");
     stripAllChip("#edit-age-chips", user.ageGroup);
-    fillChips("#edit-job-chips", m["職種"], user.jobTitle || "all");
-    stripAllChip("#edit-job-chips", user.jobTitle);
-    fillSelect("#edit-industry", m["業種"], user.industry || "all");
-    const industryEl = $("#edit-industry");
-    if (industryEl && industryEl.querySelector('option[value="all"]')) {
-      industryEl.querySelector('option[value="all"]').remove();
-      if (!user.industry) industryEl.selectedIndex = 0;
-    }
+    fillEditRequiredSelect("#edit-industry", m["業種"], user.industry || "");
+    fillEditRequiredSelect("#edit-job", m["職種"], user.jobTitle || "");
 
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
@@ -2485,7 +2488,7 @@
       gender,
       ageGroup: getSelectedChipValue("#edit-age-chips"),
       industry: $("#edit-industry").value || "",
-      jobTitle: getSelectedChipValue("#edit-job-chips"),
+      jobTitle: ($("#edit-job")?.value || "").trim(),
       location: ($("#edit-location").value || "").trim(),
       hometown: ($("#edit-hometown").value || "").trim(),
       avatarUrl: ($("#edit-avatar").value || "").trim(),
@@ -2944,7 +2947,7 @@
       }
     });
 
-    ["#edit-gender-chips", "#edit-age-chips", "#edit-job-chips"].forEach((id) => {
+    ["#edit-gender-chips", "#edit-age-chips"].forEach((id) => {
       $(id)?.addEventListener("click", (e) => {
         const chip = e.target.closest(".chip");
         if (!chip) return;
