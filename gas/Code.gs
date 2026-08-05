@@ -1259,12 +1259,26 @@ function ensureHeader_(sheet, headers, colName) {
   headers.push(colName);
 }
 
+/**
+ * 会員検索: メールを最優先、会員番号は補助
+ * （途中挿入などで番号がずれても本人を取り違えない）
+ */
 function findUserIndex_(rows, memberNo, email) {
-  return rows.findIndex(function (r) {
-    if (memberNo && String(r['会員番号'] || '') === memberNo) return true;
-    if (email && String(r['Googleメール'] || '').toLowerCase() === email.toLowerCase()) return true;
-    return false;
-  });
+  var mail = String(email || '').trim().toLowerCase();
+  if (mail) {
+    var byEmail = rows.findIndex(function (r) {
+      return String(r['Googleメール'] || '').toLowerCase() === mail;
+    });
+    if (byEmail >= 0) return byEmail;
+  }
+  var no = String(memberNo || '').trim();
+  if (no) {
+    var byNo = rows.findIndex(function (r) {
+      return String(r['会員番号'] || '') === no;
+    });
+    if (byNo >= 0) return byNo;
+  }
+  return -1;
 }
 
 function nextMemberNo_(rows) {
