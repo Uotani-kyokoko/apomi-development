@@ -414,8 +414,8 @@ function login_(body) {
   setRowValue_(newRow, table.headers, '名前', '');
   setRowValue_(newRow, table.headers, '性別', '');
   setRowValue_(newRow, table.headers, '年代', '30代');
-  setRowValue_(newRow, table.headers, '業種', 'その他');
-  setRowValue_(newRow, table.headers, '職種', 'その他');
+  setRowValue_(newRow, table.headers, '業種', '');
+  setRowValue_(newRow, table.headers, '職種', '');
   setRowValue_(newRow, table.headers, '現在地', '');
   setRowValue_(newRow, table.headers, '出身地', '');
   setRowValue_(newRow, table.headers, '自己紹介', '');

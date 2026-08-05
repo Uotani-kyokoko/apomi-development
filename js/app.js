@@ -1639,8 +1639,8 @@
           `<option value="${escapeHtml(o.value)}"${o.value === current ? " selected" : ""}>${escapeHtml(o.label || o.value)}</option>`
       )
       .join("");
-    if (current) el.value = current;
-    else el.selectedIndex = 0;
+    // 初期値は空欄（選択してください）。既存値があるときだけ選択
+    el.value = current || "";
   }
 
   function fillSelect(selectId, options, selectedValue) {
@@ -2300,8 +2300,11 @@
     updateGenderEditState(user);
     fillChips("#edit-age-chips", m["年代"], user.ageGroup || "all");
     stripAllChip("#edit-age-chips", user.ageGroup);
-    fillEditRequiredSelect("#edit-industry", getMasterCategoryOptions(m, "業種"), user.industry || "");
-    fillEditRequiredSelect("#edit-job", getMasterCategoryOptions(m, "職種"), user.jobTitle || "");
+    // 初回登録は業種・職種を空欄スタート（既存会員は保存値を表示）
+    const industryForEdit = user.isNew ? "" : String(user.industry || "").trim();
+    const jobForEdit = user.isNew ? "" : String(user.jobTitle || "").trim();
+    fillEditRequiredSelect("#edit-industry", getMasterCategoryOptions(m, "業種"), industryForEdit);
+    fillEditRequiredSelect("#edit-job", getMasterCategoryOptions(m, "職種"), jobForEdit);
 
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
