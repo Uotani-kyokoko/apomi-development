@@ -1624,23 +1624,27 @@
   function fillEditRequiredSelect(selectId, options, selectedValue) {
     const el = $(selectId);
     if (!el) return;
-    const current = String(selectedValue || "").trim();
-    let opts = uniqueOptions(options);
-    // マスタに無い既存値でも選べる／表示できるように残す
+    let current = String(selectedValue || "").trim();
+    // all / すべては編集プルダウンでは使わない
+    if (!current || current === "all" || current === "すべて") current = "";
+    let opts = uniqueOptions(options).filter(
+      (o) => o.value && o.value !== "all" && o.value !== "すべて"
+    );
+    // マスタに無い既存値でも表示できるよう残す（all系は除く）
     if (current && !opts.some((o) => o.value === current)) {
       opts = [{ value: current, label: current }, ...opts];
     }
     const rows = opts.length
       ? [{ value: "", label: "選択してください" }, ...opts]
-      : [{ value: "", label: "選択肢がありません（マスタを確認）" }];
+      : [{ value: "", label: "選択してください" }];
     el.innerHTML = rows
-      .map(
-        (o) =>
-          `<option value="${escapeHtml(o.value)}"${o.value === current ? " selected" : ""}>${escapeHtml(o.label || o.value)}</option>`
-      )
+      .map((o) => {
+        const selected = o.value === current ? " selected" : "";
+        return `<option value="${escapeHtml(o.value)}"${selected}>${escapeHtml(o.label || o.value)}</option>`;
+      })
       .join("");
-    // 初期値は空欄（選択してください）。既存値があるときだけ選択
-    el.value = current || "";
+    el.value = current;
+    if (el.value !== current) el.selectedIndex = 0;
   }
 
   function fillSelect(selectId, options, selectedValue) {
