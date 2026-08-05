@@ -2143,7 +2143,7 @@
     if (editable) {
       input.classList.remove("hidden");
       input.disabled = false;
-      input.required = true;
+      input.required = false;
       input.value = "";
       input.placeholder = "お名前（フルネーム）を入力";
       noteFirst?.classList.remove("hidden");
