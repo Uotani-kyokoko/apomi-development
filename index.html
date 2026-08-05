@@ -298,18 +298,21 @@
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-bio">自己紹介※改行は反映されません</label>
-        <textarea id="edit-bio" name="bio" class="edit-textarea" rows="4" maxlength="500"></textarea>
+        <label class="edit-label" for="edit-bio">自己紹介（150文字まで・改行不可）</label>
+        <textarea id="edit-bio" name="bio" class="edit-textarea" rows="4" maxlength="150"></textarea>
+        <p id="edit-bio-count" class="edit-help-text">0 / 150</p>
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-want">こんな人と繋がりたい※改行は反映されません</label>
-        <textarea id="edit-want" name="wantMeet" class="edit-textarea" rows="3" maxlength="300"></textarea>
+        <label class="edit-label" for="edit-want">こんな人と繋がりたい（50文字まで・改行不可）</label>
+        <textarea id="edit-want" name="wantMeet" class="edit-textarea" rows="3" maxlength="50"></textarea>
+        <p id="edit-want-count" class="edit-help-text">0 / 50</p>
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-avoid">こんな人とは繋がりたくない※改行は反映されません</label>
-        <textarea id="edit-avoid" name="avoidMeet" class="edit-textarea" rows="3" maxlength="300"></textarea>
+        <label class="edit-label" for="edit-avoid">こんな人とは繋がりたくない（50文字まで・改行不可）</label>
+        <textarea id="edit-avoid" name="avoidMeet" class="edit-textarea" rows="3" maxlength="50"></textarea>
+        <p id="edit-avoid-count" class="edit-help-text">0 / 50</p>
       </div>
 
       <div class="edit-card">

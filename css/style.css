@@ -1603,6 +1603,11 @@ body.has-connect-banner-dock .app-main {
   color: var(--text-secondary);
 }
 
+.edit-help-text.is-over {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .edit-check-label {
   display: flex;
   align-items: flex-start;

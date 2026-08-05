@@ -84,8 +84,87 @@
   /** 編集画面: その他SNS入力（URL配列。LINEは別欄） */
   let editSnsUrls = [];
   const TAG_MAX = 6;
+  const BIO_MAX = 150;
+  const WANT_MEET_MAX = 50;
+  const AVOID_MEET_MAX = 50;
   /** ネストした showLoading 用 */
   let loadingDepth = 0;
+
+  /** 自己紹介系: 改行を除去（空白にはしない） */
+  function stripProfileNewlines(text) {
+    return String(text || "").replace(/[\r\n\u2028\u2029]+/g, "");
+  }
+
+  function updateProfileTextCounts() {
+    const fields = [
+      { id: "#edit-bio", countId: "#edit-bio-count", max: BIO_MAX },
+      { id: "#edit-want", countId: "#edit-want-count", max: WANT_MEET_MAX },
+      { id: "#edit-avoid", countId: "#edit-avoid-count", max: AVOID_MEET_MAX }
+    ];
+    fields.forEach(({ id, countId, max }) => {
+      const el = $(id);
+      const note = $(countId);
+      if (!el || !note) return;
+      const len = stripProfileNewlines(el.value).length;
+      note.textContent = `${len} / ${max}`;
+      note.classList.toggle("is-over", len > max);
+    });
+  }
+
+  function sanitizeProfileTextarea(el, options = {}) {
+    if (!el) return "";
+    const notifyNewline = Boolean(options.notifyNewline);
+    const truncateOver = Boolean(options.truncateOver);
+    const before = el.value;
+    let next = stripProfileNewlines(before);
+    const hadNewline = next !== before;
+    const max = Number(el.getAttribute("maxlength") || 0);
+    let truncated = false;
+    // 貼り付けなど新規に溢れた分だけ切る。既存の超過文は保存時トーストで止める
+    if (truncateOver && max > 0 && next.length > max) {
+      next = next.slice(0, max);
+      truncated = true;
+    }
+    if (next !== before) {
+      const start = el.selectionStart;
+      el.value = next;
+      if (typeof start === "number") {
+        const pos = Math.min(start, next.length);
+        try {
+          el.setSelectionRange(pos, pos);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (notifyNewline && hadNewline) {
+      showToast("改行は入力できません");
+    } else if (truncated && max > 0) {
+      showToast(`${max}文字以内で入力してください`);
+    }
+    updateProfileTextCounts();
+    return next;
+  }
+
+  function bindProfileTextLimits() {
+    ["#edit-bio", "#edit-want", "#edit-avoid"].forEach((id) => {
+      const el = $(id);
+      if (!el || el.dataset.limitBound === "1") return;
+      el.dataset.limitBound = "1";
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          showToast("改行は入力できません");
+        }
+      });
+      el.addEventListener("input", () => sanitizeProfileTextarea(el));
+      el.addEventListener("paste", () => {
+        requestAnimationFrame(() =>
+          sanitizeProfileTextarea(el, { notifyNewline: true, truncateOver: true })
+        );
+      });
+    });
+  }
 
   function normalizeGender(gender) {
     const g = (gender || "").trim();
@@ -2213,9 +2292,11 @@
       }
     }
     $("#edit-avatar").value = user.avatarUrl || "";
-    $("#edit-bio").value = user.bio || "";
-    $("#edit-want").value = user.wantMeet || "";
-    $("#edit-avoid").value = user.avoidMeet || "";
+    // 編集欄では改行を除去して表示（シート保存は「保存する」時）
+    $("#edit-bio").value = stripProfileNewlines(user.bio || "");
+    $("#edit-want").value = stripProfileNewlines(user.wantMeet || "");
+    $("#edit-avoid").value = stripProfileNewlines(user.avoidMeet || "");
+    updateProfileTextCounts();
     const femaleOnlyEl = $("#edit-female-only");
     if (femaleOnlyEl) femaleOnlyEl.checked = isFemaleOnlyConnect(user);
     updateFemaleOnlyOptionVisibility();
@@ -2388,6 +2469,17 @@
     const name = editableName
       ? ($("#edit-name").value || "").trim()
       : String(state.currentUser?.name || "").trim();
+    const bio = stripProfileNewlines($("#edit-bio")?.value || "").trim();
+    const wantMeet = stripProfileNewlines($("#edit-want")?.value || "").trim();
+    const avoidMeet = stripProfileNewlines($("#edit-avoid")?.value || "").trim();
+    let textError = "";
+    if (bio.length > BIO_MAX) {
+      textError = `自己紹介は${BIO_MAX}文字以内で入力してください`;
+    } else if (wantMeet.length > WANT_MEET_MAX) {
+      textError = `「こんな人と繋がりたい」は${WANT_MEET_MAX}文字以内で入力してください`;
+    } else if (avoidMeet.length > AVOID_MEET_MAX) {
+      textError = `「こんな人とは繋がりたくない」は${AVOID_MEET_MAX}文字以内で入力してください`;
+    }
     return {
       name,
       gender,
@@ -2397,9 +2489,9 @@
       location: ($("#edit-location").value || "").trim(),
       hometown: ($("#edit-hometown").value || "").trim(),
       avatarUrl: ($("#edit-avatar").value || "").trim(),
-      bio: ($("#edit-bio").value || "").trim(),
-      wantMeet: ($("#edit-want").value || "").trim(),
-      avoidMeet: ($("#edit-avoid").value || "").trim(),
+      bio,
+      wantMeet,
+      avoidMeet,
       tags: filterVisibleTags(getSelectedChipValues("#edit-tag-chips")),
       annualSpend: ($("#edit-annual-spend")?.value || "").trim(),
       companyName: state.currentUser?.presidentMark
@@ -2407,7 +2499,8 @@
         : String(state.currentUser?.companyName || "").trim(),
       femaleOnlyConnect,
       snsLinks: snsCheck.ok ? snsCheck.urls : [],
-      _snsError: snsCheck.ok ? "" : snsCheck.message
+      _snsError: snsCheck.ok ? "" : snsCheck.message,
+      _textError: textError
     };
   }
 
@@ -2511,7 +2604,11 @@
       showToast(profile._snsError);
       return;
     }
-    const { _snsError, ...profilePayload } = profile;
+    if (profile._textError) {
+      showToast(profile._textError);
+      return;
+    }
+    const { _snsError, _textError, ...profilePayload } = profile;
 
     const shouldPublish = state.editRequired || state.currentUser?.isPublished === false;
 
@@ -2816,6 +2913,8 @@
     $("#edit-back").addEventListener("click", closeEditScreen);
     $("#edit-form").addEventListener("submit", saveProfile);
     $("#edit-avatar-file")?.addEventListener("change", handleAvatarFileChange);
+    bindProfileTextLimits();
+    updateProfileTextCounts();
 
     $("#btn-add-sns")?.addEventListener("click", () => {
       syncEditSnsFromDom();

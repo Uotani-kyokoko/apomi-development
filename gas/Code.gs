@@ -547,6 +547,16 @@ function updateProfile_(body) {
     if (key === 'tags') {
       value = normalizeTagsForSave_(profile[key]);
     }
+    if (key === 'bio' || key === 'wantMeet' || key === 'avoidMeet') {
+      value = String(value || '').replace(/[\r\n\u2028\u2029]+/g, '').trim();
+      var maxLen = key === 'bio' ? 150 : 50;
+      if (value.length > maxLen) {
+        var label =
+          key === 'bio' ? '自己紹介' :
+          key === 'wantMeet' ? 'こんな人と繋がりたい' : 'こんな人とは繋がりたくない';
+        throw new Error(label + 'は' + maxLen + '文字以内で入力してください');
+      }
+    }
     setCellByHeader_(sheet, table.headers, rowNumber, map[key], value);
   });
 
