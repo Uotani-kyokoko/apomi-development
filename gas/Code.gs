@@ -29,6 +29,7 @@ const APPLICATION_FOLDER_ID = '1KH9tpnep8-0RFGjpC45kiciVRWH6c26g';
 // === END ENV ===
 
 
+
 const SHEET = {
   USERS: '会員',
   BANNERS: 'バナー',
@@ -570,7 +571,7 @@ function updateProfile_(body) {
     }
     links = links.map(function (u) { return String(u || '').trim(); }).filter(Boolean).slice(0, 4);
     if (!links.length) {
-      throw new Error('個人LINEのURLは必須です');
+      throw new Error('個人LINEのURLを設定してください。');
     }
     var first = String(links[0] || '').toLowerCase();
     if (first.indexOf('lin.ee') >= 0) {

@@ -374,7 +374,7 @@
   function validateEditSnsUrls(lineRaw, otherUrls) {
     const lineUrl = normalizeSnsUrl(lineRaw);
     if (!lineUrl) {
-      return { ok: false, message: "個人LINEのURLは必須です", urls: [] };
+      return { ok: false, message: "個人LINEのURLを設定してください。", urls: [] };
     }
     if (isOfficialLineUrl(lineUrl)) {
       return {
