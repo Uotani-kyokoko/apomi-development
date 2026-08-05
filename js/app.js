@@ -744,7 +744,7 @@
           <div class="profile-name-row">
             <h2 class="profile-name">${escapeHtml(user.name || "（名前未設定）")}</h2>
             ${
-              user.presidentMark && String(user.companyName || "").trim()
+              String(user.companyName || "").trim()
                 ? `<span class="profile-company">${escapeHtml(String(user.companyName).trim())}</span>`
                 : ""
             }
