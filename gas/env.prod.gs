@@ -1,0 +1,5 @@
+// === BEGIN ENV (prod) ===
+const SPREADSHEET_ID = '1Asat_NahAxVEIwfF0nlDl7BgNGU3M2InXIGJ_2FZXl8';
+const AVATAR_FOLDER_ID = '1leOZAJ8EZI9cZO3E_Eo6MyHabidRDnNm';
+const APPLICATION_FOLDER_ID = '16LAv_PthEplEv6GJo_DoU-NkF0pCBZAr';
+// === END ENV ===

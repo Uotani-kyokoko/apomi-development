@@ -318,8 +318,14 @@
       </div>
 
       <div class="edit-card">
-        <p class="edit-label">掲載SNS（最大4件）</p>
-        <p class="edit-help-text">URLを入れると種類を自動判定します。同じ種類は1つまで。</p>
+        <label class="edit-label" for="edit-line-url">個人LINE（必須）</label>
+        <input id="edit-line-url" type="url" class="edit-input" inputmode="url" placeholder="https://line.me/..." required>
+        <p class="edit-help-text">個人の line.me URL を入力してください（lin.ee は不可）。</p>
+      </div>
+
+      <div class="edit-card">
+        <p class="edit-label">その他SNS（最大3件・任意）</p>
+        <p class="edit-help-text">URLを入れると種類を自動判定します。同じ種類は1つまで。LINEは上の必須欄へ。</p>
         <div id="edit-sns-list" class="edit-sns-list"></div>
         <button type="button" id="btn-add-sns" class="edit-sns-add" aria-label="SNSを追加">
           <i class="fa-solid fa-plus"></i>
@@ -452,11 +458,12 @@
   </div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="js/config.js?v=20260804h"></script>
-  <script src="js/auth.js?v=20260803f"></script>
+  <script src="js/env.js?v=20260805a"></script>
+  <script src="js/config.js?v=20260805a"></script>
+  <script src="js/auth.js?v=20260805a"></script>
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260803h"></script>
-  <script src="js/gas-api.js?v=20260803f"></script>
-  <script src="js/app.js?v=20260804g"></script>
+  <script src="js/gas-api.js?v=20260805a"></script>
+  <script src="js/app.js?v=20260805a"></script>
 </body>
 </html>

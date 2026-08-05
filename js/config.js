@@ -1,16 +1,10 @@
 /**
  * アプリ設定
- *
- * Google Cloud Console で「OAuth クライアントID（ウェブ）」を作成し、
- * GOOGLE_CLIENT_ID に貼り付けてください。
- *
- * 承認済みの JavaScript 生成元の例:
- *   http://localhost:3000
- *   https://あなたの本番ドメイン
+ * 接続値は js/env.js（env.dev.js / env.prod.js から生成）を参照します。
  */
 const AppConfig = {
-  // ← ここを自分のクライアントIDに変更
-  GOOGLE_CLIENT_ID: '199162935519-fbh7rfches1td8dcehesacq7qdbjtgpg.apps.googleusercontent.com',
-
-  SESSION_KEY: 'apomi_session'
+  ENV: (window.ApomyEnv && window.ApomyEnv.name) || "dev",
+  GAS_URL: (window.ApomyEnv && window.ApomyEnv.GAS_URL) || "",
+  GOOGLE_CLIENT_ID: (window.ApomyEnv && window.ApomyEnv.GOOGLE_CLIENT_ID) || "",
+  SESSION_KEY: "apomi_session"
 };

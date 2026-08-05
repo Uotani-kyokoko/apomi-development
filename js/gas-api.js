@@ -5,7 +5,7 @@
  */
 const GasAPI = (() => {
   // 例: 'https://script.google.com/macros/s/XXXX/exec'
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyZcMtmiujiLSPm4X5BU5imEUuPOo5KYVSG1rjrJt1f4hVawPEchLlyv3K-QLhKL4ry/exec';
+  const GAS_URL = (typeof AppConfig !== 'undefined' && AppConfig.GAS_URL) || '';
 
   /** true のあいだは 240件サンプル（Mock）で繋がるページを確認。本番確認後は false に戻す */
   const FORCE_SAMPLE_USERS = false;

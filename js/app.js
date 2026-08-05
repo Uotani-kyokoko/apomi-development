@@ -55,8 +55,9 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
-  /** 掲載SNS（最大4・URLから種別判定・表示は優先順位順） */
-  const SNS_MAX = 4;
+  /** 掲載SNS: 個人LINE必須 + その他最大3件 */
+  const SNS_OTHER_MAX = 3;
+  const SNS_MAX = 1 + SNS_OTHER_MAX;
   const SNS_PRIORITY = [
     "line",
     "instagram",
@@ -80,7 +81,7 @@
     ameblo: { label: "アメブロ", icon: "fa-solid fa-blog", cls: "sns-ameblo" }
   };
 
-  /** 編集画面のSNS入力（URL配列） */
+  /** 編集画面: その他SNS入力（URL配列。LINEは別欄） */
   let editSnsUrls = [];
   const TAG_MAX = 6;
   /** ネストした showLoading 用 */
@@ -255,6 +256,18 @@
     }
   }
 
+  function isPersonalLineUrl(url) {
+    const raw = String(url || "").trim();
+    if (!raw || isOfficialLineUrl(raw)) return false;
+    try {
+      const u = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+      const host = u.hostname.replace(/^www\./, "").toLowerCase();
+      return host.includes("line.me") || host.includes("page.line.me");
+    } catch {
+      return /line\.me/i.test(raw);
+    }
+  }
+
   function detectSnsType(url) {
     const raw = String(url || "").trim().toLowerCase();
     if (!raw) return null;
@@ -284,27 +297,46 @@
     return `https://${raw}`;
   }
 
-  /** 旧形式 {line,instagram,...} / snsLinks[] を URL 配列に統一 */
+  /** 旧形式 {line,instagram,...} / snsLinks[] を URL 配列に統一（LINE優先） */
   function getUserSnsUrls(user) {
     if (!user) return [];
+    let raw = [];
     if (Array.isArray(user.snsLinks) && user.snsLinks.length) {
-      return user.snsLinks.map((u) => String(u || "").trim()).filter(Boolean).slice(0, SNS_MAX);
-    }
-    if (Array.isArray(user.sns)) {
-      return user.sns
+      raw = user.snsLinks.map((u) => String(u || "").trim()).filter(Boolean);
+    } else if (Array.isArray(user.sns)) {
+      raw = user.sns
         .map((item) => (typeof item === "string" ? item : item?.url))
         .map((u) => String(u || "").trim())
-        .filter(Boolean)
-        .slice(0, SNS_MAX);
+        .filter(Boolean);
+    } else {
+      const obj = user.sns && typeof user.sns === "object" ? user.sns : {};
+      const legacyOrder = ["line", "instagram", "facebook", "x", "youtube", "home", "litlink", "canva", "ameblo"];
+      legacyOrder.forEach((key) => {
+        const v = String(obj[key] || "").trim();
+        if (v) raw.push(v);
+      });
     }
-    const obj = user.sns && typeof user.sns === "object" ? user.sns : {};
-    const legacyOrder = ["line", "instagram", "facebook", "x", "youtube", "home", "litlink", "canva", "ameblo"];
-    const out = [];
-    legacyOrder.forEach((key) => {
-      const v = String(obj[key] || "").trim();
-      if (v) out.push(v);
+    return splitSnsUrls(raw).all.slice(0, SNS_MAX);
+  }
+
+  function splitSnsUrls(urls) {
+    const list = (urls || []).map((u) => normalizeSnsUrl(u)).filter(Boolean);
+    let lineUrl = "";
+    const others = [];
+    list.forEach((url) => {
+      const type = detectSnsType(url);
+      if (type === "line" && !lineUrl) {
+        lineUrl = url;
+        return;
+      }
+      if (type === "line") return; // 2件目以降のLINEは無視
+      others.push(url);
     });
-    return out.slice(0, SNS_MAX);
+    return {
+      lineUrl,
+      otherUrls: others.slice(0, SNS_OTHER_MAX),
+      all: lineUrl ? [lineUrl, ...others.slice(0, SNS_OTHER_MAX)] : others.slice(0, SNS_OTHER_MAX)
+    };
   }
 
   function sortSnsByPriority(urls) {
@@ -339,33 +371,60 @@
       .join("");
   }
 
-  function validateEditSnsUrls(urls) {
+  function validateEditSnsUrls(lineRaw, otherUrls) {
+    const lineUrl = normalizeSnsUrl(lineRaw);
+    if (!lineUrl) {
+      return { ok: false, message: "個人LINEのURLは必須です", urls: [] };
+    }
+    if (isOfficialLineUrl(lineUrl)) {
+      return {
+        ok: false,
+        message: "公式LINE（lin.ee）は登録できません。個人の line.me URL を入力してください",
+        urls: []
+      };
+    }
+    if (!isPersonalLineUrl(lineUrl) || detectSnsType(lineUrl) !== "line") {
+      return {
+        ok: false,
+        message: "個人LINEは line.me のURLを入力してください",
+        urls: []
+      };
+    }
+
     const cleaned = [];
-    const seen = new Set();
-    for (const raw of urls || []) {
+    const seen = new Set(["line"]);
+    for (const raw of otherUrls || []) {
       const url = String(raw || "").trim();
       if (!url) continue;
       const normalized = normalizeSnsUrl(url);
       if (isOfficialLineUrl(normalized)) {
         return {
           ok: false,
-          message: `公式LINE（lin.ee）は登録できません。line.me のURLを入力してください: ${url}`
+          message: `公式LINE（lin.ee）は登録できません: ${url}`,
+          urls: []
         };
       }
       const type = detectSnsType(normalized);
       if (!type) {
-        return { ok: false, message: `対応していないURLです: ${url}` };
+        return { ok: false, message: `対応していないURLです: ${url}`, urls: [] };
+      }
+      if (type === "line") {
+        return {
+          ok: false,
+          message: "LINEは上の「個人LINE」欄に入力してください",
+          urls: []
+        };
       }
       if (seen.has(type)) {
-        return { ok: false, message: `${SNS_META[type].label} はすでに追加されています` };
+        return { ok: false, message: `${SNS_META[type].label} はすでに追加されています`, urls: [] };
       }
       seen.add(type);
       cleaned.push(normalized);
-      if (cleaned.length > SNS_MAX) {
-        return { ok: false, message: `SNSは最大${SNS_MAX}件までです` };
+      if (cleaned.length > SNS_OTHER_MAX) {
+        return { ok: false, message: `その他SNSは最大${SNS_OTHER_MAX}件までです`, urls: [] };
       }
     }
-    return { ok: true, urls: cleaned };
+    return { ok: true, urls: [lineUrl, ...cleaned] };
   }
 
   function renderEditSnsList() {
@@ -388,7 +447,7 @@
           </div>`;
       })
       .join("");
-    if (addBtn) addBtn.disabled = editSnsUrls.length >= SNS_MAX;
+    if (addBtn) addBtn.disabled = editSnsUrls.length >= SNS_OTHER_MAX;
   }
 
   function syncEditSnsFromDom() {
@@ -2127,8 +2186,10 @@
     const femaleOnlyEl = $("#edit-female-only");
     if (femaleOnlyEl) femaleOnlyEl.checked = isFemaleOnlyConnect(user);
     updateFemaleOnlyOptionVisibility();
-    editSnsUrls = getUserSnsUrls(user);
-    if (!editSnsUrls.length) editSnsUrls = [""];
+    const split = splitSnsUrls(getUserSnsUrls(user));
+    const lineInput = $("#edit-line-url");
+    if (lineInput) lineInput.value = split.lineUrl || "";
+    editSnsUrls = split.otherUrls.length ? split.otherUrls.slice() : [];
     renderEditSnsList();
     const status = $("#edit-avatar-status");
     if (status) status.textContent = "JPEG / PNG（自動で縮小して保存します）";
@@ -2282,7 +2343,8 @@
 
   function collectEditForm() {
     syncEditSnsFromDom();
-    const snsCheck = validateEditSnsUrls(editSnsUrls);
+    const lineRaw = ($("#edit-line-url")?.value || "").trim();
+    const snsCheck = validateEditSnsUrls(lineRaw, editSnsUrls);
     const editableGender = canEditGender(state.currentUser);
     const gender = editableGender
       ? getSelectedChipValue("#edit-gender-chips")
@@ -2307,7 +2369,7 @@
         ? ($("#edit-company-name")?.value || "").trim()
         : String(state.currentUser?.companyName || "").trim(),
       femaleOnlyConnect,
-      snsLinks: snsCheck.ok ? snsCheck.urls : editSnsUrls.filter(Boolean),
+      snsLinks: snsCheck.ok ? snsCheck.urls : [],
       _snsError: snsCheck.ok ? "" : snsCheck.message
     };
   }
@@ -2720,7 +2782,7 @@
 
     $("#btn-add-sns")?.addEventListener("click", () => {
       syncEditSnsFromDom();
-      if (editSnsUrls.length >= SNS_MAX) return;
+      if (editSnsUrls.length >= SNS_OTHER_MAX) return;
       editSnsUrls.push("");
       renderEditSnsList();
     });
@@ -2730,7 +2792,6 @@
       syncEditSnsFromDom();
       const idx = Number(removeBtn.dataset.removeSns);
       editSnsUrls.splice(idx, 1);
-      if (!editSnsUrls.length) editSnsUrls = [""];
       renderEditSnsList();
     });
     $("#edit-sns-list")?.addEventListener("input", (e) => {

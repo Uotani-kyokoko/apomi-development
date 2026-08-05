@@ -22,11 +22,11 @@
  */
 
 // コンテナバインド（スプレッドシートに紐付いたスクリプト）なら空文字のままでOK
-const SPREADSHEET_ID = '1Asat_NahAxVEIwfF0nlDl7BgNGU3M2InXIGJ_2FZXl8';
-
-// 保存先フォルダを固定したい場合は Drive のフォルダ ID を入れる
-const AVATAR_FOLDER_ID = '1leOZAJ8EZI9cZO3E_Eo6MyHabidRDnNm';
-const APPLICATION_FOLDER_ID = '16LAv_PthEplEv6GJo_DoU-NkF0pCBZAr';
+// === BEGIN ENV (dev) ===
+const SPREADSHEET_ID = '1JNnkjKwUwNY9OnCAkIvZE_5yOi0xJyUcHzdpBWhhu64';
+const AVATAR_FOLDER_ID = '1Dl3UOzrbFwvK8FGUEK7ZVjZ95qUqIXvV';
+const APPLICATION_FOLDER_ID = '1KH9tpnep8-0RFGjpC45kiciVRWH6c26g';
+// === END ENV ===
 
 const SHEET = {
   USERS: '会員',
@@ -561,17 +561,29 @@ function updateProfile_(body) {
     if (Array.isArray(profile.snsLinks)) {
       links = profile.snsLinks;
     } else if (profile.sns && typeof profile.sns === 'object') {
-      // 旧形式互換
-      ['line', 'instagram', 'facebook', 'x', 'youtube', 'home', 'litlink', 'canva', 'ameblo'].forEach(function (k) {
+      // 旧形式互換: LINE を先頭に
+      if (profile.sns.line) links.push(String(profile.sns.line));
+      ['instagram', 'facebook', 'x', 'youtube', 'home', 'litlink', 'canva', 'ameblo'].forEach(function (k) {
         if (profile.sns[k]) links.push(String(profile.sns[k]));
       });
     }
     links = links.map(function (u) { return String(u || '').trim(); }).filter(Boolean).slice(0, 4);
+    if (!links.length) {
+      throw new Error('個人LINEのURLは必須です');
+    }
+    var first = String(links[0] || '').toLowerCase();
+    if (first.indexOf('lin.ee') >= 0) {
+      throw new Error('公式LINE（lin.ee）は登録できません。個人の line.me URL を入力してください');
+    }
+    if (first.indexOf('line.me') < 0 && first.indexOf('page.line.me') < 0) {
+      throw new Error('個人LINE（line.me）のURLを先頭に登録してください');
+    }
     while (links.length < 4) links.push('');
     setCellByHeader_(sheet, table.headers, rowNumber, 'SNS1', links[0] || '');
     setCellByHeader_(sheet, table.headers, rowNumber, 'SNS2', links[1] || '');
     setCellByHeader_(sheet, table.headers, rowNumber, 'SNS3', links[2] || '');
     setCellByHeader_(sheet, table.headers, rowNumber, 'SNS4', links[3] || '');
+    setCellByHeader_(sheet, table.headers, rowNumber, 'LINE', links[0] || '');
   }
 
   allowed.forEach(function (col) {
@@ -1136,10 +1148,22 @@ function extractSnsLinks_(r) {
     var v = String(r[col] || '').trim();
     if (v) links.push(v);
   });
-  if (links.length) return links.slice(0, 4);
+  if (links.length) {
+    var legacyLine = String(r['LINE'] || '').trim();
+    var first = String(links[0] || '').toLowerCase();
+    var firstIsLine = first.indexOf('line.me') >= 0 || first.indexOf('page.line.me') >= 0;
+    if (!firstIsLine && legacyLine) {
+      links = [legacyLine].concat(links.filter(function (u) {
+        return String(u || '').trim() !== legacyLine;
+      }));
+    }
+    return links.slice(0, 4);
+  }
 
-  // 旧列からの読み取り互換
-  ['Instagram', 'Facebook', 'X', 'LINE', 'YouTube'].forEach(function (col) {
+  // 旧列からの読み取り互換（LINEを先頭）
+  var line = String(r['LINE'] || '').trim();
+  if (line) links.push(line);
+  ['Instagram', 'Facebook', 'X', 'YouTube'].forEach(function (col) {
     var v = String(r[col] || '').trim();
     if (v) links.push(v);
   });
