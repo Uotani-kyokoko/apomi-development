@@ -90,7 +90,8 @@ const MockAPI = (() => {
     users.forEach((u) => {
       const createdKey = toDateKeyTokyo(u.createdAt || u.publishedAt);
       const loginKey = toDateKeyTokyo(u.lastLoginAt);
-      if (u.isPublished === false && loginKey === yesterday) unpublished += 1;
+      const hasRealName = Boolean(String(u.realName || "").trim());
+      if (u.isPublished === false && loginKey === yesterday && hasRealName) unpublished += 1;
       if (createdKey === yesterday) yesterdayNew += 1;
       if (
         loginKey === yesterday &&

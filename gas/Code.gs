@@ -192,7 +192,8 @@ function getUsers_(p) {
  * ホームダッシュボード用集計（Asia/Tokyo）
  * - 登録人数: 会員シート全件
  * - 昨日の新規: 登録日時が昨日
- * - 昨日の掲載停止者: 掲載中=FALSE かつ 最終ログイン日時が昨日
+ * - 昨日の掲載停止者: 掲載中=FALSE かつ 最終ログイン日時が昨日 かつ 本名が空でない
+ *   （本名空＝プロフィール未完了の未登録扱いは除外）
  * - 再参加者: 昨日ログインがあり、登録日が昨日より前、かつ掲載中=TRUE
  * - newLast7Days: 直近7日の新規登録（棒グラフ用）
  */
@@ -215,7 +216,8 @@ function getDashboard_() {
     const createdKey = tokyoDateKey_(parseDate_(r['登録日時']));
     const loginKey = tokyoDateKey_(parseDate_(r['最終ログイン日時']));
     const isPublished = toBool_(r['掲載中']);
-    if (!isPublished && loginKey === yesterday) unpublished += 1;
+    const hasRealName = Boolean(realNameFromRow_(r));
+    if (!isPublished && loginKey === yesterday && hasRealName) unpublished += 1;
     if (createdKey === yesterday) yesterdayNew += 1;
     if (loginKey === yesterday && createdKey && createdKey < yesterday && isPublished) {
       yesterdayReturning += 1;
