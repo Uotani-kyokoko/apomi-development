@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260807c">
+  <link rel="stylesheet" href="css/style.css?v=20260807e">
 </head>
 <body>
 
@@ -56,11 +56,13 @@
   <!-- ===== メンテナンス画面 ===== -->
   <div id="maintenance-screen" class="hidden" aria-live="polite">
     <div class="maintenance-inner">
-      <img class="maintenance-logo" src="img/apomy-logo.png" alt="apomy" width="1024" height="768">
+      <img id="maintenance-logo" class="maintenance-logo" src="img/apomy-logo.png" alt="apomy" width="1024" height="768">
       <h1 class="maintenance-title">メンテナンス中です</h1>
       <p class="maintenance-text">ご迷惑をおかけします。</p>
-      <p class="maintenance-admin-hint">管理者の方は下からログインできます</p>
-      <div id="maintenance-google-btn-host" class="google-btn-host"></div>
+      <div id="maintenance-admin-panel" class="maintenance-admin-panel hidden">
+        <p class="maintenance-admin-hint">管理者ログイン</p>
+        <div id="maintenance-google-btn-host" class="google-btn-host"></div>
+      </div>
     </div>
   </div>
 
@@ -504,6 +506,6 @@
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260807d"></script>
   <script src="js/gas-api.js?v=20260807d"></script>
-  <script src="js/app.js?v=20260807d"></script>
+  <script src="js/app.js?v=20260807e"></script>
 </body>
 </html>

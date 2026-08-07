@@ -243,6 +243,9 @@ img {
   height: auto;
   margin: 0 0 8px;
   object-fit: contain;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .maintenance-title {
@@ -264,6 +267,19 @@ img {
   margin: 12px 0 0;
   font-size: 0.8rem;
   color: #9ca3af;
+}
+
+.maintenance-admin-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.maintenance-admin-panel.hidden {
+  display: none;
 }
 
 /* ===== App Shell ===== */

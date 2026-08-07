@@ -2889,7 +2889,56 @@
     $("#maintenance-screen")?.classList.remove("hidden");
     closeFilterScreen();
     closeEditScreen(true);
+    // 一般ユーザーにはログインを出さない。管理者のみロゴ連打 / ?admin=1 で解錠
+    hideMaintenanceAdminLogin();
+    bindMaintenanceAdminUnlock();
+    if (shouldUnlockMaintenanceAdmin()) {
+      revealMaintenanceAdminLogin();
+    }
+  }
+
+  function hideMaintenanceAdminLogin() {
+    const panel = $("#maintenance-admin-panel");
+    const host = $("#maintenance-google-btn-host");
+    panel?.classList.add("hidden");
+    if (host) host.innerHTML = "";
+  }
+
+  function revealMaintenanceAdminLogin() {
+    const panel = $("#maintenance-admin-panel");
+    if (!panel) return;
+    panel.classList.remove("hidden");
     setupGoogleButton("maintenance-google-btn-host");
+  }
+
+  function shouldUnlockMaintenanceAdmin() {
+    try {
+      const q = new URLSearchParams(window.location.search || "");
+      return q.get("admin") === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function bindMaintenanceAdminUnlock() {
+    const logo = $("#maintenance-logo");
+    if (!logo || logo.dataset.adminUnlockBound === "1") return;
+    logo.dataset.adminUnlockBound = "1";
+    let taps = 0;
+    let resetTimer = null;
+    const NEED = 5;
+    const WINDOW_MS = 2500;
+    logo.addEventListener("click", () => {
+      taps += 1;
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => {
+        taps = 0;
+      }, WINDOW_MS);
+      if (taps < NEED) return;
+      taps = 0;
+      if (resetTimer) clearTimeout(resetTimer);
+      revealMaintenanceAdminLogin();
+    });
   }
 
   /** 拒否時: セッション破棄して拒否画面へ */
