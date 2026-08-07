@@ -1928,6 +1928,12 @@
       const settingsRes = results[4].status === "fulfilled" ? results[4].value : null;
       const dashboardRes = results[5].status === "fulfilled" ? results[5].value : null;
 
+      // セッション復元中に拒否された場合は一覧フォールバックせず即ログアウト
+      if (results[2].status === "rejected" && isAccessDeniedError(results[2].reason)) {
+        forceLogoutForAccessDenied(results[2].reason?.message || results[2].reason);
+        return;
+      }
+
       // GAS失敗時はモックにフォールバック（画面が空にならないようにする）
       if (!usersRes) {
         console.error("users failed", results[1].reason);
@@ -2756,6 +2762,38 @@
     setupGoogleButton();
   }
 
+  function isAccessDeniedError(err) {
+    const msg = String(err?.message || err || "");
+    return msg.includes("アクセスが拒否されました");
+  }
+
+  /** 拒否時: セッション破棄してログイン画面へ */
+  function forceLogoutForAccessDenied(message) {
+    try {
+      Session.clear();
+    } catch (err) {
+      console.warn(err);
+    }
+    try {
+      window.google?.accounts?.id?.disableAutoSelect?.();
+    } catch (err) {
+      console.warn(err);
+    }
+    state.currentUser = null;
+    state.allUsers = [];
+    state.users = [];
+    state.banners = [];
+    state.dashboard = null;
+    state.identity = null;
+    state.isLoggedIn = false;
+    state.editRequired = false;
+    showToast(
+      message ||
+        "アクセスが拒否されました。心当たりのない方はオーナーにお問合せください。"
+    );
+    showLogin();
+  }
+
   /** 開発者用: セッション破棄してログイン画面へ */
   function logoutToLogin() {
     try {
@@ -2836,7 +2874,11 @@
       await showApp();
     } catch (err) {
       console.error(err);
-      showToast(err.message || "ログインに失敗しました");
+      if (isAccessDeniedError(err)) {
+        forceLogoutForAccessDenied(err.message);
+      } else {
+        showToast(err.message || "ログインに失敗しました");
+      }
     } finally {
       forceHideLoading();
     }

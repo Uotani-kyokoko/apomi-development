@@ -18,8 +18,13 @@
  * 【マスタ】区分=年間経費 の行で年間経費の選択肢を管理
  * 【マスタ】区分=プライバシーポリシー の行で初回同意文を管理
  * 【設定キー】サロンURL / サロンボタン名
+ * 【設定キー】拒否メール … アクセス拒否するメール（改行・カンマ区切り）。API応答には含めない
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  */
+
+var ACCESS_DENIED_MESSAGE =
+  'アクセスが拒否されました。心当たりのない方はオーナーにお問合せください。';
+
 
 // コンテナバインド（スプレッドシートに紐付いたスクリプト）なら空文字のままでOK
 // === BEGIN ENV (dev) ===
@@ -60,7 +65,7 @@ function doGet(e) {
         data = getMasters_();
         break;
       case 'settings':
-        data = getSettings_();
+        data = getPublicSettings_();
         break;
       case 'login':
         // POST の body 欠落対策として GET でもログイン可
@@ -297,10 +302,16 @@ function touchActivity_(body) {
     throw new Error('email または memberNo が必要です');
   }
 
+  // メール指定時は先に拒否チェック（会員未登録でも弾く）
+  if (email) assertNotDeniedEmail_(email);
+
   const sheet = getSheet_(SHEET.USERS);
   const table = readTable_(sheet);
   const idx = findUserIndex_(table.rows, memberNo, email);
   if (idx < 0) throw new Error('会員が見つかりません');
+
+  // 会員番号のみで来た場合もシート上のメールで拒否チェック
+  assertNotDeniedEmail_(table.rows[idx]['Googleメール']);
 
   const now = formatDateTime_(new Date());
   const rowNumber = idx + 2;
@@ -354,6 +365,45 @@ function getSettings_() {
   return out;
 }
 
+/** フロント公開用（拒否リスト等は含めない） */
+function getPublicSettings_() {
+  const out = getSettings_();
+  delete out['拒否メール'];
+  delete out['承認トークン'];
+  return out;
+}
+
+/**
+ * 設定シート「拒否メール」から拒否アドレス集合を取得
+ * 改行・カンマ・読点・セミコロン・空白区切り
+ */
+function getDeniedEmailSet_() {
+  var set = {};
+  try {
+    var raw = String((getSettings_()['拒否メール'] || '')).trim();
+    if (!raw) return set;
+    String(raw)
+      .split(/[\s,，、;；\n\r]+/)
+      .map(function (s) { return String(s || '').trim().toLowerCase(); })
+      .filter(Boolean)
+      .forEach(function (mail) {
+        set[mail] = true;
+      });
+  } catch (e) {
+    // 設定読めないときは拒否しない（可用性優先）
+  }
+  return set;
+}
+
+function assertNotDeniedEmail_(email) {
+  var mail = String(email || '').trim().toLowerCase();
+  if (!mail) return;
+  var denied = getDeniedEmailSet_();
+  if (denied[mail]) {
+    throw new Error(ACCESS_DENIED_MESSAGE);
+  }
+}
+
 /* ========== Write APIs ========== */
 
 function login_(body) {
@@ -375,6 +425,9 @@ function login_(body) {
   if (!email) {
     throw new Error('email が必要です（GASを最新Code.gsで再デプロイし、idTokenまたはemailを送ってください）');
   }
+
+  // 会員シート更新の前に拒否判定
+  assertNotDeniedEmail_(email);
 
   const sheet = getSheet_(SHEET.USERS);
   const table = readTable_(sheet);
