@@ -2755,6 +2755,7 @@
     state.identity = null;
     state.editRequired = false;
     closeConnectMenu();
+    $("#access-denied-screen")?.classList.add("hidden");
     $("#login-screen").classList.remove("hidden");
     $("#app-screen").classList.add("hidden");
     closeFilterScreen();
@@ -2767,8 +2768,63 @@
     return msg.includes("アクセスが拒否されました");
   }
 
-  /** 拒否時: セッション破棄してログイン画面へ */
-  function forceLogoutForAccessDenied(message) {
+  function resolveOfficialLineUrl(masters = state.masters) {
+    const items = getMasterCategoryOptions(masters, "公式LINE");
+    for (const item of items) {
+      const url = String(item?.value || item?.label || "").trim();
+      if (/^https?:\/\//i.test(url)) return url;
+    }
+    return "";
+  }
+
+  function applyAccessDeniedLineUrl(url) {
+    const link = $("#access-denied-line-link");
+    const btn = $("#access-denied-line-btn");
+    const safe = String(url || "").trim();
+    if (link) {
+      if (safe) {
+        link.href = safe;
+        link.classList.remove("is-disabled");
+      } else {
+        link.removeAttribute("href");
+        link.classList.add("is-disabled");
+      }
+    }
+    if (btn) {
+      if (safe) {
+        btn.href = safe;
+        btn.classList.remove("hidden");
+      } else {
+        btn.classList.add("hidden");
+      }
+    }
+  }
+
+  async function showAccessDeniedScreen() {
+    state.isLoggedIn = false;
+    state.identity = null;
+    state.editRequired = false;
+    closeConnectMenu();
+    $("#login-screen")?.classList.add("hidden");
+    $("#app-screen")?.classList.add("hidden");
+    $("#access-denied-screen")?.classList.remove("hidden");
+    closeFilterScreen();
+    closeEditScreen(true);
+
+    applyAccessDeniedLineUrl(resolveOfficialLineUrl());
+    try {
+      const res = await GasAPI.fetchMasters();
+      if (res?.data) {
+        state.masters = res.data;
+        applyAccessDeniedLineUrl(resolveOfficialLineUrl(res.data));
+      }
+    } catch (err) {
+      console.warn("access-denied masters fetch failed", err);
+    }
+  }
+
+  /** 拒否時: セッション破棄して拒否画面へ */
+  function forceLogoutForAccessDenied(_message) {
     try {
       Session.clear();
     } catch (err) {
@@ -2787,11 +2843,7 @@
     state.identity = null;
     state.isLoggedIn = false;
     state.editRequired = false;
-    showToast(
-      message ||
-        "アクセスが拒否されました。心当たりのない方はオーナーにお問合せください。"
-    );
-    showLogin();
+    showAccessDeniedScreen();
   }
 
   /** 開発者用: セッション破棄してログイン画面へ */
@@ -2843,6 +2895,7 @@
 
   function showApp() {
     state.isLoggedIn = true;
+    $("#access-denied-screen")?.classList.add("hidden");
     $("#login-screen").classList.add("hidden");
     $("#app-screen").classList.remove("hidden");
     switchTab("home");
@@ -2949,6 +3002,10 @@
     bindDevLogoutOnHeaderTitle();
     bindInstallAppEvents();
     bindConnectJumpEvents();
+
+    $("#access-denied-back-login")?.addEventListener("click", () => {
+      showLogin();
+    });
 
     document.addEventListener("click", (e) => {
       const guarded = e.target.closest("a.sns-link[data-sns-guard='female-only']");

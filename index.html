@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260804f">
+  <link rel="stylesheet" href="css/style.css?v=20260807b">
 </head>
 <body>
 
@@ -32,6 +32,24 @@
       <img class="login-logo" src="img/apomy-logo.png" alt="apomy" width="1024" height="768">
       <div id="google-btn-host" class="google-btn-host"></div>
       <p id="login-hint" class="login-hint hidden"></p>
+    </div>
+  </div>
+
+  <!-- ===== アクセス拒否画面 ===== -->
+  <div id="access-denied-screen" class="hidden" aria-live="polite">
+    <div class="access-denied-inner">
+      <img class="access-denied-logo" src="img/apomy-logo.png" alt="apomy" width="1024" height="768">
+      <h1 class="access-denied-title">アクセスが拒否されました</h1>
+      <p class="access-denied-text">
+        詳細は
+        <a id="access-denied-line-link" class="access-denied-link" href="#" target="_blank" rel="noopener noreferrer">コチラ</a>
+        から問合せください。
+      </p>
+      <a id="access-denied-line-btn" class="access-denied-btn hidden" href="#" target="_blank" rel="noopener noreferrer">
+        <i class="fa-brands fa-line" aria-hidden="true"></i>
+        公式LINEで問合せ
+      </a>
+      <button type="button" id="access-denied-back-login" class="access-denied-back">ログイン画面へ戻る</button>
     </div>
   </div>
 
@@ -469,6 +487,6 @@
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260803h"></script>
   <script src="js/gas-api.js?v=20260805b"></script>
-  <script src="js/app.js?v=20260807a"></script>
+  <script src="js/app.js?v=20260807b"></script>
 </body>
 </html>

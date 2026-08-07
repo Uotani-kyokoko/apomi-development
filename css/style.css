@@ -121,6 +121,98 @@ img {
   line-height: 1.5;
 }
 
+/* ===== アクセス拒否 ===== */
+#access-denied-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  padding: 32px 28px calc(32px + env(safe-area-inset-bottom, 0px));
+}
+
+#access-denied-screen.hidden {
+  display: none;
+}
+
+.access-denied-inner {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.access-denied-logo {
+  display: block;
+  width: min(56vw, 180px);
+  height: auto;
+  margin: 0 0 8px;
+  object-fit: contain;
+}
+
+.access-denied-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.02em;
+}
+
+.access-denied-text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #374151;
+}
+
+.access-denied-link {
+  color: #06c755;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.access-denied-link.is-disabled {
+  color: #9ca3af;
+  pointer-events: none;
+  text-decoration: none;
+}
+
+.access-denied-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #06c755;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  width: 100%;
+  max-width: 280px;
+  box-sizing: border-box;
+}
+
+.access-denied-btn.hidden {
+  display: none;
+}
+
+.access-denied-back {
+  margin-top: 4px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 8px;
+}
+
 /* ===== App Shell ===== */
 #app-screen {
   display: flex;
