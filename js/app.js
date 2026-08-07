@@ -742,7 +742,7 @@
             <div class="profile-sns">${renderSns(user)}</div>
           </div>
           <div class="profile-name-row">
-            <h2 class="profile-name">${escapeHtml(user.name || "（名前未設定）")}</h2>
+            <h2 class="profile-name">${escapeHtml(user.name || user.nickname || "（ニックネーム未設定）")}</h2>
             ${
               user.presidentMark && String(user.companyName || "").trim()
                 ? `<span class="profile-company">${escapeHtml(String(user.companyName).trim())}</span>`
@@ -2154,10 +2154,16 @@
     }
   }
 
+  function displayNameOf(user) {
+    return String(user?.nickname || user?.name || "").trim();
+  }
+
   function needsProfileSetup(user) {
     if (!user) return false;
     if (user.isNew) return true;
     if (user.isPublished === false) return true;
+    if (!displayNameOf(user)) return true;
+    if (!String(user.realName || "").trim()) return true;
     return false;
   }
 
@@ -2271,36 +2277,43 @@
     openEditScreen({ required: true });
   }
 
-  function canEditDisplayName(user) {
+  function canEditRealName(user) {
     if (!user) return false;
-    // 初回登録中、または名前未設定（途中離脱の再開）のみ編集可
     if (user.isNew) return true;
-    return !String(user.name || "").trim();
+    return !String(user.realName || "").trim();
   }
 
-  function applyEditNameFieldState(user) {
-    const input = $("#edit-name");
-    const noteFirst = $("#edit-name-note-first");
-    const noteLocked = $("#edit-name-note-locked");
-    if (!input) return;
-    const editable = canEditDisplayName(user);
-    if (editable) {
-      input.classList.remove("hidden");
-      input.disabled = false;
-      input.required = false;
-      input.value = "";
-      input.placeholder = "お名前（フルネーム）を入力";
-      noteFirst?.classList.remove("hidden");
-      noteLocked?.classList.add("hidden");
-    } else {
-      // 登録後は値を出さず、ラベル＋問い合わせ案内のみ
-      input.value = "";
-      input.required = false;
-      input.disabled = true;
-      input.classList.add("hidden");
-      input.placeholder = "";
-      noteFirst?.classList.add("hidden");
-      noteLocked?.classList.remove("hidden");
+  function applyEditNameFieldsState(user) {
+    const realInput = $("#edit-real-name");
+    const noteFirst = $("#edit-real-name-note-first");
+    const noteLocked = $("#edit-real-name-note-locked");
+    const nickInput = $("#edit-nickname");
+
+    if (realInput) {
+      const editable = canEditRealName(user);
+      if (editable) {
+        realInput.classList.remove("hidden");
+        realInput.disabled = false;
+        realInput.value = "";
+        realInput.placeholder = "本名（フルネーム）を入力";
+        noteFirst?.classList.remove("hidden");
+        noteLocked?.classList.add("hidden");
+      } else {
+        // 登録後は値を出さず、注記のみ（非公開のため）
+        realInput.value = "";
+        realInput.disabled = true;
+        realInput.classList.add("hidden");
+        realInput.placeholder = "";
+        noteFirst?.classList.add("hidden");
+        noteLocked?.classList.remove("hidden");
+      }
+    }
+
+    if (nickInput) {
+      nickInput.disabled = false;
+      nickInput.classList.remove("hidden");
+      nickInput.value = displayNameOf(user);
+      nickInput.placeholder = "ニックネームを入力";
     }
   }
 
@@ -2355,7 +2368,7 @@
     fillMultiChips("#edit-tag-chips", getActiveTagOptions(), filterVisibleTags(user.tags));
     updateEditTagCount();
 
-    applyEditNameFieldState(user);
+    applyEditNameFieldsState(user);
     const companyCard = $("#edit-company-card");
     const companyInput = $("#edit-company-name");
     if (companyCard && companyInput) {
@@ -2541,10 +2554,11 @@
       : String(state.currentUser?.gender || "").trim();
     const femaleOnlyConnect =
       gender === "女性" && Boolean($("#edit-female-only")?.checked);
-    const editableName = canEditDisplayName(state.currentUser);
-    const name = editableName
-      ? ($("#edit-name").value || "").trim()
-      : String(state.currentUser?.name || "").trim();
+    const editableRealName = canEditRealName(state.currentUser);
+    const realName = editableRealName
+      ? ($("#edit-real-name")?.value || "").trim()
+      : String(state.currentUser?.realName || "").trim();
+    const nickname = ($("#edit-nickname")?.value || "").trim();
     const bio = stripProfileNewlines($("#edit-bio")?.value || "").trim();
     const wantMeet = stripProfileNewlines($("#edit-want")?.value || "").trim();
     const avoidMeet = stripProfileNewlines($("#edit-avoid")?.value || "").trim();
@@ -2557,7 +2571,9 @@
       textError = `「こんな人とは繋がりたくない」は${AVOID_MEET_MAX}文字以内で入力してください`;
     }
     return {
-      name,
+      realName,
+      nickname,
+      name: nickname, // 互換: 公開表示名
       gender,
       ageGroup: getSelectedChipValue("#edit-age-chips"),
       industry: $("#edit-industry").value || "",
@@ -2657,8 +2673,12 @@
   async function saveProfile(e) {
     e.preventDefault();
     const profile = collectEditForm();
-    if (!profile.name) {
-      showToast("お名前（フルネーム）を入力してください");
+    if (!profile.realName) {
+      showToast("本名（フルネーム）を入力してください（公開されません）");
+      return;
+    }
+    if (!profile.nickname) {
+      showToast("ニックネームを入力してください");
       return;
     }
     if (!profile.gender || profile.gender === "all") {
@@ -2709,6 +2729,11 @@
         ...profilePayload,
         ...(res.data || {})
       };
+      state.currentUser.nickname =
+        state.currentUser.nickname || profilePayload.nickname || "";
+      state.currentUser.name = state.currentUser.nickname;
+      state.currentUser.realName =
+        state.currentUser.realName || profilePayload.realName || "";
       state.currentUser.femaleOnlyConnect = Boolean(profilePayload.femaleOnlyConnect);
       state.currentUser.tags = normalizeTagList(
         Array.isArray(profilePayload.tags) && profilePayload.tags.length
@@ -2731,13 +2756,18 @@
       }
 
       const idx = state.allUsers.findIndex((u) => u.id === state.currentUser.id);
-      if (idx >= 0) state.allUsers[idx] = { ...state.currentUser };
+      if (idx >= 0) {
+        const publicUser = { ...state.currentUser };
+        delete publicUser.realName;
+        delete publicUser.annualSpend;
+        state.allUsers[idx] = publicUser;
+      }
       refreshConnectList();
       renderMyPage(state.currentUser);
       Session.save({
         email: state.identity?.email || state.currentUser.email || "",
         memberNo: state.currentUser.id || "",
-        name: state.currentUser.name || ""
+        name: state.currentUser.nickname || state.currentUser.name || ""
       });
       state.editRequired = false;
       $("#edit-screen").classList.add("hidden");
@@ -2919,7 +2949,7 @@
       Session.save({
         email: user.email,
         memberNo: user.id,
-        name: user.name
+        name: user.nickname || user.name || ""
       });
       showToast("ログインしました");
       applyMyActivity(user.lastLoginAt);

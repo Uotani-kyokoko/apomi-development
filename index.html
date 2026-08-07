@@ -42,7 +42,7 @@
       <h1 class="access-denied-title">アクセスが拒否されました</h1>
       <p class="access-denied-text">
         詳細は
-        <a id="access-denied-line-link" class="access-denied-link" href="#" target="_blank" rel="noopener noreferrer">コチラ</a>
+        <a id="access-denied-line-link" class="access-denied-link" href="#" target="_blank" rel="noopener noreferrer">オーナー</a>
         から問合せください。
       </p>
       <a id="access-denied-line-btn" class="access-denied-btn hidden" href="#" target="_blank" rel="noopener noreferrer">
@@ -256,11 +256,17 @@
     </div>
 
     <form id="edit-form" class="edit-body">
-      <div class="edit-card" id="edit-name-card">
-        <label class="edit-label" for="edit-name">お名前(フルネーム)</label>
-        <input id="edit-name" name="name" type="text" class="edit-input" maxlength="40" autocomplete="name">
-        <p id="edit-name-note-first" class="edit-help-text hidden">※お名前の入力が可能なのは初回のみ</p>
-        <p id="edit-name-note-locked" class="edit-help-text hidden">※変更点あれば公式LINEに問い合わせて下さい</p>
+      <div class="edit-card" id="edit-real-name-card">
+        <label class="edit-label" for="edit-real-name">本名（フルネーム）</label>
+        <input id="edit-real-name" name="realName" type="text" class="edit-input" maxlength="40" autocomplete="name">
+        <p id="edit-real-name-note-first" class="edit-help-text hidden">※公開されません。登録後の変更はできません。</p>
+        <p id="edit-real-name-note-locked" class="edit-help-text hidden">※本名は公開されません。変更は公式LINEへお問合せください。</p>
+      </div>
+
+      <div class="edit-card" id="edit-nickname-card">
+        <label class="edit-label" for="edit-nickname">ニックネーム</label>
+        <input id="edit-nickname" name="nickname" type="text" class="edit-input" maxlength="40" autocomplete="nickname">
+        <p class="edit-help-text">※マイページ・他の会員に表示されます。あとから変更できます。</p>
       </div>
 
       <div id="edit-company-card" class="edit-card hidden">
@@ -487,6 +493,6 @@
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260803h"></script>
   <script src="js/gas-api.js?v=20260805b"></script>
-  <script src="js/app.js?v=20260807b"></script>
+  <script src="js/app.js?v=20260807c"></script>
 </body>
 </html>

@@ -11,6 +11,8 @@
  * 5. 発行された URL をフロントの GAS_URL に設定
  *
  * 【シート】会員 / バナー / 申請 / マスタ / 設定
+ * 【会員シート】ニックネーム（公開・変更可）/ 本名（非公開・初回のみ）
+ * ※旧列「名前」はニックネームとして読む互換あり（ヘッダーを「ニックネーム」へ改名推奨）
  * 【会員シート追加列】女性限定（TRUE/FALSE）…女性とだけ繋がりたい
  * 【会員シート追加列】年間経費（非公開）…人脈拡大の為の年間経費。一覧には出さない
  * 【バナー】場所=ホーム / 繋がる / 両方（空欄はホーム）
@@ -181,6 +183,7 @@ function getUsers_(p) {
       var user = mapUser_(r);
       // 非公開項目は一覧から除外
       delete user.annualSpend;
+      delete user.realName;
       return user;
     });
 }
@@ -504,12 +507,19 @@ function login_(body) {
 
   // 新規会員（初回は未掲載 → プロフィール入力後に掲載）
   const memberNo = nextMemberNo_(table.rows);
+  ensureHeader_(sheet, table.headers, 'ニックネーム');
+  ensureHeader_(sheet, table.headers, '本名');
   const newRow = buildEmptyRow_(table.headers);
   setRowValue_(newRow, table.headers, '会員番号', memberNo);
   setRowValue_(newRow, table.headers, 'Googleメール', email);
   setRowValue_(newRow, table.headers, 'GoogleID', googleId);
-  // 名前は空のまま。初回プロフィール登録で本人入力させる
-  setRowValue_(newRow, table.headers, '名前', '');
+  // ニックネーム・本名は空のまま。初回プロフィール登録で本人入力させる
+  setRowValue_(newRow, table.headers, 'ニックネーム', '');
+  setRowValue_(newRow, table.headers, '本名', '');
+  // 旧列が残っている環境向け
+  if (table.headers.indexOf('名前') >= 0) {
+    setRowValue_(newRow, table.headers, '名前', '');
+  }
   setRowValue_(newRow, table.headers, '性別', '');
   setRowValue_(newRow, table.headers, '年代', '30代');
   setRowValue_(newRow, table.headers, '業種', '');
@@ -596,18 +606,23 @@ function updateProfile_(body) {
   ensureHeader_(sheet, table.headers, '女性限定');
   ensureHeader_(sheet, table.headers, '年間経費');
   ensureHeader_(sheet, table.headers, '社名');
+  ensureHeader_(sheet, table.headers, 'ニックネーム');
+  ensureHeader_(sheet, table.headers, '本名');
   const idx = findUserIndex_(table.rows, memberNo, email);
   if (idx < 0) throw new Error('会員が見つかりません');
 
   const rowNumber = idx + 2;
+  const nicknameCol = nicknameHeader_(table.headers);
   const allowed = [
-    '名前', '性別', '年代', '業種', '職種', '現在地', '出身地',
+    nicknameCol, '本名', '性別', '年代', '業種', '職種', '現在地', '出身地',
     '自己紹介', 'こんな人と繋がりたい', 'こんな人とは繋がりたくない',
     'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube', '年間経費', '社名'
   ];
 
   const map = {
-    name: '名前',
+    nickname: nicknameCol,
+    name: nicknameCol, // 互換: name は公開表示名＝ニックネーム
+    realName: '本名',
     gender: '性別',
     ageGroup: '年代',
     industry: '業種',
@@ -629,12 +644,15 @@ function updateProfile_(body) {
     if (profile[key] === undefined || profile[key] === null) return;
     // 社名は社長マーク会員のみ更新可
     if (key === 'companyName' && !isPresident) return;
-    // 名前など必須っぽい項目は空文字での上書きを防ぐ
-    if ((key === 'name' || key === 'gender') && String(profile[key]).trim() === '') return;
-    if (key === 'name') {
-      var existingName = String(table.rows[idx]['名前'] || '').trim();
-      // 一度登録した名前は変更不可（初回のみ入力）
-      if (existingName) return;
+    // 空文字での必須項目上書きを防ぐ
+    if ((key === 'name' || key === 'nickname' || key === 'realName' || key === 'gender') &&
+        String(profile[key]).trim() === '') {
+      return;
+    }
+    if (key === 'realName') {
+      var existingReal = realNameFromRow_(table.rows[idx]);
+      // 一度登録した本名は変更不可（初回のみ）
+      if (existingReal) return;
     }
     if (key === 'gender') {
       var existingGender = String(table.rows[idx]['性別'] || '').trim();
@@ -1226,11 +1244,15 @@ function mapUser_(r) {
   const tags = tagsRaw
     ? tagsRaw.split(/[,、|／\t]+/).map(function (t) { return t.trim(); }).filter(Boolean)
     : [];
+  const nickname = nicknameFromRow_(r);
+  const realName = realNameFromRow_(r);
 
   return {
     id: String(r['会員番号'] || ''),
     email: String(r['Googleメール'] || ''),
-    name: String(r['名前'] || ''),
+    name: nickname, // 公開表示名（ニックネーム）
+    nickname: nickname,
+    realName: realName, // 自分用のみ。一覧 API では削除する
     gender: String(r['性別'] || ''),
     ageGroup: String(r['年代'] || ''),
     industry: String(r['業種'] || ''),
@@ -1256,6 +1278,24 @@ function mapUser_(r) {
     salonListingStatus: String(r['サロン掲載状態'] || 'なし'),
     snsLinks: extractSnsLinks_(r)
   };
+}
+
+/** 公開名列: ニックネーム優先、旧「名前」互換 */
+function nicknameHeader_(headers) {
+  var list = headers || [];
+  if (list.indexOf('ニックネーム') >= 0) return 'ニックネーム';
+  if (list.indexOf('名前') >= 0) return '名前';
+  return 'ニックネーム';
+}
+
+function nicknameFromRow_(r) {
+  var nick = String((r && r['ニックネーム']) || '').trim();
+  if (nick) return nick;
+  return String((r && r['名前']) || '').trim();
+}
+
+function realNameFromRow_(r) {
+  return String((r && r['本名']) || '').trim();
 }
 
 function extractSnsLinks_(r) {
