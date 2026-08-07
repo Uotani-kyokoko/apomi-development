@@ -18,7 +18,7 @@
  * 【マスタ】区分=年間経費 の行で年間経費の選択肢を管理
  * 【マスタ】区分=プライバシーポリシー の行で初回同意文を管理
  * 【設定キー】サロンURL / サロンボタン名
- * 【設定キー】拒否メール … アクセス拒否するメール（改行・カンマ区切り）。API応答には含めない
+ * 【シート】拒否メール … A列「メール」に拒否アドレス（1行1件）。API応答には含めない
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  */
 
@@ -40,7 +40,8 @@ const SHEET = {
   BANNERS: 'バナー',
   REQUESTS: '申請',
   MASTERS: 'マスタ',
-  SETTINGS: '設定'
+  SETTINGS: '設定',
+  DENIED_MAIL: '拒否メール'
 };
 
 /* ========== Web App Entry ========== */
@@ -374,23 +375,66 @@ function getPublicSettings_() {
 }
 
 /**
- * 設定シート「拒否メール」から拒否アドレス集合を取得
- * 改行・カンマ・読点・セミコロン・空白区切り
+ * 「拒否メール」シートを用意（無ければ作成）
+ * ヘッダー: メール / メモ
+ */
+function ensureDeniedMailSheet_() {
+  var ss = getSpreadsheet_();
+  var sheet = ss.getSheetByName(SHEET.DENIED_MAIL);
+  if (sheet) return sheet;
+  sheet = ss.insertSheet(SHEET.DENIED_MAIL);
+  sheet.getRange(1, 1, 1, 2).setValues([['メール', 'メモ']]);
+  sheet.setFrozenRows(1);
+  try {
+    sheet.setColumnWidth(1, 280);
+    sheet.setColumnWidth(2, 200);
+  } catch (e) {
+    // ignore
+  }
+  return sheet;
+}
+
+/**
+ * 「拒否メール」シートから拒否アドレス集合を取得（1行1メール）
+ * ヘッダー名が メール / Googleメール / email ならその列、なければ A 列
  */
 function getDeniedEmailSet_() {
   var set = {};
   try {
-    var raw = String((getSettings_()['拒否メール'] || '')).trim();
-    if (!raw) return set;
-    String(raw)
-      .split(/[\s,，、;；\n\r]+/)
-      .map(function (s) { return String(s || '').trim().toLowerCase(); })
-      .filter(Boolean)
-      .forEach(function (mail) {
-        set[mail] = true;
-      });
+    var sheet = ensureDeniedMailSheet_();
+    var values = sheet.getDataRange().getValues();
+    if (!values || values.length < 2) return set;
+
+    var headers = values[0].map(function (h) {
+      return String(h || '').trim().toLowerCase();
+    });
+    var col = 0;
+    for (var h = 0; h < headers.length; h++) {
+      if (
+        headers[h] === 'メール' ||
+        headers[h] === 'googleメール' ||
+        headers[h] === 'email' ||
+        headers[h] === 'mail'
+      ) {
+        col = h;
+        break;
+      }
+    }
+
+    for (var i = 1; i < values.length; i++) {
+      var raw = String(values[i][col] || '').trim().toLowerCase();
+      if (!raw) continue;
+      // 1セルに複数ある場合も拾う
+      String(raw)
+        .split(/[\s,，、;；]+/)
+        .map(function (s) { return String(s || '').trim().toLowerCase(); })
+        .filter(Boolean)
+        .forEach(function (mail) {
+          if (mail.indexOf('@') >= 0) set[mail] = true;
+        });
+    }
   } catch (e) {
-    // 設定読めないときは拒否しない（可用性優先）
+    // 読めないときは拒否しない（可用性優先）
   }
   return set;
 }
