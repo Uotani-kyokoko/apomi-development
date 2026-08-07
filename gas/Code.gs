@@ -168,12 +168,28 @@ function matchesFilterList_(userValue, selectedRaw) {
   return selected.indexOf(current) >= 0;
 }
 
+/** タグ複数選択: 会員タグのいずれかが一致すればOK（OR） */
+function matchesAnyTagFilter_(tagsRaw, selectedRaw) {
+  var selected = parseFilterList_(selectedRaw);
+  if (!selected.length) return true;
+  var tags = String(tagsRaw || '')
+    .split(/[,、|／\t]+/)
+    .map(function (t) { return String(t || '').trim(); })
+    .filter(Boolean);
+  if (!tags.length) return false;
+  for (var i = 0; i < selected.length; i++) {
+    if (tags.indexOf(selected[i]) >= 0) return true;
+  }
+  return false;
+}
+
 function getUsers_(p) {
   const rows = readObjects_(SHEET.USERS);
   const industry = p.industry || 'all';
   const gender = String(p.gender || 'all');
   const jobTitle = p.jobTitle || p.job_title || 'all';
   const ageGroup = p.ageGroup || p.age_group || 'all';
+  const tags = p.tags || p.tag || 'all';
   const includeUnpublished = String(p.includeUnpublished || '') === 'true';
 
   return rows
@@ -184,6 +200,7 @@ function getUsers_(p) {
       if (!matchesFilterList_(r['業種'], industry)) return false;
       if (!matchesFilterList_(r['職種'], jobTitle)) return false;
       if (!matchesFilterList_(r['年代'], ageGroup)) return false;
+      if (!matchesAnyTagFilter_(r['タグ'], tags)) return false;
       return true;
     })
     .map(function (r) {

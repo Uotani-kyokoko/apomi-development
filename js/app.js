@@ -44,7 +44,8 @@
       industry: [],
       gender: "all",
       jobTitle: [],
-      ageGroup: []
+      ageGroup: [],
+      tags: []
     },
     /** 検索結果の表示件数（もっと見る用） */
     searchVisibleCount: SEARCH_RESULT_PAGE_SIZE,
@@ -1691,6 +1692,15 @@
     return selected.includes(current);
   }
 
+  /** タグ複数選択: 会員タグのいずれかが一致すればOK（OR） */
+  function matchesAnyTagFilter(userTags, selectedList) {
+    const selected = normalizeFilterList(selectedList);
+    if (!selected.length) return true;
+    const tags = normalizeTagList(userTags);
+    if (!tags.length) return false;
+    return selected.some((t) => tags.includes(t));
+  }
+
   function fillChips(containerId, options, selectedValue) {
     const el = $(containerId);
     if (!el) return;
@@ -1714,7 +1724,7 @@
     if (!el) return;
     const selected = new Set((selectedValues || []).map((v) => String(v)));
     const opts = uniqueOptions(options);
-    const allowBreak = containerId === "#edit-tag-chips";
+    const allowBreak = containerId === "#edit-tag-chips" || containerId === "#filter-tag-chips";
     el.innerHTML = opts
       .map((o) => {
         const label = allowBreak
@@ -1744,6 +1754,7 @@
     fillMultiChips("#filter-age-chips", m["年代"], normalizeFilterList(state.filters.ageGroup));
     fillMultiChips("#filter-industry-chips", m["業種"], normalizeFilterList(state.filters.industry));
     fillMultiChips("#filter-job-chips", m["職種"], normalizeFilterList(state.filters.jobTitle));
+    fillMultiChips("#filter-tag-chips", getActiveTagOptions(), normalizeFilterList(state.filters.tags));
     const regionItems = Array.isArray(m["地域リンク"]) ? m["地域リンク"] : [];
     state.regionLinks = regionItems.length
       ? regionItems
@@ -1853,7 +1864,8 @@
       industry: [],
       gender: "all",
       jobTitle: [],
-      ageGroup: []
+      ageGroup: [],
+      tags: []
     };
     applyMastersToFilterUI();
     $$(".filter-card").forEach((c) => c.classList.remove("open"));
@@ -1864,6 +1876,7 @@
     const ageGroup = normalizeFilterList(filters.ageGroup);
     const industry = normalizeFilterList(filters.industry);
     const jobTitle = normalizeFilterList(filters.jobTitle);
+    const tags = normalizeFilterList(filters.tags);
 
     return (users || []).filter((u) => {
       // 性別は単一選択のため必須条件（その他 ↔ LGBTQ は同一扱い）
@@ -1873,10 +1886,11 @@
         if (want !== got) return false;
       }
       // 同一項目内はOR、項目をまたぐとAND
-      // ≒ 考えうる組み合わせ（年代×業種×職種）のいずれかに一致
+      // ≒ 考えうる組み合わせ（年代×業種×職種×タグ）のいずれかに一致
       if (!matchesFilterList(u.ageGroup, ageGroup)) return false;
       if (!matchesFilterList(u.industry, industry)) return false;
       if (!matchesFilterList(u.jobTitle, jobTitle)) return false;
+      if (!matchesAnyTagFilter(u.tags, tags)) return false;
       return true;
     });
   }
@@ -1886,6 +1900,7 @@
     if (normalizeFilterList(filters.ageGroup).length) return true;
     if (normalizeFilterList(filters.industry).length) return true;
     if (normalizeFilterList(filters.jobTitle).length) return true;
+    if (normalizeFilterList(filters.tags).length) return true;
     return false;
   }
 
@@ -1902,6 +1917,9 @@
     normalizeFilterList(state.filters.ageGroup).forEach((v) => parts.push(v));
     normalizeFilterList(state.filters.industry).forEach((v) => parts.push(v));
     normalizeFilterList(state.filters.jobTitle).forEach((v) => parts.push(v));
+    normalizeFilterList(state.filters.tags).forEach((v) =>
+      parts.push(String(tagLabel(v) || v).replace(/\n/g, ""))
+    );
     el.textContent = `絞り込み: ${parts.join(" / ")}（全 ${state.users.length} 件・No.順）`;
     el.classList.remove("hidden");
   }
@@ -3243,7 +3261,7 @@
       chip.classList.add("selected");
     });
 
-    ["#filter-age-chips", "#filter-industry-chips", "#filter-job-chips"].forEach((id) => {
+    ["#filter-age-chips", "#filter-industry-chips", "#filter-job-chips", "#filter-tag-chips"].forEach((id) => {
       $(id)?.addEventListener("click", (e) => {
         const chip = e.target.closest(".chip");
         if (!chip) return;
@@ -3260,7 +3278,8 @@
         gender: getSelectedChipValue("#filter-gender-chips"),
         ageGroup: getSelectedChipValues("#filter-age-chips"),
         industry: getSelectedChipValues("#filter-industry-chips"),
-        jobTitle: getSelectedChipValues("#filter-job-chips")
+        jobTitle: getSelectedChipValues("#filter-job-chips"),
+        tags: getSelectedChipValues("#filter-tag-chips")
       };
       applyFilters();
     });

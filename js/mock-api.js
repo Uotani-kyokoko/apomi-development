@@ -143,6 +143,18 @@ const MockAPI = (() => {
         if (!list.length) return true; // 未選択＝条件なし
         return list.includes(String(userValue || "").trim());
       };
+      const matchAnyTag = (userTags, selected) => {
+        const list = toList(selected);
+        if (!list.length) return true;
+        const tags = Array.isArray(userTags)
+          ? userTags.map((t) => String(t || "").trim()).filter(Boolean)
+          : String(userTags || "")
+              .split(/[,、|／\t]+/)
+              .map((t) => t.trim())
+              .filter(Boolean);
+        if (!tags.length) return false;
+        return list.some((t) => tags.includes(t));
+      };
 
       let result = users.slice();
       if (filters.gender && filters.gender !== "all") {
@@ -152,6 +164,7 @@ const MockAPI = (() => {
       result = result.filter((u) => matchList(u.ageGroup, filters.ageGroup));
       result = result.filter((u) => matchList(u.industry, filters.industry));
       result = result.filter((u) => matchList(u.jobTitle, filters.jobTitle));
+      result = result.filter((u) => matchAnyTag(u.tags, filters.tags));
       return delay(result);
     },
 

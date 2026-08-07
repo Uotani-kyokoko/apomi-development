@@ -116,7 +116,7 @@ const GasAPI = (() => {
     async fetchUsers(filters = {}) {
       if (!USE_GAS) return MockAPI.fetchUsers(filters);
       const params = { ...filters };
-      ['industry', 'jobTitle', 'ageGroup'].forEach((key) => {
+      ['industry', 'jobTitle', 'ageGroup', 'tags'].forEach((key) => {
         if (Array.isArray(params[key])) {
           params[key] = params[key].filter(Boolean).join('、');
         }
