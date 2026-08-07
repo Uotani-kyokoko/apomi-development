@@ -1928,9 +1928,20 @@
       const settingsRes = results[4].status === "fulfilled" ? results[4].value : null;
       const dashboardRes = results[5].status === "fulfilled" ? results[5].value : null;
 
-      // セッション復元中に拒否された場合は一覧フォールバックせず即ログアウト
+      // セッション復元中に拒否・メンテされた場合は一覧フォールバックせず即ログアウト
       if (results[2].status === "rejected" && isAccessDeniedError(results[2].reason)) {
         forceLogoutForAccessDenied(results[2].reason?.message || results[2].reason);
+        return;
+      }
+      if (results[2].status === "rejected" && isMaintenanceError(results[2].reason)) {
+        forceLogoutForMaintenance(results[2].reason?.message || results[2].reason);
+        return;
+      }
+      const maintenanceHit = results.some(
+        (r) => r.status === "rejected" && isMaintenanceError(r.reason)
+      );
+      if (maintenanceHit) {
+        forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
         return;
       }
 
@@ -2786,16 +2797,29 @@
     state.editRequired = false;
     closeConnectMenu();
     $("#access-denied-screen")?.classList.add("hidden");
+    $("#maintenance-screen")?.classList.add("hidden");
     $("#login-screen").classList.remove("hidden");
     $("#app-screen").classList.add("hidden");
     closeFilterScreen();
     closeEditScreen(true);
-    setupGoogleButton();
+    setupGoogleButton("google-btn-host");
   }
 
   function isAccessDeniedError(err) {
     const msg = String(err?.message || err || "");
     return msg.includes("アクセスが拒否されました");
+  }
+
+  function isMaintenanceError(err) {
+    const msg = String(err?.message || err || "");
+    return msg.includes("メンテナンス中です");
+  }
+
+  function isMaintenanceOn(settings) {
+    const raw = settings?.["メンテナンス"];
+    if (raw === true || raw === 1) return true;
+    const s = String(raw || "").trim().toUpperCase();
+    return s === "TRUE" || s === "1" || s === "○" || s === "はい";
   }
 
   function resolveOfficialLineUrl(masters = state.masters) {
@@ -2837,6 +2861,7 @@
     closeConnectMenu();
     $("#login-screen")?.classList.add("hidden");
     $("#app-screen")?.classList.add("hidden");
+    $("#maintenance-screen")?.classList.add("hidden");
     $("#access-denied-screen")?.classList.remove("hidden");
     closeFilterScreen();
     closeEditScreen(true);
@@ -2851,6 +2876,20 @@
     } catch (err) {
       console.warn("access-denied masters fetch failed", err);
     }
+  }
+
+  function showMaintenanceScreen() {
+    state.isLoggedIn = false;
+    state.identity = null;
+    state.editRequired = false;
+    closeConnectMenu();
+    $("#login-screen")?.classList.add("hidden");
+    $("#app-screen")?.classList.add("hidden");
+    $("#access-denied-screen")?.classList.add("hidden");
+    $("#maintenance-screen")?.classList.remove("hidden");
+    closeFilterScreen();
+    closeEditScreen(true);
+    setupGoogleButton("maintenance-google-btn-host");
   }
 
   /** 拒否時: セッション破棄して拒否画面へ */
@@ -2874,6 +2913,29 @@
     state.isLoggedIn = false;
     state.editRequired = false;
     showAccessDeniedScreen();
+  }
+
+  /** メンテ時: セッション破棄してメンテ画面へ */
+  function forceLogoutForMaintenance(_message) {
+    try {
+      Session.clear();
+    } catch (err) {
+      console.warn(err);
+    }
+    try {
+      window.google?.accounts?.id?.disableAutoSelect?.();
+    } catch (err) {
+      console.warn(err);
+    }
+    state.currentUser = null;
+    state.allUsers = [];
+    state.users = [];
+    state.banners = [];
+    state.dashboard = null;
+    state.identity = null;
+    state.isLoggedIn = false;
+    state.editRequired = false;
+    showMaintenanceScreen();
   }
 
   /** 開発者用: セッション破棄してログイン画面へ */
@@ -2926,6 +2988,7 @@
   function showApp() {
     state.isLoggedIn = true;
     $("#access-denied-screen")?.classList.add("hidden");
+    $("#maintenance-screen")?.classList.add("hidden");
     $("#login-screen").classList.add("hidden");
     $("#app-screen").classList.remove("hidden");
     switchTab("home");
@@ -2959,6 +3022,8 @@
       console.error(err);
       if (isAccessDeniedError(err)) {
         forceLogoutForAccessDenied(err.message);
+      } else if (isMaintenanceError(err)) {
+        forceLogoutForMaintenance(err.message);
       } else {
         showToast(err.message || "ログインに失敗しました");
       }
@@ -2967,20 +3032,24 @@
     }
   }
 
-  function setupGoogleButton() {
+  function setupGoogleButton(buttonHostId = "google-btn-host") {
     const hint = $("#login-hint");
     try {
       if (!(AppConfig.GOOGLE_CLIENT_ID || "").trim()) {
-        hint.textContent =
-          "js/config.js の GOOGLE_CLIENT_ID を設定してください。Google Cloud で OAuth クライアント（ウェブ）を作成し、生成元に http://localhost:3000 を追加します。";
-        hint.classList.remove("hidden");
-        $("#google-btn-host").innerHTML = "";
+        if (hint) {
+          hint.textContent =
+            "js/config.js の GOOGLE_CLIENT_ID を設定してください。Google Cloud で OAuth クライアント（ウェブ）を作成し、生成元に http://localhost:3000 を追加します。";
+          hint.classList.remove("hidden");
+        }
+        const host = document.getElementById(buttonHostId);
+        if (host) host.innerHTML = "";
         return;
       }
-      hint.classList.add("hidden");
+      hint?.classList.add("hidden");
 
       const start = () => {
         GoogleAuth.init({
+          buttonHostId,
           onCredential: (err, idToken) => {
             if (err) {
               showToast(err.message || "認証に失敗しました");
@@ -3002,15 +3071,68 @@
             start();
           } else if (tries > 50) {
             clearInterval(timer);
-            hint.textContent = "Googleログインの読み込みに失敗しました。ページを再読み込みしてください。";
-            hint.classList.remove("hidden");
+            if (hint && buttonHostId === "google-btn-host") {
+              hint.textContent = "Googleログインの読み込みに失敗しました。ページを再読み込みしてください。";
+              hint.classList.remove("hidden");
+            }
           }
         }, 100);
       }
     } catch (err) {
       console.error(err);
-      hint.textContent = err.message || "Googleログインを初期化できませんでした";
-      hint.classList.remove("hidden");
+      if (hint && buttonHostId === "google-btn-host") {
+        hint.textContent = err.message || "Googleログインを初期化できませんでした";
+        hint.classList.remove("hidden");
+      }
+    }
+  }
+
+  /**
+   * 起動時メンテ判定。
+   * @returns {Promise<boolean>} true=メンテ画面表示済み（またはバイパスでアプリ起動済み）
+   */
+  async function checkAndApplyMaintenanceGate() {
+    try {
+      const res = await GasAPI.fetchSettings();
+      const settings = res?.data || {};
+      state.settings = settings;
+      if (!isMaintenanceOn(settings)) return false;
+
+      const saved = Session.load();
+      if (saved?.email || saved?.memberNo) {
+        state.identity = {
+          email: saved.email || "",
+          memberNo: saved.memberNo || ""
+        };
+        try {
+          const meRes = await GasAPI.fetchCurrentUser(state.identity);
+          const user = meRes?.data;
+          if (user) {
+            state.currentUser = user;
+            showToast("ようこそ、" + (saved.name || user.nickname || user.name || "会員") + "さん");
+            await showApp();
+            return true;
+          }
+        } catch (err) {
+          if (isAccessDeniedError(err)) {
+            forceLogoutForAccessDenied(err.message);
+            return true;
+          }
+          // メンテ対象 or その他 → メンテ画面へ
+          try {
+            Session.clear();
+          } catch (_) {
+            /* ignore */
+          }
+          state.identity = null;
+        }
+      }
+
+      showMaintenanceScreen();
+      return true;
+    } catch (err) {
+      console.warn("maintenance gate settings fetch failed", err);
+      return false;
     }
   }
 
@@ -3243,7 +3365,10 @@
     if (shouldForceSplash()) {
       await showWelcomeSplashIfNeeded();
     }
-    tryRestoreSession();
+    const handled = await checkAndApplyMaintenanceGate();
+    if (!handled) {
+      tryRestoreSession();
+    }
   }
 
   document.addEventListener("DOMContentLoaded", init);

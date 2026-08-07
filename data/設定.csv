@@ -3,4 +3,6 @@
 サロンURL,https://example.com/salon
 サロンボタン名,井口智明オンラインサロン
 オーナーメール,
+開発者メール,
+メンテナンス,FALSE
 GoogleクライアントID,（config.jsと同じクライアントIDを入れる）

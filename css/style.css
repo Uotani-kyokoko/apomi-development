@@ -213,6 +213,59 @@ img {
   padding: 8px;
 }
 
+/* ===== メンテナンス ===== */
+#maintenance-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  padding: 32px 28px calc(32px + env(safe-area-inset-bottom, 0px));
+}
+
+#maintenance-screen.hidden {
+  display: none;
+}
+
+.maintenance-inner {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.maintenance-logo {
+  display: block;
+  width: min(56vw, 180px);
+  height: auto;
+  margin: 0 0 8px;
+  object-fit: contain;
+}
+
+.maintenance-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.02em;
+}
+
+.maintenance-text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #374151;
+}
+
+.maintenance-admin-hint {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
 /* ===== App Shell ===== */
 #app-screen {
   display: flex;

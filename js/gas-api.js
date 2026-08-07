@@ -32,7 +32,18 @@ const GasAPI = (() => {
     const url = new URL(GAS_URL);
     url.searchParams.set('action', action);
     url.searchParams.set('_ts', String(Date.now())); // キャッシュ防止
-    Object.entries(params).forEach(([k, v]) => {
+    const merged = { ...params };
+    // メンテ中バイパス判定用: セッションのメールを付与（明示指定を優先）
+    if (!merged.email && typeof Session !== 'undefined') {
+      try {
+        const saved = Session.load();
+        if (saved?.email) merged.email = saved.email;
+        if (!merged.memberNo && saved?.memberNo) merged.memberNo = saved.memberNo;
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    Object.entries(merged).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
     });
     const res = await fetchWithTimeout(url.toString(), {
@@ -53,10 +64,20 @@ const GasAPI = (() => {
   }
 
   async function post(action, body = {}) {
+    const payload = { action, ...body };
+    if (!payload.email && typeof Session !== 'undefined') {
+      try {
+        const saved = Session.load();
+        if (saved?.email) payload.email = saved.email;
+        if (!payload.memberNo && saved?.memberNo) payload.memberNo = saved.memberNo;
+      } catch (_) {
+        /* ignore */
+      }
+    }
     const res = await fetchWithTimeout(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, ...body })
+      body: JSON.stringify(payload)
     });
     const text = await res.text();
     let json;

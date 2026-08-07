@@ -234,7 +234,7 @@ const MockAPI = (() => {
         アプリ名: "apomy",
         サロンURL: "https://example.com/salon",
         サロンボタン名: "井口智明オンラインサロン",
-        オーナーメール: ""
+        メンテナンス: "FALSE"
       });
     },
 

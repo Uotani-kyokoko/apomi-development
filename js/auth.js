@@ -34,7 +34,8 @@ const GoogleAuth = (() => {
 
     initialized = true;
 
-    const btnHost = document.getElementById('google-btn-host');
+    const btnHostId = handlers.buttonHostId || 'google-btn-host';
+    const btnHost = document.getElementById(btnHostId);
     if (btnHost) {
       btnHost.innerHTML = '';
       google.accounts.id.renderButton(btnHost, {

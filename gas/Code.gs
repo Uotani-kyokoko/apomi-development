@@ -21,12 +21,17 @@
  * 【マスタ】区分=プライバシーポリシー の行で初回同意文を管理
  * 【マスタ】区分=公式LINE … 値に公式LINEのURL（アクセス拒否画面の問合せ先）
  * 【設定キー】サロンURL / サロンボタン名
+ * 【設定キー】メンテナンス … TRUE で全ユーザーにメンテ画面（オーナーメール・開発者メールのみ利用可）
+ * 【設定キー】オーナーメール / 開発者メール … メンテ中のバイパス許可
  * 【シート】アクセス拒否 … A列「メール」に拒否アドレス（1行1件）。API応答には含めない
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  */
 
 var ACCESS_DENIED_MESSAGE =
   'アクセスが拒否されました。詳細はコチラから問合せください。';
+
+var MAINTENANCE_MESSAGE =
+  'メンテナンス中です。ご迷惑をおかけします。';
 
 
 // コンテナバインド（スプレッドシートに紐付いたスクリプト）なら空文字のままでOK
@@ -53,6 +58,7 @@ function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
     const action = String(p.action || '').trim();
+    guardMaintenance_(action, p);
     let data;
 
     switch (action) {
@@ -109,6 +115,7 @@ function doPost(e) {
   try {
     const body = parseBody_(e);
     const action = String(body.action || '').trim();
+    guardMaintenance_(action, body);
     let data;
 
     switch (action) {
@@ -309,16 +316,20 @@ function touchActivity_(body) {
     throw new Error('email または memberNo が必要です');
   }
 
-  // メール指定時は先に拒否チェック（会員未登録でも弾く）
-  if (email) assertNotDeniedEmail_(email);
+  // メール指定時は先に拒否・メンテチェック（会員未登録でも弾く）
+  if (email) {
+    assertNotDeniedEmail_(email);
+    assertMaintenanceAccess_(email);
+  }
 
   const sheet = getSheet_(SHEET.USERS);
   const table = readTable_(sheet);
   const idx = findUserIndex_(table.rows, memberNo, email);
   if (idx < 0) throw new Error('会員が見つかりません');
 
-  // 会員番号のみで来た場合もシート上のメールで拒否チェック
+  // 会員番号のみで来た場合もシート上のメールで拒否・メンテチェック
   assertNotDeniedEmail_(table.rows[idx]['Googleメール']);
+  assertMaintenanceAccess_(table.rows[idx]['Googleメール']);
 
   const now = formatDateTime_(new Date());
   const rowNumber = idx + 2;
@@ -372,12 +383,74 @@ function getSettings_() {
   return out;
 }
 
-/** フロント公開用（拒否リスト等は含めない） */
+/** フロント公開用（拒否リスト・許可メール等は含めない） */
 function getPublicSettings_() {
   const out = getSettings_();
   delete out['拒否メール'];
   delete out['承認トークン'];
+  delete out['オーナーメール'];
+  delete out['開発者メール'];
   return out;
+}
+
+function isMaintenanceMode_() {
+  try {
+    var settings = getSettings_();
+    return toBool_(settings['メンテナンス']);
+  } catch (e) {
+    return false;
+  }
+}
+
+/** メンテ中バイパス: オーナーメール + 開発者メール */
+function getMaintenanceBypassEmailSet_() {
+  var set = {};
+  try {
+    var settings = getSettings_();
+    [settings['オーナーメール'], settings['開発者メール']].forEach(function (raw) {
+      String(raw || '')
+        .split(/[\s,，、;；]+/)
+        .map(function (s) { return String(s || '').trim().toLowerCase(); })
+        .filter(function (mail) { return mail.indexOf('@') >= 0; })
+        .forEach(function (mail) {
+          set[mail] = true;
+        });
+    });
+  } catch (e) {
+    // ignore
+  }
+  return set;
+}
+
+function isMaintenanceBypassEmail_(email) {
+  var mail = String(email || '').trim().toLowerCase();
+  if (!mail) return false;
+  return Boolean(getMaintenanceBypassEmailSet_()[mail]);
+}
+
+function assertMaintenanceAccess_(email) {
+  if (!isMaintenanceMode_()) return;
+  if (isMaintenanceBypassEmail_(email)) return;
+  throw new Error(MAINTENANCE_MESSAGE);
+}
+
+/**
+ * メンテ中は settings / ping / 承認リンク / login(内部判定) 以外を遮断。
+ * login はメール確定後に assertMaintenanceAccess_ する。
+ */
+function guardMaintenance_(action, params) {
+  if (!isMaintenanceMode_()) return;
+  var act = String(action || '').trim();
+  if (
+    act === 'settings' ||
+    act === 'ping' ||
+    act === 'approveRequest' ||
+    act === 'rejectRequest' ||
+    act === 'login'
+  ) {
+    return;
+  }
+  assertMaintenanceAccess_((params && params.email) || '');
 }
 
 /**
@@ -476,8 +549,9 @@ function login_(body) {
     throw new Error('email が必要です（GASを最新Code.gsで再デプロイし、idTokenまたはemailを送ってください）');
   }
 
-  // 会員シート更新の前に拒否判定
+  // 会員シート更新の前に拒否・メンテ判定
   assertNotDeniedEmail_(email);
+  assertMaintenanceAccess_(email);
 
   const sheet = getSheet_(SHEET.USERS);
   const table = readTable_(sheet);
