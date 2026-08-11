@@ -1,10 +1,38 @@
 /**
  * GAS API モック
  * 本番では fetch(GAS_WEB_APP_URL + '?action=...') に差し替え
- * サンプル: js/sample-users-240.js（240件）
+ * サンプル: js/sample-users-240.js（必要なときだけ遅延ロード）
  */
 const MockAPI = (() => {
   const DELAY_MS = 200;
+  let sampleLoadPromise = null;
+
+  function ensureSampleUsersLoaded() {
+    if (Array.isArray(window.APOMI_SAMPLE_USERS) && window.APOMI_SAMPLE_USERS.length) {
+      return Promise.resolve();
+    }
+    if (sampleLoadPromise) return sampleLoadPromise;
+    sampleLoadPromise = new Promise(function (resolve, reject) {
+      const s = document.createElement("script");
+      s.src = "js/sample-users-240.js?v=20260803f";
+      s.async = true;
+      s.onload = function () { resolve(); };
+      s.onerror = function () {
+        sampleLoadPromise = null;
+        reject(new Error("サンプル会員の読み込みに失敗しました"));
+      };
+      document.head.appendChild(s);
+    });
+    return sampleLoadPromise;
+  }
+
+  async function getAllUsers() {
+    await ensureSampleUsersLoaded();
+    const allUsers = Array.isArray(window.APOMI_SAMPLE_USERS)
+      ? window.APOMI_SAMPLE_USERS.map((u) => ({ ...u, sns: { ...(u.sns || {}) } }))
+      : [];
+    return allUsers;
+  }
 
   const banners = [
     {
@@ -33,13 +61,17 @@ const MockAPI = (() => {
     }
   ];
 
-  const allUsers = Array.isArray(window.APOMI_SAMPLE_USERS)
-    ? window.APOMI_SAMPLE_USERS.map((u) => ({ ...u, sns: { ...(u.sns || {}) } }))
-    : [];
+  let users = [];
+  let currentUser = null;
+  let sampleReady = false;
 
-  /** 一覧は掲載中のみ（GAS getUsers_ と同じ） */
-  let users = allUsers.filter((u) => u.isPublished !== false);
-  let currentUser = allUsers.find((u) => u.id === "00001") || allUsers[0] || null;
+  async function ensureMockUsers() {
+    if (sampleReady && users.length) return;
+    const allUsers = await getAllUsers();
+    users = allUsers.filter((u) => u.isPublished !== false);
+    currentUser = allUsers.find((u) => u.id === "00001") || allUsers[0] || null;
+    sampleReady = true;
+  }
 
   function delay(data) {
     return new Promise((resolve) => {
@@ -128,10 +160,13 @@ const MockAPI = (() => {
     computeDashboardFromUsers,
 
     async fetchDashboard() {
-      return delay(computeDashboardFromUsers(allUsers));
+      await ensureMockUsers();
+      const all = await getAllUsers();
+      return delay(computeDashboardFromUsers(all));
     },
 
     async fetchUsers(filters = {}) {
+      await ensureMockUsers();
       const toList = (v) => {
         if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter((x) => x && x !== "all");
         const raw = String(v || "").trim();
@@ -260,6 +295,7 @@ const MockAPI = (() => {
     },
 
     async fetchCurrentUser(identity = {}) {
+      await ensureMockUsers();
       const user = { ...(currentUser || {}) };
       // [みんつく] モックでもアクセス時に番号を付与
       if (String(identity.app || "").toLowerCase() === "mintuku" && identity.region) {
@@ -349,6 +385,7 @@ const MockAPI = (() => {
     },
 
     async loginWithGoogle(payload = {}) {
+      await ensureMockUsers();
       if (payload.idToken) {
         try {
           const part = payload.idToken.split(".")[1];

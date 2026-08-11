@@ -10,12 +10,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="apomy">
   <title>apomy - ビジネスマッチング</title>
+  <link rel="preconnect" href="https://accounts.google.com" crossorigin>
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
+  <link rel="dns-prefetch" href="https://accounts.google.com">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="css/style.css?v=20260811c">
+  <!-- GSI は早めに読み込み（ログインボタン表示を速くする） -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -540,14 +545,12 @@
     </div>
   </div>
 
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="js/env.js?v=20260805b"></script>
   <script src="js/config.js?v=20260805b"></script>
   <script src="js/app-mode.js?v=20260811b"></script>
   <script src="js/auth.js?v=20260807d"></script>
-  <script src="js/sample-users-240.js?v=20260803f"></script>
-  <script src="js/mock-api.js?v=20260808a"></script>
-  <script src="js/gas-api.js?v=20260812a"></script>
-  <script src="js/app.js?v=20260812a"></script>
+  <script src="js/mock-api.js?v=20260812a"></script>
+  <script src="js/gas-api.js?v=20260812b"></script>
+  <script src="js/app.js?v=20260812b"></script>
 </body>
 </html>

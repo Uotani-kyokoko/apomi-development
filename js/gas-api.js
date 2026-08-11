@@ -179,11 +179,13 @@ const GasAPI = (() => {
         name: payload.name || decoded.name || '',
         picture: payload.picture || decoded.picture || ''
       };
+      if (payload.app) merged.app = payload.app;
+      if (payload.region) merged.region = payload.region;
 
       if (!USE_GAS) return MockAPI.loginWithGoogle(merged);
 
-      // GAS の POST はリダイレクトで body が欠けることがあるため GET で送る
-      return get('login', merged);
+      // JWT は長いので GET ではなく POST（URL制限・遅延を避ける）
+      return post('login', merged);
     },
 
     async updateProfile(payload) {

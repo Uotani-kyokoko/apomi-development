@@ -20,6 +20,8 @@
 
   /** このセッションでウェルカムを出したら再表示しない */
   let welcomeSplashShown = false;
+  /** ログイン直後は me/touch を1回スキップ（シート二重書き込み・タイムアウト対策） */
+  let skipMeTouchOnce = false;
 
   /** 繋がるページの会員番号帯（1ページあたり） */
   const CONNECT_BAND_SIZE = 100;
@@ -2249,8 +2251,11 @@
 
       // [みんつく] 先に me を完了（初回ログイン日の書き込み・期限判定）。
       // users / dashboard と同時だと Sheets 競合で一覧取得が落ちやすい。
+      // ただし Google ログイン直後は login_ 側で更新済みなので省略する。
       let meRes = null;
-      if (identity.email || identity.memberNo) {
+      const skipMe = skipMeTouchOnce;
+      skipMeTouchOnce = false;
+      if (!skipMe && (identity.email || identity.memberNo)) {
         try {
           meRes = await GasAPI.fetchCurrentUser(identityForApi(identity));
         } catch (err) {
@@ -2269,7 +2274,7 @@
           console.error("me failed", err);
           showToast(err.message || "プロフィールの取得に失敗しました");
         }
-      } else {
+      } else if (!skipMe) {
         showToast("ログイン情報がありません");
         return;
       }
@@ -2283,6 +2288,13 @@
         if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
         if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
+          showMintukuExpiredScreen();
+          return;
+        }
+      } else if (skipMe && state.currentUser) {
+        if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
+        if (redirectMintukuToOwnRegion(state.currentUser)) return;
+        if (isMintukuMode() && state.currentUser.mintukuAccessOk === false) {
           showMintukuExpiredScreen();
           return;
         }
@@ -3508,7 +3520,12 @@
   async function completeLoginWithIdToken(idToken) {
     showLoading(true);
     try {
-      const loginRes = await GasAPI.loginWithGoogle({ idToken });
+      const loginPayload = { idToken };
+      if (isMintukuMode() && state.mintukuRegion) {
+        loginPayload.app = "mintuku";
+        loginPayload.region = state.mintukuRegion;
+      }
+      const loginRes = await GasAPI.loginWithGoogle(loginPayload);
       const user = loginRes.data;
       state.identity = {
         email: user.email,
@@ -3523,6 +3540,8 @@
       showToast("ログインしました");
       applyMyActivity(user.lastLoginAt);
       lastTouchAt = Date.now();
+      // ログイン処理で最終ログイン・みんつく採番済みなので直後の me は省略
+      skipMeTouchOnce = true;
       await showApp();
     } catch (err) {
       console.error(err);
@@ -3592,7 +3611,7 @@
           if (window.google?.accounts?.id) {
             clearInterval(timer);
             start();
-          } else if (tries > 50) {
+          } else if (tries > 100) {
             clearInterval(timer);
             if (hint && isMainLogin) {
               hint.textContent = "Googleログインの読み込みに失敗しました。ページを再読み込みしてください。";
@@ -3618,7 +3637,13 @@
    */
   async function checkAndApplyMaintenanceGate() {
     try {
-      const res = await GasAPI.fetchSettings();
+      // 起動をブロックしすぎないよう短めタイムアウト
+      const res = await Promise.race([
+        GasAPI.fetchSettings(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("settings timeout")), 8000)
+        )
+      ]);
       const settings = res?.data || {};
       state.settings = settings;
       if (!isMaintenanceOn(settings)) return false;
@@ -3996,6 +4021,20 @@
     if (shouldForceSplash()) {
       await showWelcomeSplashIfNeeded();
     }
+
+    const saved = Session.load();
+    const hasSession = Boolean(saved?.email || saved?.memberNo);
+
+    // 未ログイン時は GAS を待たず、すぐ Google ボタンを出す
+    if (!hasSession) {
+      showLogin();
+      checkAndApplyMaintenanceGate().then((handled) => {
+        if (handled) return;
+        // メンテでなければログイン画面のまま
+      });
+      return;
+    }
+
     const handled = await checkAndApplyMaintenanceGate();
     if (!handled) {
       tryRestoreSession();

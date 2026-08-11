@@ -800,6 +800,15 @@ function getMasters_() {
 }
 
 function getSettings_() {
+  var cache = CacheService.getScriptCache();
+  try {
+    var cached = cache.get('apomy_settings_v1');
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    // ignore cache errors
+  }
   const sheet = getSheet_(SHEET.SETTINGS);
   const values = sheet.getDataRange().getValues();
   const out = {};
@@ -807,6 +816,11 @@ function getSettings_() {
     const key = String(values[i][0] || '').trim();
     if (!key) continue;
     out[key] = values[i][1];
+  }
+  try {
+    cache.put('apomy_settings_v1', JSON.stringify(out), 60);
+  } catch (e2) {
+    // ignore
   }
   return out;
 }
@@ -906,11 +920,23 @@ function ensureDeniedMailSheet_() {
  * ヘッダー名が メール / Googleメール / email ならその列、なければ A 列
  */
 function getDeniedEmailSet_() {
+  var cache = CacheService.getScriptCache();
+  try {
+    var cached = cache.get('apomy_denied_v1');
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    // ignore
+  }
   var set = {};
   try {
     var sheet = ensureDeniedMailSheet_();
     var values = sheet.getDataRange().getValues();
-    if (!values || values.length < 2) return set;
+    if (!values || values.length < 2) {
+      try { cache.put('apomy_denied_v1', '{}', 60); } catch (e0) {}
+      return set;
+    }
 
     var headers = values[0].map(function (h) {
       return String(h || '').trim().toLowerCase();
@@ -927,11 +953,9 @@ function getDeniedEmailSet_() {
         break;
       }
     }
-
     for (var i = 1; i < values.length; i++) {
       var raw = String(values[i][col] || '').trim().toLowerCase();
       if (!raw) continue;
-      // 1セルに複数ある場合も拾う
       String(raw)
         .split(/[\s,，、;；]+/)
         .map(function (s) { return String(s || '').trim().toLowerCase(); })
@@ -940,8 +964,13 @@ function getDeniedEmailSet_() {
           if (mail.indexOf('@') >= 0) set[mail] = true;
         });
     }
-  } catch (e) {
-    // 読めないときは拒否しない（可用性優先）
+  } catch (err) {
+    // ignore
+  }
+  try {
+    cache.put('apomy_denied_v1', JSON.stringify(set), 60);
+  } catch (e2) {
+    // ignore
   }
   return set;
 }
@@ -996,16 +1025,37 @@ function login_(body) {
   if (idx >= 0) {
     const rowNumber = idx + 2; // header = 1
     setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
-    if (googleId) setCellByHeader_(sheet, table.headers, rowNumber, 'GoogleID', googleId);
+    table.rows[idx]['最終ログイン日時'] = now;
+    if (googleId) {
+      setCellByHeader_(sheet, table.headers, rowNumber, 'GoogleID', googleId);
+      table.rows[idx]['GoogleID'] = googleId;
+    }
     // 名前は初回プロフィール登録でのみ設定（Google表示名で上書きしない）
     if (picture) {
       const currentAvatar = String(table.rows[idx]['プロフィール画像URL'] || '');
       if (!currentAvatar) {
         setCellByHeader_(sheet, table.headers, rowNumber, 'プロフィール画像URL', picture);
+        table.rows[idx]['プロフィール画像URL'] = picture;
       }
     }
-    const user = mapUser_(readObjects_(SHEET.USERS)[idx]);
+
+    // [みんつく] ログイン時に採番・初回日（me の二重呼び出しを避けるため）
+    var appKind = String((body && body.app) || '').trim().toLowerCase();
+    var mintukuRegion = resolveMintukuRegionId_((body && (body.region || body.r)) || '');
+    if (appKind === 'mintuku' && mintukuRegion) {
+      var myLoc = String(table.rows[idx]['現在地'] || '').trim();
+      if (!myLoc || isPrefInMintukuRegion_(myLoc, mintukuRegion)) {
+        ensureMintukuNumber_(sheet, table, idx, mintukuRegion);
+        ensureMintukuFirstLogin_(sheet, table, idx);
+      }
+    }
+
+    const user = mapUser_(table.rows[idx]);
     user.isNew = false;
+    user.lastLoginAt = now;
+    if (appKind === 'mintuku') {
+      attachMintukuAccess_(user, table.rows[idx]);
+    }
     return user;
   }
 
