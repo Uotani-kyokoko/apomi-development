@@ -216,7 +216,8 @@ function getUsers_(p) {
 
   if (isMintuku) {
     if (!mintukuRegion) throw new Error('みんつくの地方が不正です');
-    assertMintukuViewerAccess_(p, mintukuRegion);
+    // すでに読んだ rows を使い回す（会員シートの二重取得を避ける）
+    assertMintukuViewerAccess_(p, mintukuRegion, rows);
   }
 
   return rows
@@ -533,12 +534,15 @@ function attachMintukuAccess_(user, row) {
  * [みんつく] 閲覧者チェック（一覧用）
  * - 無料期間切れ
  * - 現在地が指定地方と一致（URLいじりで他地方を見られないようにする）
+ * @param {Object} p
+ * @param {string} [regionIdOpt]
+ * @param {Object[]} [rowsOpt] 呼び出し元ですでに読んだ会員行（省略時のみ再取得）
  */
-function assertMintukuViewerAccess_(p, regionIdOpt) {
+function assertMintukuViewerAccess_(p, regionIdOpt, rowsOpt) {
   var email = String((p && p.email) || '').trim();
   var memberNo = String((p && (p.memberNo || p.member_no)) || '').trim();
   if (!email && !memberNo) return;
-  var rows = readObjects_(SHEET.USERS);
+  var rows = rowsOpt || readObjects_(SHEET.USERS);
   var idx = findUserIndex_(rows, memberNo, email);
   if (idx < 0) return;
   var access = evaluateMintukuAccess_(rows[idx]);
@@ -741,6 +745,7 @@ function touchActivity_(body) {
   const now = formatDateTime_(new Date());
   const rowNumber = idx + 2;
   setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
+  table.rows[idx]['最終ログイン日時'] = now;
 
   // [みんつく] アクセス順に地方会員番号を自動採番
   var appKind = String((body && body.app) || '').trim().toLowerCase();
@@ -754,11 +759,11 @@ function touchActivity_(body) {
     }
   }
 
-  const freshRows = readObjects_(SHEET.USERS);
-  const user = mapUser_(freshRows[idx]);
+  // 会員シートの再読込はしない（書き込み直後の二重取得＋競合を避ける）
+  const user = mapUser_(table.rows[idx]);
   user.lastLoginAt = now;
   if (appKind === 'mintuku') {
-    attachMintukuAccess_(user, freshRows[idx]);
+    attachMintukuAccess_(user, table.rows[idx]);
   }
   return user;
 }

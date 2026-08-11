@@ -11,7 +11,7 @@ const GasAPI = (() => {
   const FORCE_SAMPLE_USERS = false;
 
   const USE_GAS = Boolean(GAS_URL) && !FORCE_SAMPLE_USERS;
-  const REQUEST_TIMEOUT_MS = 28000;
+  const REQUEST_TIMEOUT_MS = 45000;
 
   async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();

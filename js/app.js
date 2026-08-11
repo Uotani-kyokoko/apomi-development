@@ -2288,19 +2288,29 @@
         }
       }
 
+      // 会員シートを叩く users と dashboard は並列にしない（GAS/Sheets 競合でタイムアウトしやすい）
       const results = await Promise.allSettled([
         GasAPI.fetchBanners(),
         GasAPI.fetchUsers(usersFetchParams()),
         GasAPI.fetchMasters(),
-        GasAPI.fetchSettings(),
-        GasAPI.fetchDashboard()
+        GasAPI.fetchSettings()
       ]);
 
       const bannersRes = results[0].status === "fulfilled" ? results[0].value : null;
       const usersRes = results[1].status === "fulfilled" ? results[1].value : null;
       const mastersRes = results[2].status === "fulfilled" ? results[2].value : null;
       const settingsRes = results[3].status === "fulfilled" ? results[3].value : null;
-      const dashboardRes = results[4].status === "fulfilled" ? results[4].value : null;
+
+      let dashboardRes = null;
+      try {
+        dashboardRes = await GasAPI.fetchDashboard();
+      } catch (dashErr) {
+        console.warn("dashboard failed", dashErr);
+        if (isMaintenanceError(dashErr)) {
+          forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
+          return;
+        }
+      }
 
       const maintenanceHit = results.some(
         (r) => r.status === "rejected" && isMaintenanceError(r.reason)
