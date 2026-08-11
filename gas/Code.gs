@@ -26,11 +26,13 @@
  * 【シート】アクセス拒否 … A列「メール」に拒否アドレス（1行1件）。API応答には含めない
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  *
- * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=… で地方一覧。
+ * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=…（または r=トークン）で地方一覧。
  * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無 / 現在地変更日
  * 現在地変更日: 初回入力後の「変更」時に記録。以降30日間は変更不可（GASで強制）
  * 設定キー: みんつく問い合わせURL（期限切れ画面の「こちら」）
  * POST: stopMintukuListing / resumeMintukuListing（みんつく掲載のみ）
+ * 掲載フラグは TRUE/FALSE 文字列で書き込み（チェックボックス／文字列列両対応）
+ * 閲覧者の現在地が指定地方と一致しない一覧取得は拒否（URLいじり対策）
  */
 
 var ACCESS_DENIED_MESSAGE =
@@ -207,13 +209,14 @@ function getUsers_(p) {
   const ageGroup = p.ageGroup || p.age_group || 'all';
   const tags = p.tags || p.tag || 'all';
   const includeUnpublished = String(p.includeUnpublished || '') === 'true';
-  // [みんつく] app=mintuku & region=kanto など。未指定時は Apomy（全国）
+  // [みんつく] app=mintuku & region=（または r=トークン）。未指定時は Apomy（全国）
   const appKind = String(p.app || 'apomy').trim().toLowerCase();
-  const mintukuRegion = String(p.region || '').trim().toLowerCase();
+  const mintukuRegion = resolveMintukuRegionId_(p.region || p.r || '');
   const isMintuku = appKind === 'mintuku';
 
   if (isMintuku) {
-    assertMintukuViewerAccess_(p);
+    if (!mintukuRegion) throw new Error('みんつくの地方が不正です');
+    assertMintukuViewerAccess_(p, mintukuRegion);
   }
 
   return rows
@@ -256,16 +259,69 @@ function getUsers_(p) {
 }
 
 /**
+ * [みんつく] URLの不透明トークン / 旧 region=id → 正規地方ID
+ * ※ フロント AppMode.REGION_TO_TOKEN と揃える
+ */
+function resolveMintukuRegionId_(raw) {
+  var s = String(raw || '').trim().toLowerCase();
+  if (!s) return '';
+  var tokenMap = {
+    m8h3k9qx: 'hokkaido',
+    m8t7n2wp: 'tohoku',
+    m8k4r1vz: 'kanto',
+    m8c5p6yd: 'chubu',
+    m8n9s0ue: 'kinki',
+    m8g2b8af: 'chugoku',
+    m8s1d4jh: 'shikoku',
+    m8y6o3lm: 'kyushu-okinawa'
+  };
+  if (tokenMap[s]) return tokenMap[s];
+  if (mintukuRegionPrefs_(s).length) return s;
+  return '';
+}
+
+/**
+ * [みんつく] 地方ID → 都道府県リスト（Apomyの7ブロック地図とは別・8地方）
+ */
+function mintukuRegionPrefs_(regionId) {
+  switch (String(regionId || '').trim().toLowerCase()) {
+    case 'hokkaido':
+      return ['北海道'];
+    case 'tohoku':
+      return ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'];
+    case 'kanto':
+      return ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'];
+    case 'chubu':
+      return ['新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県'];
+    case 'kinki':
+      return ['三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県'];
+    case 'chugoku':
+      return ['鳥取県', '島根県', '岡山県', '広島県', '山口県'];
+    case 'shikoku':
+      return ['徳島県', '香川県', '愛媛県', '高知県'];
+    case 'kyushu-okinawa':
+      return ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'];
+    default:
+      return [];
+  }
+}
+
+/**
  * [みんつく] 都道府県が指定地方に含まれるか
  * ※ Apomy の「北海道・東北」結合地図とは別（8地方）
  */
 function isPrefInMintukuRegion_(location, regionId) {
   var pref = String(location || '').trim();
-  var id = String(regionId || '').trim().toLowerCase();
+  var id = resolveMintukuRegionId_(regionId) || String(regionId || '').trim().toLowerCase();
   if (!pref || !id) return false;
   var prefs = mintukuRegionPrefs_(id);
   if (!prefs || !prefs.length) return false;
   return prefs.indexOf(pref) >= 0;
+}
+
+/** シート用 TRUE/FALSE（チェックボックス列・文字列列どちらでも安定） */
+function sheetBool_(on) {
+  return on ? 'TRUE' : 'FALSE';
 }
 
 /** [みんつく] 地方ID → 表示ラベル（採番接頭辞） */
@@ -330,8 +386,8 @@ function ensureMintukuNumber_(sheet, table, idx, regionId) {
     // 列追加直後で空欄のときだけ ON（明示的な停止 FALSE は維持）
     var listedRaw = table.rows[idx]['みんつく掲載'];
     if (listedRaw === '' || listedRaw === null || listedRaw === undefined) {
-      setCellByHeader_(sheet, table.headers, idx + 2, 'みんつく掲載', true);
-      table.rows[idx]['みんつく掲載'] = true;
+      setCellByHeader_(sheet, table.headers, idx + 2, 'みんつく掲載', sheetBool_(true));
+      table.rows[idx]['みんつく掲載'] = 'TRUE';
     }
     return current;
   }
@@ -340,9 +396,9 @@ function ensureMintukuNumber_(sheet, table, idx, regionId) {
   var value = label + String(seq);
   var rowNumber = idx + 2;
   setCellByHeader_(sheet, table.headers, rowNumber, 'みんつく番号', value);
-  setCellByHeader_(sheet, table.headers, rowNumber, 'みんつく掲載', true);
+  setCellByHeader_(sheet, table.headers, rowNumber, 'みんつく掲載', sheetBool_(true));
   table.rows[idx]['みんつく番号'] = value;
-  table.rows[idx]['みんつく掲載'] = true;
+  table.rows[idx]['みんつく掲載'] = 'TRUE';
   return value;
 }
 
@@ -460,8 +516,12 @@ function attachMintukuAccess_(user, row) {
   return user;
 }
 
-/** [みんつく] 閲覧者の課金チェック（一覧用）。期限切れなら例外 */
-function assertMintukuViewerAccess_(p) {
+/**
+ * [みんつく] 閲覧者チェック（一覧用）
+ * - 無料期間切れ
+ * - 現在地が指定地方と一致（URLいじりで他地方を見られないようにする）
+ */
+function assertMintukuViewerAccess_(p, regionIdOpt) {
   var email = String((p && p.email) || '').trim();
   var memberNo = String((p && (p.memberNo || p.member_no)) || '').trim();
   if (!email && !memberNo) return;
@@ -472,6 +532,15 @@ function assertMintukuViewerAccess_(p) {
   if (!access.ok) {
     throw new Error(
       'MINTUKU_EXPIRED:無料期間(30日)が終了しました。今まで通り閲覧するにはこちらからお問合せください'
+    );
+  }
+  var regionId = resolveMintukuRegionId_(regionIdOpt || (p && (p.region || p.r)) || '');
+  if (!regionId) return;
+  var loc = String(rows[idx]['現在地'] || '').trim();
+  // 現在地未設定はプロフィール設定中として許可（一覧は地方フィルタのみ）
+  if (loc && !isPrefInMintukuRegion_(loc, regionId)) {
+    throw new Error(
+      'MINTUKU_REGION_DENIED:この地方のみんつくは、現在地が一致する会員のみ利用できます'
     );
   }
 }
@@ -492,16 +561,29 @@ function setMintukuListed_(body, listed, typeLabel) {
   const no = String(user['会員番号'] || memberNo);
   const rowNumber = idx + 2;
   const now = formatDateTime_(new Date());
-  setCellByHeader_(userSheet, table.headers, rowNumber, 'みんつく掲載', listed);
+  const flag = sheetBool_(listed);
+  setCellByHeader_(userSheet, table.headers, rowNumber, 'みんつく掲載', flag);
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
-  table.rows[idx]['みんつく掲載'] = listed;
+  SpreadsheetApp.flush();
+  table.rows[idx]['みんつく掲載'] = flag;
 
-  const requestId = createRequest_(no, typeLabel || (listed ? 'みんつく掲載再開' : 'みんつく掲載停止'), '対応済', String(body.note || ''));
+  var requestId = '';
+  try {
+    requestId = createRequest_(
+      no,
+      typeLabel || (listed ? 'みんつく掲載再開' : 'みんつく掲載停止'),
+      '対応済',
+      String(body.note || '')
+    );
+  } catch (err) {
+    // 申請ログ失敗でも掲載フラグ更新は成功扱いにする
+    Logger.log('createRequest_ failed (mintuku listed): ' + err);
+  }
   return {
     requestId: requestId,
     memberNo: no,
-    mintukuListed: listed,
+    mintukuListed: !!listed,
     isPublished: toBool_(user['掲載中']),
     lastLoginAt: now
   };
@@ -649,10 +731,14 @@ function touchActivity_(body) {
 
   // [みんつく] アクセス順に地方会員番号を自動採番
   var appKind = String((body && body.app) || '').trim().toLowerCase();
-  var mintukuRegion = String((body && body.region) || '').trim().toLowerCase();
+  var mintukuRegion = resolveMintukuRegionId_((body && (body.region || body.r)) || '');
   if (appKind === 'mintuku' && mintukuRegion) {
-    ensureMintukuNumber_(sheet, table, idx, mintukuRegion);
-    ensureMintukuFirstLogin_(sheet, table, idx);
+    // 現在地が別地方なら採番しない（URLいじり対策）。一覧拒否は getUsers_ 側
+    var myLoc = String(table.rows[idx]['現在地'] || '').trim();
+    if (!myLoc || isPrefInMintukuRegion_(myLoc, mintukuRegion)) {
+      ensureMintukuNumber_(sheet, table, idx, mintukuRegion);
+      ensureMintukuFirstLogin_(sheet, table, idx);
+    }
   }
 
   const freshRows = readObjects_(SHEET.USERS);
@@ -1575,15 +1661,22 @@ function setPublished_(body, published, typeLabel) {
   const rowNumber = idx + 2;
 
   const now = formatDateTime_(new Date());
-  setCellByHeader_(userSheet, table.headers, rowNumber, '掲載中', published);
+  const flag = sheetBool_(published);
+  setCellByHeader_(userSheet, table.headers, rowNumber, '掲載中', flag);
   setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
   setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
+  SpreadsheetApp.flush();
 
-  const requestId = createRequest_(no, typeLabel, '対応済', String(body.note || ''));
+  var requestId = '';
+  try {
+    requestId = createRequest_(no, typeLabel, '対応済', String(body.note || ''));
+  } catch (err) {
+    Logger.log('createRequest_ failed (published): ' + err);
+  }
   return {
     requestId: requestId,
     memberNo: no,
-    isPublished: published,
+    isPublished: !!published,
     lastLoginAt: now,
     publishedAt: String(user['登録日時'] || '')
   };

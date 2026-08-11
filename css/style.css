@@ -121,6 +121,10 @@ img {
   line-height: 1.5;
 }
 
+.login-hint.is-loading {
+  color: #64748b;
+}
+
 /* ===== アクセス拒否 ===== */
 #access-denied-screen {
   min-height: 100dvh;

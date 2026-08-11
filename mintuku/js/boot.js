@@ -1,10 +1,22 @@
 /**
  * [みんつく] 薄い起動スクリプト
- * - region を検証し、共通UI（../index.html）へ app=mintuku 付きで渡す
+ * - r=（不透明トークン）または旧 region= を検証し、共通UIへ渡す
  * - Apomy本体のファイルはここでは編集しない
  */
 (function () {
   "use strict";
+
+  /** AppMode と同じ対応表（boot 単体でも動くよう重複定義） */
+  var TOKEN_TO_REGION = {
+    m8h3k9qx: "hokkaido",
+    m8t7n2wp: "tohoku",
+    m8k4r1vz: "kanto",
+    m8c5p6yd: "chubu",
+    m8n9s0ue: "kinki",
+    m8g2b8af: "chugoku",
+    m8s1d4jh: "shikoku",
+    m8y6o3lm: "kyushu-okinawa"
+  };
 
   var VALID = {
     hokkaido: 1,
@@ -17,26 +29,39 @@
     "kyushu-okinawa": 1
   };
 
-  var params = new URLSearchParams(window.location.search);
-  var region = String(params.get("region") || "")
-    .trim()
-    .toLowerCase();
+  var REGION_TO_TOKEN = {};
+  Object.keys(TOKEN_TO_REGION).forEach(function (tok) {
+    REGION_TO_TOKEN[TOKEN_TO_REGION[tok]] = tok;
+  });
 
-  if (!region || !VALID[region]) {
+  function resolveRegionId(raw) {
+    var s = String(raw || "")
+      .trim()
+      .toLowerCase();
+    if (!s) return "";
+    if (TOKEN_TO_REGION[s]) return TOKEN_TO_REGION[s];
+    if (VALID[s]) return s;
+    return "";
+  }
+
+  var params = new URLSearchParams(window.location.search);
+  var region = resolveRegionId(params.get("r") || params.get("region") || "");
+
+  if (!region) {
     document.body.innerHTML =
       '<main style="font-family:sans-serif;padding:2rem;line-height:1.7">' +
       "<h1>みんつく</h1>" +
-      "<p>地方（region）が指定されていないか、不正です。</p>" +
-      "<p>Apomyの「地域を選ぶ」から開くか、<code>?region=kanto</code> のように指定してください。</p>" +
+      "<p>入口リンクが指定されていないか、不正です。</p>" +
+      "<p>Apomyの「地域を選ぶ」から開いてください。</p>" +
       '<p><a href="../index.html">Apomyへ戻る</a></p>' +
       "</main>";
     return;
   }
 
+  var token = REGION_TO_TOKEN[region] || region;
   var q = new URLSearchParams();
   q.set("app", "mintuku");
-  q.set("region", region);
-  // テスト用 splash を引き継ぐ
+  q.set("r", token);
   if (params.get("splash") === "1") q.set("splash", "1");
 
   window.location.replace("../index.html?" + q.toString());

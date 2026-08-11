@@ -1,7 +1,7 @@
 /**
  * [共通] Apomy / みんつくの起動モードと地方定義
  * - Apomy: 全国（既存）
- * - みんつく: ?app=mintuku&region=kanto など
+ * - みんつく: ?app=mintuku&r=（不透明トークン）※旧 ?region=kanto も互換
  */
 (function (global) {
   "use strict";
@@ -69,6 +69,29 @@
     }
   };
 
+  /**
+   * URL用の不透明トークン（推測しにくい固定値）
+   * GAS 側 resolveMintukuRegionId_ と揃えること
+   */
+  const REGION_TO_TOKEN = {
+    hokkaido: "m8h3k9qx",
+    tohoku: "m8t7n2wp",
+    kanto: "m8k4r1vz",
+    chubu: "m8c5p6yd",
+    kinki: "m8n9s0ue",
+    chugoku: "m8g2b8af",
+    shikoku: "m8s1d4jh",
+    "kyushu-okinawa": "m8y6o3lm"
+  };
+
+  const TOKEN_TO_REGION = (function () {
+    const map = {};
+    Object.keys(REGION_TO_TOKEN).forEach(function (id) {
+      map[REGION_TO_TOKEN[id]] = id;
+    });
+    return map;
+  })();
+
   /** 都道府県 → みんつく地方ID（8地方。Apomyの7ブロック地図とは別） */
   const PREFECTURE_TO_MINTUKU_REGION = (function () {
     const map = {};
@@ -80,6 +103,24 @@
     return map;
   })();
 
+  /** r=トークン または 旧 region=id を正規の地方IDへ */
+  function resolveRegionId(raw) {
+    const s = String(raw || "")
+      .trim()
+      .toLowerCase();
+    if (!s) return "";
+    if (TOKEN_TO_REGION[s]) return TOKEN_TO_REGION[s];
+    if (MINTUKU_REGIONS[s]) return s;
+    return "";
+  }
+
+  function regionToken(regionId) {
+    const id = String(regionId || "")
+      .trim()
+      .toLowerCase();
+    return REGION_TO_TOKEN[id] || "";
+  }
+
   function parseModeFromLocation(loc) {
     const url = loc || (typeof window !== "undefined" ? window.location : null);
     let app = "apomy";
@@ -88,12 +129,10 @@
       const params = new URLSearchParams(url && url.search ? url.search : "");
       const rawApp = String(params.get("app") || "apomy").trim().toLowerCase();
       if (rawApp === "mintuku") app = "mintuku";
-      region = String(params.get("region") || "").trim().toLowerCase();
+      // 新: r= / 旧互換: region=
+      region = resolveRegionId(params.get("r") || params.get("region") || "");
     } catch (_) {
       /* ignore */
-    }
-    if (app === "mintuku" && region && !MINTUKU_REGIONS[region]) {
-      region = "";
     }
     return { app: app, region: region };
   }
@@ -120,12 +159,13 @@
   }
 
   /**
-   * みんつく入口URL（同じオリジン）
+   * みんつく入口URL（同じオリジン・不透明トークン）
    * @param {string} regionId
    * @param {{ fromMintukuDir?: boolean }} [opts]
    */
   function mintukuEntryUrl(regionId, opts) {
-    const q = "region=" + encodeURIComponent(regionId || "");
+    const token = regionToken(regionId) || String(regionId || "");
+    const q = "r=" + encodeURIComponent(token);
     if (opts && opts.fromMintukuDir) {
       return "./index.html?" + q;
     }
@@ -136,7 +176,9 @@
   function appShellUrl(regionId) {
     const q = new URLSearchParams();
     q.set("app", "mintuku");
-    if (regionId) q.set("region", regionId);
+    const token = regionToken(regionId);
+    if (token) q.set("r", token);
+    else if (regionId) q.set("region", regionId);
     return "../index.html?" + q.toString();
   }
 
@@ -146,9 +188,13 @@
 
   global.AppMode = {
     MINTUKU_REGIONS: MINTUKU_REGIONS,
+    REGION_TO_TOKEN: REGION_TO_TOKEN,
+    TOKEN_TO_REGION: TOKEN_TO_REGION,
     PREFECTURE_TO_MINTUKU_REGION: PREFECTURE_TO_MINTUKU_REGION,
     parseModeFromLocation: parseModeFromLocation,
     detect: detect,
+    resolveRegionId: resolveRegionId,
+    regionToken: regionToken,
     getRegionMeta: getRegionMeta,
     displayName: displayName,
     prefectureToRegionId: prefectureToRegionId,

@@ -1353,6 +1353,42 @@
     return msg.indexOf("MINTUKU_EXPIRED:") === 0 || msg.indexOf("無料期間(30日)が終了") >= 0;
   }
 
+  function isMintukuRegionDeniedError(err) {
+    const msg = String(err?.message || err || "");
+    return msg.indexOf("MINTUKU_REGION_DENIED:") === 0 || msg.indexOf("現在地が一致する会員のみ") >= 0;
+  }
+
+  /**
+   * [みんつく] Apomy掲載停止中かつみんつく掲載中なら、みんつくへ誘導
+   * @returns {boolean} 遷移したとき true
+   */
+  function redirectApomyUnpublishedToMintuku(user) {
+    if (isMintukuMode() || !user) return false;
+    if (user.isPublished !== false) return false;
+    if (!user.mintukuListed) return false;
+    if (typeof AppMode === "undefined" || !AppMode.prefectureToRegionId) return false;
+    const regionId = AppMode.prefectureToRegionId(user.location);
+    if (!regionId) return false;
+    const entry = AppMode.mintukuEntryUrl(regionId);
+    showToast("Apomy掲載停止中のため、みんつくへ移動します");
+    window.location.replace(entry);
+    return true;
+  }
+
+  /**
+   * [みんつく] URLの地方と現在地が食い違うとき、自分の地方へ寄せる
+   * @returns {boolean} 遷移したとき true
+   */
+  function redirectMintukuToOwnRegion(user) {
+    if (!isMintukuMode() || !user) return false;
+    if (typeof AppMode === "undefined" || !AppMode.prefectureToRegionId) return false;
+    const own = AppMode.prefectureToRegionId(user.location);
+    if (!own || !state.mintukuRegion || own === state.mintukuRegion) return false;
+    showToast("現在地の地方のみんつくへ移動します");
+    window.location.replace(AppMode.mintukuEntryUrl(own));
+    return true;
+  }
+
   function mintukuExpiredMessage(err) {
     const msg = String(err?.message || err || "");
     return msg.replace(/^MINTUKU_EXPIRED:/, "").trim() ||
@@ -2222,6 +2258,8 @@
         if (wasNew) state.currentUser.isNew = true;
         lastTouchAt = Date.now();
         applyMyActivity(meRes.data.lastLoginAt);
+        if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
+        if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
           showMintukuExpiredScreen();
           return;
@@ -2257,23 +2295,33 @@
           showMintukuExpiredScreen(reason);
           return;
         }
-        const detail = String(reason?.message || reason || "").trim();
-        // みんつくでは誤ったサンプル会員を出さない
-        if (isMintukuMode()) {
+        if (isMintukuMode() && isMintukuRegionDeniedError(reason)) {
+          if (redirectMintukuToOwnRegion(state.currentUser)) return;
           state.allUsers = [];
           showToast(
-            detail
-              ? `会員データの取得に失敗しました: ${detail}`
-              : "会員データの取得に失敗しました"
+            String(reason?.message || reason || "")
+              .replace(/^MINTUKU_REGION_DENIED:/, "")
+              .trim() || "この地方のみんつくは利用できません"
           );
         } else {
-          const mockUsers = await MockAPI.fetchUsers({});
-          state.allUsers = mockUsers.data || [];
-          showToast(
-            detail
-              ? `会員データの取得に失敗したため、一時データを表示しています（${detail}）`
-              : "会員データの取得に失敗したため、一時データを表示しています"
-          );
+          const detail = String(reason?.message || reason || "").trim();
+          // みんつくでは誤ったサンプル会員を出さない
+          if (isMintukuMode()) {
+            state.allUsers = [];
+            showToast(
+              detail
+                ? `会員データの取得に失敗しました: ${detail}`
+                : "会員データの取得に失敗しました"
+            );
+          } else {
+            const mockUsers = await MockAPI.fetchUsers({});
+            state.allUsers = mockUsers.data || [];
+            showToast(
+              detail
+                ? `会員データの取得に失敗したため、一時データを表示しています（${detail}）`
+                : "会員データの取得に失敗したため、一時データを表示しています"
+            );
+          }
         }
       } else {
         state.allUsers = applyMintukuScope(usersRes.data || []);
@@ -3460,18 +3508,34 @@
 
   function setupGoogleButton(buttonHostId = "google-btn-host") {
     const hint = $("#login-hint");
+    const isMainLogin = buttonHostId === "google-btn-host";
     try {
       if (!(AppConfig.GOOGLE_CLIENT_ID || "").trim()) {
-        if (hint) {
+        if (hint && isMainLogin) {
           hint.textContent =
             "js/config.js の GOOGLE_CLIENT_ID を設定してください。Google Cloud で OAuth クライアント（ウェブ）を作成し、生成元に http://localhost:3000 を追加します。";
+          hint.classList.remove("is-loading");
           hint.classList.remove("hidden");
         }
         const host = document.getElementById(buttonHostId);
         if (host) host.innerHTML = "";
         return;
       }
-      hint?.classList.add("hidden");
+
+      // GSI 読込中は最初から案内を出す
+      if (hint && isMainLogin) {
+        hint.textContent = "Googleログインを読み込み中…";
+        hint.classList.add("is-loading");
+        hint.classList.remove("hidden");
+      }
+
+      const clearLoadingHint = () => {
+        if (hint && isMainLogin) {
+          hint.textContent = "";
+          hint.classList.remove("is-loading");
+          hint.classList.add("hidden");
+        }
+      };
 
       const start = () => {
         GoogleAuth.init({
@@ -3484,6 +3548,7 @@
             completeLoginWithIdToken(idToken);
           }
         });
+        clearLoadingHint();
       };
 
       if (window.google?.accounts?.id) {
@@ -3497,8 +3562,9 @@
             start();
           } else if (tries > 50) {
             clearInterval(timer);
-            if (hint && buttonHostId === "google-btn-host") {
+            if (hint && isMainLogin) {
               hint.textContent = "Googleログインの読み込みに失敗しました。ページを再読み込みしてください。";
+              hint.classList.remove("is-loading");
               hint.classList.remove("hidden");
             }
           }
@@ -3506,8 +3572,9 @@
       }
     } catch (err) {
       console.error(err);
-      if (hint && buttonHostId === "google-btn-host") {
+      if (hint && isMainLogin) {
         hint.textContent = err.message || "Googleログインを初期化できませんでした";
+        hint.classList.remove("is-loading");
         hint.classList.remove("hidden");
       }
     }
@@ -3786,7 +3853,9 @@
       try {
         showLoading(true);
         const res = await GasAPI.stopListing(identityForApi());
-        if (state.currentUser) state.currentUser.isPublished = false;
+        if (state.currentUser) {
+          state.currentUser.isPublished = false;
+        }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
         showToast("Apomyの掲載を停止しました（みんつくには残ります）");
@@ -3822,7 +3891,9 @@
       try {
         showLoading(true);
         const res = await GasAPI.stopMintukuListing(identityForApi());
-        if (state.currentUser) state.currentUser.mintukuListed = false;
+        if (state.currentUser) {
+          state.currentUser.mintukuListed = false;
+        }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
         showToast("みんつくの掲載を停止しました");
