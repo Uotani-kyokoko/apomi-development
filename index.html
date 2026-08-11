@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260807e">
+  <link rel="stylesheet" href="css/style.css?v=20260811b">
 </head>
 <body>
 
@@ -63,6 +63,20 @@
         <p class="maintenance-admin-hint">管理者ログイン</p>
         <div id="maintenance-google-btn-host" class="google-btn-host"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== みんつく期限切れ画面 ===== -->
+  <div id="mintuku-expired-screen" class="hidden" aria-live="polite">
+    <div class="mintuku-expired-inner">
+      <h1 class="mintuku-expired-title">無料期間が終了しました</h1>
+      <p class="mintuku-expired-text">
+        無料期間(30日)が終了しました。今まで通り閲覧するには
+        <a id="mintuku-expired-link" class="mintuku-expired-link" href="#" target="_blank" rel="noopener noreferrer">こちら</a>
+        からお問合せください
+      </p>
+      <a id="mintuku-expired-btn" class="mintuku-expired-btn hidden" href="#" target="_blank" rel="noopener noreferrer">お問い合わせ</a>
+      <button type="button" id="mintuku-expired-back" class="mintuku-expired-back">ログイン画面へ戻る</button>
     </div>
   </div>
 
@@ -141,6 +155,10 @@
           <button id="btn-salon" class="mypage-link" type="button">井口智明オンラインサロン掲載を申請</button>
           <button id="btn-president-badge" class="mypage-link" type="button">社長マーク掲載を申請</button>
           <button id="btn-stop-listing" class="mypage-link" type="button">掲載停止</button>
+          <button id="btn-stop-apomy-from-mintuku" class="mypage-link hidden" type="button">Apomyの掲載を停止</button>
+          <button id="btn-resume-apomy-from-mintuku" class="mypage-link hidden" type="button">Apomyの掲載を再開</button>
+          <button id="btn-stop-mintuku-listing" class="mypage-link hidden" type="button">みんつくの掲載を停止</button>
+          <button id="btn-resume-mintuku-listing" class="mypage-link hidden" type="button">みんつくの掲載を再開</button>
         </div>
       </section>
 
@@ -529,7 +547,7 @@
   <script src="js/auth.js?v=20260807d"></script>
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260808a"></script>
-  <script src="js/gas-api.js?v=20260811a"></script>
-  <script src="js/app.js?v=20260811a"></script>
+  <script src="js/gas-api.js?v=20260811b"></script>
+  <script src="js/app.js?v=20260811b"></script>
 </body>
 </html>

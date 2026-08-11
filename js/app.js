@@ -1279,6 +1279,11 @@
   function updateMypageActionLabels(user) {
     const salonBtn = $("#btn-salon");
     const presidentBtn = $("#btn-president-badge");
+    const stopApomy = $("#btn-stop-listing");
+    const stopApomyMintuku = $("#btn-stop-apomy-from-mintuku");
+    const resumeApomyMintuku = $("#btn-resume-apomy-from-mintuku");
+    const stopMintuku = $("#btn-stop-mintuku-listing");
+    const resumeMintuku = $("#btn-resume-mintuku-listing");
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
     const salonName = state.salonLabel || "井口智明オンラインサロン";
@@ -1314,6 +1319,97 @@
         presidentBtn.disabled = false;
       }
     }
+
+    // [みんつく] 掲載スイッチ分離 / [Apomy] 従来の掲載停止1つ
+    const published = user?.isPublished !== false;
+    const mintukuOn = Boolean(user?.mintukuListed);
+    if (isMintukuMode()) {
+      stopApomy?.classList.add("hidden");
+      if (published) {
+        stopApomyMintuku?.classList.remove("hidden");
+        resumeApomyMintuku?.classList.add("hidden");
+      } else {
+        stopApomyMintuku?.classList.add("hidden");
+        resumeApomyMintuku?.classList.remove("hidden");
+      }
+      if (mintukuOn) {
+        stopMintuku?.classList.remove("hidden");
+        resumeMintuku?.classList.add("hidden");
+      } else {
+        stopMintuku?.classList.add("hidden");
+        resumeMintuku?.classList.remove("hidden");
+      }
+    } else {
+      stopApomy?.classList.remove("hidden");
+      stopApomyMintuku?.classList.add("hidden");
+      resumeApomyMintuku?.classList.add("hidden");
+      stopMintuku?.classList.add("hidden");
+      resumeMintuku?.classList.add("hidden");
+    }
+  }
+
+  function isMintukuExpiredError(err) {
+    const msg = String(err?.message || err || "");
+    return msg.indexOf("MINTUKU_EXPIRED:") === 0 || msg.indexOf("無料期間(30日)が終了") >= 0;
+  }
+
+  function mintukuExpiredMessage(err) {
+    const msg = String(err?.message || err || "");
+    return msg.replace(/^MINTUKU_EXPIRED:/, "").trim() ||
+      "無料期間(30日)が終了しました。今まで通り閲覧するにはこちらからお問合せください";
+  }
+
+  function showMintukuExpiredScreen(err) {
+    const screen = $("#mintuku-expired-screen");
+    const app = $("#app-screen");
+    const login = $("#login-screen");
+    if (login) login.classList.add("hidden");
+    if (app) app.classList.add("hidden");
+    showLoading(false);
+
+    const contactUrl = String(
+      state.settings?.["みんつく問い合わせURL"] ||
+        state.settings?.["みんつくの問い合わせ用リンク"] ||
+        ""
+    ).trim();
+    const link = $("#mintuku-expired-link");
+    const btn = $("#mintuku-expired-btn");
+    const text = document.querySelector(".mintuku-expired-text");
+    if (text) {
+      const body = mintukuExpiredMessage(err);
+      // 仕様文言をベースに「こちら」リンクを維持
+      text.innerHTML =
+        '無料期間(30日)が終了しました。今まで通り閲覧するには' +
+        '<a id="mintuku-expired-link" class="mintuku-expired-link" href="#" target="_blank" rel="noopener noreferrer">こちら</a>' +
+        'からお問合せください';
+    }
+    const linkEl = $("#mintuku-expired-link");
+    if (contactUrl) {
+      if (linkEl) {
+        linkEl.href = contactUrl;
+        linkEl.classList.remove("hidden");
+      }
+      if (btn) {
+        btn.href = contactUrl;
+        btn.classList.remove("hidden");
+      }
+    } else {
+      if (linkEl) {
+        linkEl.removeAttribute("href");
+        linkEl.onclick = (e) => {
+          e.preventDefault();
+          showToast("問い合わせ先が未設定です。設定シートに「みんつく問い合わせURL」を追加してください");
+        };
+      }
+      if (btn) btn.classList.add("hidden");
+      showToast("設定に「みんつく問い合わせURL」がありません");
+    }
+    screen?.classList.remove("hidden");
+    state.isLoggedIn = false;
+  }
+
+  function hideMintukuExpiredScreen() {
+    $("#mintuku-expired-screen")?.classList.add("hidden");
   }
 
   function updateHeader(tabId) {
@@ -2130,6 +2226,10 @@
       // GAS失敗時はモックにフォールバック（画面が空にならないようにする）
       if (!usersRes) {
         console.error("users failed", results[1].reason);
+        if (isMintukuMode() && isMintukuExpiredError(results[1].reason)) {
+          showMintukuExpiredScreen(results[1].reason);
+          return;
+        }
         const mockUsers = await MockAPI.fetchUsers({});
         state.allUsers = applyMintukuScope(mockUsers.data || []);
         showToast("会員データの取得に失敗したため、一時データを表示しています");
@@ -2183,6 +2283,12 @@
         if (wasNew) state.currentUser.isNew = true;
         lastTouchAt = Date.now();
         applyMyActivity(meRes.data.lastLoginAt);
+
+        // [みんつく] 無料30日終了
+        if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
+          showMintukuExpiredScreen();
+          return;
+        }
       } else if (!state.currentUser) {
         // 自分の取得に失敗しても、一覧からメール一致を探す
         const email = (identity.email || "").toLowerCase();
@@ -3001,6 +3107,7 @@
     state.identity = null;
     state.editRequired = false;
     closeConnectMenu();
+    hideMintukuExpiredScreen();
     $("#access-denied-screen")?.classList.add("hidden");
     $("#maintenance-screen")?.classList.add("hidden");
     $("#login-screen").classList.remove("hidden");
@@ -3606,6 +3713,84 @@
       } finally {
         showLoading(false);
       }
+    });
+
+    // [みんつく] Apomy掲載のみ停止（みんつくには残る）
+    $("#btn-stop-apomy-from-mintuku")?.addEventListener("click", async () => {
+      if (!confirm("Apomy（全国）の掲載だけを停止しますか？\nみんつくには引き続き掲載されます。")) return;
+      try {
+        showLoading(true);
+        const res = await GasAPI.stopListing(identityForApi());
+        if (state.currentUser) state.currentUser.isPublished = false;
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        showToast("Apomyの掲載を停止しました（みんつくには残ります）");
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "停止に失敗しました");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    $("#btn-resume-apomy-from-mintuku")?.addEventListener("click", async () => {
+      if (!confirm("Apomy（全国）の掲載を再開しますか？")) return;
+      try {
+        showLoading(true);
+        const res = await GasAPI.resumeListing(identityForApi());
+        if (state.currentUser) {
+          state.currentUser.isPublished = res.data?.isPublished !== false;
+        }
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        showToast("Apomyの掲載を再開しました");
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "再開に失敗しました");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    $("#btn-stop-mintuku-listing")?.addEventListener("click", async () => {
+      if (!confirm("みんつくの掲載を停止しますか？")) return;
+      try {
+        showLoading(true);
+        const res = await GasAPI.stopMintukuListing(identityForApi());
+        if (state.currentUser) state.currentUser.mintukuListed = false;
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        showToast("みんつくの掲載を停止しました");
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "停止に失敗しました");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    $("#btn-resume-mintuku-listing")?.addEventListener("click", async () => {
+      if (!confirm("みんつくの掲載を再開しますか？")) return;
+      try {
+        showLoading(true);
+        const res = await GasAPI.resumeMintukuListing(identityForApi());
+        if (state.currentUser) {
+          state.currentUser.mintukuListed = res.data?.mintukuListed !== false;
+        }
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        showToast("みんつくの掲載を再開しました");
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "再開に失敗しました");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    $("#mintuku-expired-back")?.addEventListener("click", () => {
+      Session.clear();
+      showLogin();
     });
 
     document.addEventListener("visibilitychange", () => {

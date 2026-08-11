@@ -263,6 +263,79 @@ img {
   color: #374151;
 }
 
+/* [みんつく] 無料期間終了 */
+#mintuku-expired-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f3f4f6;
+}
+
+#mintuku-expired-screen.hidden {
+  display: none;
+}
+
+.mintuku-expired-inner {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.mintuku-expired-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.mintuku-expired-text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: #374151;
+}
+
+.mintuku-expired-link {
+  color: #1d4ed8;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.mintuku-expired-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 200px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mintuku-expired-btn.hidden {
+  display: none;
+}
+
+.mintuku-expired-back {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 8px;
+}
+
 .maintenance-admin-hint {
   margin: 12px 0 0;
   font-size: 0.8rem;

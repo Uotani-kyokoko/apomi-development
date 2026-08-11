@@ -27,7 +27,9 @@
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  *
  * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=… で地方一覧。
- * 会員列（追加予定）: みんつく掲載 / みんつく初回ログイン日 / 課金有無
+ * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無
+ * 設定キー: みんつく問い合わせURL（期限切れ画面の「こちら」）
+ * POST: stopMintukuListing / resumeMintukuListing（みんつく掲載のみ）
  */
 
 var ACCESS_DENIED_MESSAGE =
@@ -138,10 +140,20 @@ function doPost(e) {
         data = requestListing_(body, 'サロン掲載');
         break;
       case 'stopListing':
+        // [Apomy] 全国掲載のみ停止（みんつく掲載は変えない）
         data = setPublished_(body, false, '掲載停止');
         break;
       case 'resumeListing':
+        // [Apomy] 全国掲載のみ再開
         data = setPublished_(body, true, '掲載再開');
+        break;
+      case 'stopMintukuListing':
+        // [みんつく] みんつく掲載のみ停止
+        data = setMintukuListed_(body, false, 'みんつく掲載停止');
+        break;
+      case 'resumeMintukuListing':
+        // [みんつく] みんつく掲載のみ再開
+        data = setMintukuListed_(body, true, 'みんつく掲載再開');
         break;
       case 'touch':
         data = touchActivity_(body);
@@ -198,6 +210,10 @@ function getUsers_(p) {
   const appKind = String(p.app || 'apomy').trim().toLowerCase();
   const mintukuRegion = String(p.region || '').trim().toLowerCase();
   const isMintuku = appKind === 'mintuku';
+
+  if (isMintuku) {
+    assertMintukuViewerAccess_(p);
+  }
 
   return rows
     .filter(function (r) {
@@ -294,7 +310,7 @@ function nextMintukuSeq_(rows, label) {
 /**
  * [みんつく] 初回アクセス時に地方番号を自動採番（アクセス順）
  * 保存例: 関東1 / 近畿2
- * @returns {string} みんつく番号（採番不要・失敗時は既存または空）
+ * ※すでに番号がある場合は掲載フラグを勝手にONに戻さない（停止操作を尊重）
  */
 function ensureMintukuNumber_(sheet, table, idx, regionId) {
   var label = mintukuRegionLabel_(regionId);
@@ -306,11 +322,6 @@ function ensureMintukuNumber_(sheet, table, idx, regionId) {
   var current = String(table.rows[idx]['みんつく番号'] || '').trim();
   var parsed = parseMintukuNumber_(current);
   if (parsed && parsed.label === label && parsed.n > 0) {
-    // 既にこの地方の番号あり → 掲載もONに寄せる
-    if (!toBool_(table.rows[idx]['みんつく掲載'])) {
-      setCellByHeader_(sheet, table.headers, idx + 2, 'みんつく掲載', true);
-      table.rows[idx]['みんつく掲載'] = true;
-    }
     return current;
   }
 
@@ -322,6 +333,122 @@ function ensureMintukuNumber_(sheet, table, idx, regionId) {
   table.rows[idx]['みんつく番号'] = value;
   table.rows[idx]['みんつく掲載'] = true;
   return value;
+}
+
+/** [みんつく] 初回ログイン日を1回だけ記録（無料30日の起点） */
+function ensureMintukuFirstLogin_(sheet, table, idx) {
+  if (idx < 0) return '';
+  ensureHeader_(sheet, table.headers, 'みんつく初回ログイン日');
+  ensureHeader_(sheet, table.headers, '課金有無');
+  var current = String(table.rows[idx]['みんつく初回ログイン日'] || '').trim();
+  if (current) return current;
+  var key = tokyoDateKey_(new Date());
+  if (!key) key = formatDateTime_(new Date());
+  setCellByHeader_(sheet, table.headers, idx + 2, 'みんつく初回ログイン日', key);
+  table.rows[idx]['みんつく初回ログイン日'] = key;
+  return key;
+}
+
+/** [みんつく] 課金有無（手入力） */
+function isMintukuPaid_(row) {
+  return toBool_((row && row['課金有無']) || '');
+}
+
+/** [みんつく] 東京カレンダー日数差（初日=0） */
+function mintukuDaysSinceFirst_(firstRaw) {
+  var first = parseDate_(firstRaw);
+  if (!first) return 0;
+  var a = tokyoDateKey_(first);
+  var b = tokyoDateKey_(new Date());
+  if (!a || !b) return 0;
+  var da = new Date(a + 'T00:00:00+09:00');
+  var db = new Date(b + 'T00:00:00+09:00');
+  var diff = Math.floor((db.getTime() - da.getTime()) / 86400000);
+  return diff < 0 ? 0 : diff;
+}
+
+/**
+ * [みんつく] 利用可否
+ * 初回日から30日間無料（day 0〜29）。31日目以降は課金有無がはいのときのみ
+ */
+function evaluateMintukuAccess_(row) {
+  var first = String((row && row['みんつく初回ログイン日']) || '').trim();
+  var paid = isMintukuPaid_(row);
+  if (!first) {
+    return { ok: true, expired: false, paid: paid, daysUsed: 0, daysLeft: 30 };
+  }
+  var daysUsed = mintukuDaysSinceFirst_(first);
+  if (daysUsed < 30) {
+    return {
+      ok: true,
+      expired: false,
+      paid: paid,
+      daysUsed: daysUsed,
+      daysLeft: 30 - daysUsed
+    };
+  }
+  if (paid) {
+    return { ok: true, expired: false, paid: true, daysUsed: daysUsed, daysLeft: 0 };
+  }
+  return { ok: false, expired: true, paid: false, daysUsed: daysUsed, daysLeft: 0 };
+}
+
+function attachMintukuAccess_(user, row) {
+  var access = evaluateMintukuAccess_(row || {});
+  user.mintukuAccessOk = access.ok;
+  user.mintukuExpired = access.expired;
+  user.mintukuPaid = access.paid;
+  user.mintukuDaysUsed = access.daysUsed;
+  user.mintukuDaysLeft = access.daysLeft;
+  user.mintukuFirstLoginAt = String((row && row['みんつく初回ログイン日']) || '').trim();
+  return user;
+}
+
+/** [みんつく] 閲覧者の課金チェック（一覧用）。期限切れなら例外 */
+function assertMintukuViewerAccess_(p) {
+  var email = String((p && p.email) || '').trim();
+  var memberNo = String((p && (p.memberNo || p.member_no)) || '').trim();
+  if (!email && !memberNo) return;
+  var rows = readObjects_(SHEET.USERS);
+  var idx = findUserIndex_(rows, memberNo, email);
+  if (idx < 0) return;
+  var access = evaluateMintukuAccess_(rows[idx]);
+  if (!access.ok) {
+    throw new Error(
+      'MINTUKU_EXPIRED:無料期間(30日)が終了しました。今まで通り閲覧するにはこちらからお問合せください'
+    );
+  }
+}
+
+/** [みんつく] みんつく掲載のON/OFF */
+function setMintukuListed_(body, listed, typeLabel) {
+  const memberNo = String(body.memberNo || body.member_no || '').trim();
+  const email = String(body.email || '').trim();
+  if (!memberNo && !email) throw new Error('memberNo または email が必要です');
+
+  const userSheet = getSheet_(SHEET.USERS);
+  const table = readTable_(userSheet);
+  const idx = findUserIndex_(table.rows, memberNo, email);
+  if (idx < 0) throw new Error('会員が見つかりません');
+
+  ensureHeader_(userSheet, table.headers, 'みんつく掲載');
+  const user = table.rows[idx];
+  const no = String(user['会員番号'] || memberNo);
+  const rowNumber = idx + 2;
+  const now = formatDateTime_(new Date());
+  setCellByHeader_(userSheet, table.headers, rowNumber, 'みんつく掲載', listed);
+  setCellByHeader_(userSheet, table.headers, rowNumber, '更新日時', now);
+  setCellByHeader_(userSheet, table.headers, rowNumber, '最終ログイン日時', now);
+  table.rows[idx]['みんつく掲載'] = listed;
+
+  const requestId = createRequest_(no, typeLabel || (listed ? 'みんつく掲載再開' : 'みんつく掲載停止'), '対応済', String(body.note || ''));
+  return {
+    requestId: requestId,
+    memberNo: no,
+    mintukuListed: listed,
+    isPublished: toBool_(user['掲載中']),
+    lastLoginAt: now
+  };
 }
 
 /**
@@ -469,10 +596,15 @@ function touchActivity_(body) {
   var mintukuRegion = String((body && body.region) || '').trim().toLowerCase();
   if (appKind === 'mintuku' && mintukuRegion) {
     ensureMintukuNumber_(sheet, table, idx, mintukuRegion);
+    ensureMintukuFirstLogin_(sheet, table, idx);
   }
 
-  const user = mapUser_(readObjects_(SHEET.USERS)[idx]);
+  const freshRows = readObjects_(SHEET.USERS);
+  const user = mapUser_(freshRows[idx]);
   user.lastLoginAt = now;
+  if (appKind === 'mintuku') {
+    attachMintukuAccess_(user, freshRows[idx]);
+  }
   return user;
 }
 
@@ -1490,6 +1622,8 @@ function mapUser_(r) {
       : false,
     // [みんつく] 例: 関東1（画面では No.00001 に変換）
     mintukuNumber: String(r['みんつく番号'] || '').trim(),
+    mintukuFirstLoginAt: String(r['みんつく初回ログイン日'] || '').trim(),
+    mintukuPaid: isMintukuPaid_(r),
     presidentMark: toBool_(r['社長マーク']),
     presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
     salonListing: toBool_(r['サロン掲載']),

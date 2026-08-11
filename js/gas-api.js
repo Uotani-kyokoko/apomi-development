@@ -233,6 +233,22 @@ const GasAPI = (() => {
       return post('resumeListing', payload);
     },
 
+    /** [みんつく] みんつく掲載のみ停止 */
+    async stopMintukuListing(payload) {
+      if (!USE_GAS) {
+        return { success: true, data: { mintukuListed: false } };
+      }
+      return post('stopMintukuListing', payload);
+    },
+
+    /** [みんつく] みんつく掲載のみ再開 */
+    async resumeMintukuListing(payload) {
+      if (!USE_GAS) {
+        return { success: true, data: { mintukuListed: true } };
+      }
+      return post('resumeMintukuListing', payload);
+    },
+
     /** 操作のたびに最終ログイン日時を更新（デバウンス用） */
     async touchActivity(identity = {}) {
       const email = identity.email || '';
