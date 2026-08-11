@@ -480,6 +480,19 @@ function mintukuDaysSinceFirst_(firstRaw) {
 }
 
 /**
+ * [みんつく] 課金有無列が「はい」か
+ * スプシ手入力想定: TRUE / はい / 有 / 1 など
+ */
+function isMintukuPaid_(row) {
+  var v = row && row['課金有無'];
+  if (v === true || v === 1) return true;
+  var s = String(v || '').trim().toUpperCase();
+  if (!s) return false;
+  if (s === 'TRUE' || s === '1' || s === '○' || s === 'はい' || s === '有' || s === 'あり') return true;
+  return toBool_(v);
+}
+
+/**
  * [みんつく] 利用可否
  * 初回日から30日間無料（day 0〜29）。31日目以降は課金有無がはいのときのみ
  */
