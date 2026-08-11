@@ -1359,17 +1359,39 @@
   }
 
   /**
-   * [みんつく] Apomy掲載停止中かつみんつく掲載中なら、みんつくへ誘導
+   * [みんつく] Apomy掲載をみんつくから停止した人だけ、Apomy起動時にみんつくへ誘導
+   * （新規・未完成プロフィール・単なる掲載停止は Apomy に残す）
    * @returns {boolean} 遷移したとき true
    */
   function redirectApomyUnpublishedToMintuku(user) {
     if (isMintukuMode() || !user) return false;
+    if (user.isNew) return false;
     if (user.isPublished !== false) return false;
     if (!user.mintukuListed) return false;
+    if (!String(user.mintukuNumber || "").trim()) return false;
+    // みんつく側の「Apomy掲載を停止」を押したときだけ立てる旗
+    let shouldRedirect = false;
+    try {
+      shouldRedirect = localStorage.getItem("apomy_open_mintuku_after_stop") === "1";
+    } catch (_) {
+      shouldRedirect = false;
+    }
+    if (!shouldRedirect) return false;
+    // 復旧用: ?stay=1 で Apomy に留まる
+    try {
+      if (new URLSearchParams(window.location.search).get("stay") === "1") return false;
+    } catch (_) {
+      /* ignore */
+    }
     if (typeof AppMode === "undefined" || !AppMode.prefectureToRegionId) return false;
     const regionId = AppMode.prefectureToRegionId(user.location);
     if (!regionId) return false;
     const entry = AppMode.mintukuEntryUrl(regionId);
+    try {
+      localStorage.removeItem("apomy_open_mintuku_after_stop");
+    } catch (_) {
+      /* ignore */
+    }
     showToast("Apomy掲載停止中のため、みんつくへ移動します");
     window.location.replace(entry);
     return true;
@@ -3856,6 +3878,11 @@
         if (state.currentUser) {
           state.currentUser.isPublished = false;
         }
+        try {
+          localStorage.setItem("apomy_open_mintuku_after_stop", "1");
+        } catch (_) {
+          /* ignore */
+        }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
         showToast("Apomyの掲載を停止しました（みんつくには残ります）");
@@ -3874,6 +3901,11 @@
         const res = await GasAPI.resumeListing(identityForApi());
         if (state.currentUser) {
           state.currentUser.isPublished = res.data?.isPublished !== false;
+        }
+        try {
+          localStorage.removeItem("apomy_open_mintuku_after_stop");
+        } catch (_) {
+          /* ignore */
         }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
@@ -3938,6 +3970,14 @@
 
   async function init() {
     applyMintukuChrome();
+    // 復旧: ?stay=1 でみんつく自動遷移フラグを消す
+    try {
+      if (new URLSearchParams(window.location.search).get("stay") === "1") {
+        localStorage.removeItem("apomy_open_mintuku_after_stop");
+      }
+    } catch (_) {
+      /* ignore */
+    }
     if (isMintukuMode() && !state.mintukuRegion) {
       showToast(`みんつくの地方が指定されていません。「地域を選ぶ」から開いてください`);
     }
