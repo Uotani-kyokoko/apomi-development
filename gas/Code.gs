@@ -25,6 +25,9 @@
  * 【設定キー】オーナーメール / 開発者メール … メンテ中のバイパス許可
  * 【シート】アクセス拒否 … A列「メール」に拒否アドレス（1行1件）。API応答には含めない
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
+ *
+ * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=… で地方一覧。
+ * 会員列（追加予定）: みんつく掲載 / みんつく初回ログイン日 / 課金有無
  */
 
 var ACCESS_DENIED_MESSAGE =
@@ -191,10 +194,29 @@ function getUsers_(p) {
   const ageGroup = p.ageGroup || p.age_group || 'all';
   const tags = p.tags || p.tag || 'all';
   const includeUnpublished = String(p.includeUnpublished || '') === 'true';
+  // [みんつく] app=mintuku & region=kanto など。未指定時は Apomy（全国）
+  const appKind = String(p.app || 'apomy').trim().toLowerCase();
+  const mintukuRegion = String(p.region || '').trim().toLowerCase();
+  const isMintuku = appKind === 'mintuku';
 
   return rows
     .filter(function (r) {
-      if (!includeUnpublished && !toBool_(r['掲載中'])) return false;
+      if (isMintuku) {
+        // [みんつく] いまの地方以外は出さない
+        if (!isPrefInMintukuRegion_(r['現在地'], mintukuRegion)) return false;
+        if (!includeUnpublished) {
+          if (Object.prototype.hasOwnProperty.call(r, 'みんつく掲載')) {
+            // [みんつく] 列がある場合はみんつく掲載のみ（Apomy掲載中と独立）
+            if (!toBool_(r['みんつく掲載'])) return false;
+          } else if (!toBool_(r['掲載中'])) {
+            // [みんつく] 列未追加の暫定: Apomyの掲載中を母集団にする
+            return false;
+          }
+        }
+      } else if (!includeUnpublished && !toBool_(r['掲載中'])) {
+        // [Apomy] 全国：掲載中のみ
+        return false;
+      }
       if (gender !== 'all' && String(r['性別'] || '').trim() !== gender) return false;
       // 同一項目内OR・項目間AND（＝考えうる組み合わせのいずれか）
       if (!matchesFilterList_(r['業種'], industry)) return false;
@@ -210,6 +232,43 @@ function getUsers_(p) {
       delete user.realName;
       return user;
     });
+}
+
+/**
+ * [みんつく] 都道府県が指定地方に含まれるか
+ * ※ Apomy の「北海道・東北」結合地図とは別（8地方）
+ */
+function isPrefInMintukuRegion_(location, regionId) {
+  var pref = String(location || '').trim();
+  var id = String(regionId || '').trim().toLowerCase();
+  if (!pref || !id) return false;
+  var prefs = mintukuRegionPrefs_(id);
+  if (!prefs || !prefs.length) return false;
+  return prefs.indexOf(pref) >= 0;
+}
+
+/** [みんつく] 地方ID → 都道府県リスト */
+function mintukuRegionPrefs_(regionId) {
+  switch (String(regionId || '').trim().toLowerCase()) {
+    case 'hokkaido':
+      return ['北海道'];
+    case 'tohoku':
+      return ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'];
+    case 'kanto':
+      return ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'];
+    case 'chubu':
+      return ['新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県'];
+    case 'kinki':
+      return ['三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県'];
+    case 'chugoku':
+      return ['鳥取県', '島根県', '岡山県', '広島県', '山口県'];
+    case 'shikoku':
+      return ['徳島県', '香川県', '愛媛県', '高知県'];
+    case 'kyushu-okinawa':
+      return ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'];
+    default:
+      return [];
+  }
 }
 
 /**
@@ -1365,6 +1424,10 @@ function mapUser_(r) {
     // 最新一覧は登録日時で判定（掲載日カラムは使わない）
     publishedAt: String(r['登録日時'] || ''),
     isPublished: toBool_(r['掲載中']),
+    // [みんつく] 列が無い環境では undefined 相当（false）
+    mintukuListed: Object.prototype.hasOwnProperty.call(r, 'みんつく掲載')
+      ? toBool_(r['みんつく掲載'])
+      : false,
     presidentMark: toBool_(r['社長マーク']),
     presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
     salonListing: toBool_(r['サロン掲載']),

@@ -121,6 +121,7 @@ const GasAPI = (() => {
           params[key] = params[key].filter(Boolean).join('、');
         }
       });
+      // [みんつく] app / region はそのまま query に載せる（GAS側でも地方絞り込み）
       return get('users', params);
     },
 

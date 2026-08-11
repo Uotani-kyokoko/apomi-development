@@ -165,6 +165,14 @@ const MockAPI = (() => {
       result = result.filter((u) => matchList(u.industry, filters.industry));
       result = result.filter((u) => matchList(u.jobTitle, filters.jobTitle));
       result = result.filter((u) => matchAnyTag(u.tags, filters.tags));
+      // [みんつく] モックでも地方絞り込み
+      if (String(filters.app || "").toLowerCase() === "mintuku" && filters.region) {
+        if (typeof AppMode !== "undefined" && AppMode.isPrefectureInRegion) {
+          result = result.filter((u) =>
+            AppMode.isPrefectureInRegion(u.location, filters.region)
+          );
+        }
+      }
       return delay(result);
     },
 

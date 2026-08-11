@@ -1,5 +1,7 @@
 /**
- * apomy マッチングアプリ - フロントエンド
+ * apomy / みんつく マッチングアプリ - フロントエンド（共通UI）
+ * - Apomy固有: 全国一覧・地域リンク導線
+ * - みんつく固有: 地方絞り込み・みんつく名表示（app-mode.js）
  */
 (() => {
   "use strict";
@@ -8,7 +10,7 @@
   const LATEST_WITHIN_DAYS = 30;
   /** 検索結果の初回表示件数・追加読み込み単位 */
   const SEARCH_RESULT_PAGE_SIZE = 50;
-  /** 初回ログイン時のウェルカム文言（新規会員のみ） */
+  /** 初回ログイン時のウェルカム文言（新規会員のみ）[Apomy] */
   const WELCOME_MESSAGES = [
     "アポイントメイトへようこそ！",
     "あなたのこと教えてください"
@@ -22,9 +24,18 @@
   /** 繋がるページの会員番号帯（1ページあたり） */
   const CONNECT_BAND_SIZE = 100;
 
+  const bootMode =
+    typeof AppMode !== "undefined" && AppMode.detect
+      ? AppMode.detect()
+      : { app: "apomy", region: "" };
+
   const state = {
     isLoggedIn: false,
     activeTab: "home",
+    /** apomy | mintuku */
+    appKind: bootMode.app === "mintuku" ? "mintuku" : "apomy",
+    /** みんつく地方ID（例: kanto）。Apomy時は空 */
+    mintukuRegion: bootMode.app === "mintuku" ? bootMode.region || "" : "",
     users: [],
     allUsers: [],
     banners: [],
@@ -52,6 +63,50 @@
     /** ホームダッシュボード集計 */
     dashboard: null
   };
+
+  function isMintukuMode() {
+    return state.appKind === "mintuku";
+  }
+
+  function mintukuDisplayName() {
+    if (typeof AppMode === "undefined") return "みんつく";
+    return AppMode.displayName(state.mintukuRegion);
+  }
+
+  /** [みんつく] GAS / ローカル両方で使う一覧取得パラメータ */
+  function usersFetchParams(extra = {}) {
+    const params = { ...extra };
+    if (isMintukuMode() && state.mintukuRegion) {
+      params.app = "mintuku";
+      params.region = state.mintukuRegion;
+    }
+    return params;
+  }
+
+  /** [みんつく] 地方外の会員を落とす（画面側の二重チェック） */
+  function applyMintukuScope(users) {
+    if (!isMintukuMode() || !state.mintukuRegion) return users || [];
+    if (typeof AppMode === "undefined") return users || [];
+    return (users || []).filter((u) =>
+      AppMode.isPrefectureInRegion(u.location, state.mintukuRegion)
+    );
+  }
+
+  function applyMintukuChrome() {
+    if (!isMintukuMode()) return;
+    const name = mintukuDisplayName();
+    document.title = name;
+    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    if (appleTitle) appleTitle.setAttribute("content", name);
+
+    const catchEl = document.querySelector(".login-catch");
+    if (catchEl) {
+      catchEl.innerHTML = `${name}<br>同じ地方の人と繋がるマッチング。`;
+    }
+
+    const regionBtn = $("#btn-region-link");
+    if (regionBtn) regionBtn.classList.add("hidden");
+  }
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -1213,7 +1268,7 @@
     range.classList.toggle("hidden", tabId !== "connect");
 
     if (tabId === "home") {
-      title.textContent = "apomy HOME";
+      title.textContent = isMintukuMode() ? `${mintukuDisplayName()} HOME` : "apomy HOME";
       title.classList.remove("hidden");
     } else if (tabId === "mypage") {
       title.textContent = "マイページ";
@@ -1835,6 +1890,11 @@
   }
 
   function openRegionByCurrentLocation() {
+    // [みんつく] みんつく内では地域導線を出さない（入口はApomy側）
+    if (isMintukuMode()) {
+      showToast("みんつくでは地域の切り替えはありません");
+      return;
+    }
     const location = String(state.currentUser?.location || "").trim();
     if (!location) {
       showToast("現在地が未設定です。プロフィールで現在地を選んでください");
@@ -1843,6 +1903,17 @@
     // 47都道府県以外（海外など）は地域検索対象外
     if (!Object.prototype.hasOwnProperty.call(PREFECTURE_TO_REGION, location)) {
       showToast("日本在住者のみのサービスとなります。");
+      return;
+    }
+    // [みんつく] Apomyの「地域を選ぶ」→ みんつく地方アプリへ
+    if (typeof AppMode !== "undefined" && AppMode.prefectureToRegionId) {
+      const mintukuRegionId = AppMode.prefectureToRegionId(location);
+      if (!mintukuRegionId) {
+        showToast("日本在住者のみのサービスとなります。");
+        return;
+      }
+      const entry = AppMode.mintukuEntryUrl(mintukuRegionId);
+      window.location.assign(entry);
       return;
     }
     const region = resolveRegionFromLocation(location);
@@ -1891,6 +1962,10 @@
       if (!matchesFilterList(u.industry, industry)) return false;
       if (!matchesFilterList(u.jobTitle, jobTitle)) return false;
       if (!matchesAnyTagFilter(u.tags, tags)) return false;
+      // [みんつく] 地方外は一覧に出さない
+      if (isMintukuMode() && state.mintukuRegion && typeof AppMode !== "undefined") {
+        if (!AppMode.isPrefectureInRegion(u.location, state.mintukuRegion)) return false;
+      }
       return true;
     });
   }
@@ -1930,7 +2005,7 @@
       const identity = state.identity || {};
       const results = await Promise.allSettled([
         GasAPI.fetchBanners(),
-        GasAPI.fetchUsers({}),
+        GasAPI.fetchUsers(usersFetchParams()),
         identity.email || identity.memberNo
           ? GasAPI.fetchCurrentUser(identity)
           : Promise.reject(new Error('ログイン情報がありません')),
@@ -1967,10 +2042,10 @@
       if (!usersRes) {
         console.error("users failed", results[1].reason);
         const mockUsers = await MockAPI.fetchUsers({});
-        state.allUsers = mockUsers.data || [];
+        state.allUsers = applyMintukuScope(mockUsers.data || []);
         showToast("会員データの取得に失敗したため、一時データを表示しています");
       } else {
-        state.allUsers = usersRes.data || [];
+        state.allUsers = applyMintukuScope(usersRes.data || []);
       }
 
       if (!bannersRes) {
@@ -2094,8 +2169,8 @@
     state.searchVisibleCount = SEARCH_RESULT_PAGE_SIZE;
     try {
       // 最新の会員一覧を取得し、フロントでページ＋絞り込み
-      const res = await GasAPI.fetchUsers({});
-      state.allUsers = res.data || [];
+      const res = await GasAPI.fetchUsers(usersFetchParams());
+      state.allUsers = applyMintukuScope(res.data || []);
       refreshConnectList();
       closeFilterScreen();
       switchTab("connect");
@@ -2210,7 +2285,23 @@
   }
 
   function shouldShowWelcomeSplash() {
-    return shouldForceSplash() || Boolean(state.currentUser?.isNew);
+    if (shouldForceSplash()) return true;
+    if (isMintukuMode() && state.mintukuRegion) {
+      try {
+        const key = `mintuku_intro_${state.mintukuRegion}`;
+        if (!sessionStorage.getItem(key)) return true;
+      } catch {
+        return true;
+      }
+    }
+    return Boolean(state.currentUser?.isNew);
+  }
+
+  function welcomeMessagesForMode() {
+    if (isMintukuMode()) {
+      return [`${mintukuDisplayName()}へようこそ！`, "同じ地方の人と繋がろう"];
+    }
+    return WELCOME_MESSAGES;
   }
 
   /**
@@ -2274,7 +2365,7 @@
           /* ignore */
         }
 
-        for (const text of WELCOME_MESSAGES) {
+        for (const text of welcomeMessagesForMode()) {
           if (finished) return;
           msgEl.textContent = text;
           // 次フレームでフェード開始（空白待ちをほぼゼロに）
@@ -2298,6 +2389,13 @@
     if (!shouldShowWelcomeSplash()) return;
     showLoading(false);
     await playWelcomeSplash();
+    if (isMintukuMode() && state.mintukuRegion) {
+      try {
+        sessionStorage.setItem(`mintuku_intro_${state.mintukuRegion}`, "1");
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   async function maybeOpenRequiredEdit() {
@@ -3428,6 +3526,10 @@
   }
 
   async function init() {
+    applyMintukuChrome();
+    if (isMintukuMode() && !state.mintukuRegion) {
+      showToast("みんつくの地方が指定されていません。Apomyの「地域を選ぶ」から開いてください");
+    }
     bindEvents();
     // テスト用 ?splash=1 はログイン前後どちらでもすぐ見えるようにする
     if (shouldForceSplash()) {
