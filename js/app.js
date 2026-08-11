@@ -2708,6 +2708,7 @@
 
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
+    applyLocationEditLockState(user);
     fillAnnualSpendSelect(user.annualSpend || "");
     // 初回登録、または未掲載の必須入力（掲載停止後の再掲載含む）で表示
     const showPrivacy = Boolean(user.isNew) || (required && user.isPublished === false);
@@ -3018,6 +3019,27 @@
     }
   }
 
+  function applyLocationEditLockState(user) {
+    const sel = $("#edit-location");
+    const help = $("#edit-location-help");
+    if (!sel) return;
+    const locked = Boolean(user?.locationChangeLocked);
+    sel.disabled = locked;
+    if (help) {
+      if (locked) {
+        const next = String(user.locationChangeNextDate || "").trim();
+        help.textContent = next
+          ? `現在地は変更後30日間、新たな変更はできません（次回変更可能日: ${next}）`
+          : "現在地は変更後30日間、新たな変更はできません";
+      } else if (String(user?.location || "").trim()) {
+        help.textContent =
+          "現在地を変更すると、変更後30日間は新たな変更はできません。地方が変わる場合はみんつく番号も付け直されます。";
+      } else {
+        help.textContent = "お引越しする際は現在地の変更とオーナーへお問合せください";
+      }
+    }
+  }
+
   async function saveProfile(e) {
     e.preventDefault();
     const profile = collectEditForm();
@@ -3043,6 +3065,23 @@
     if (!profile.location) {
       showToast("現在地を選択してください");
       return;
+    }
+    const prevLocation = String(state.currentUser?.location || "").trim();
+    const nextLocation = String(profile.location || "").trim();
+    if (prevLocation && nextLocation && prevLocation !== nextLocation) {
+      if (state.currentUser?.locationChangeLocked) {
+        const next = String(state.currentUser.locationChangeNextDate || "").trim();
+        showToast(
+          next
+            ? `現在地は変更後30日間、新たな変更はできません（次回変更可能日: ${next}）`
+            : "現在地は変更後30日間、新たな変更はできません"
+        );
+        return;
+      }
+      const ok = confirm(
+        "現在地は変更後30日間、新たな変更はできません。\n変更してよろしいですか？"
+      );
+      if (!ok) return;
     }
     if (!profile.industry) {
       showToast("業種を選択してください");

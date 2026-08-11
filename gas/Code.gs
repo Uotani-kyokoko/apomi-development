@@ -27,7 +27,8 @@
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  *
  * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=… で地方一覧。
- * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無
+ * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無 / 現在地変更日
+ * 現在地変更日: 初回入力後の「変更」時に記録。以降30日間は変更不可（GASで強制）
  * 設定キー: みんつく問い合わせURL（期限切れ画面の「こちら」）
  * POST: stopMintukuListing / resumeMintukuListing（みんつく掲載のみ）
  */
@@ -246,6 +247,10 @@ function getUsers_(p) {
       // 非公開項目は一覧から除外
       delete user.annualSpend;
       delete user.realName;
+      delete user.locationChangedAt;
+      delete user.locationChangeLocked;
+      delete user.locationChangeNextDate;
+      delete user.locationChangeDaysLeft;
       return user;
     });
 }
@@ -355,9 +360,54 @@ function ensureMintukuFirstLogin_(sheet, table, idx) {
   return key;
 }
 
-/** [みんつく] 課金有無（手入力） */
-function isMintukuPaid_(row) {
-  return toBool_((row && row['課金有無']) || '');
+/** [共通] 現在地変更ロック（変更後30日） */
+var LOCATION_CHANGE_LOCK_DAYS = 30;
+
+function getLocationChangeLock_(row) {
+  var raw = String((row && row['現在地変更日']) || '').trim();
+  if (!raw) {
+    return { locked: false, daysLeft: 0, nextDate: '', changedAt: '' };
+  }
+  var days = mintukuDaysSinceFirst_(raw);
+  if (days < LOCATION_CHANGE_LOCK_DAYS) {
+    var first = parseDate_(raw);
+    var next = first ? addDays_(first, LOCATION_CHANGE_LOCK_DAYS) : null;
+    return {
+      locked: true,
+      daysLeft: LOCATION_CHANGE_LOCK_DAYS - days,
+      nextDate: next ? tokyoDateKey_(next) : '',
+      changedAt: raw
+    };
+  }
+  return { locked: false, daysLeft: 0, nextDate: '', changedAt: raw };
+}
+
+/** 都道府県 → みんつく地方ID */
+function prefectureToMintukuRegionId_(pref) {
+  var p = String(pref || '').trim();
+  if (!p) return '';
+  var ids = ['hokkaido', 'tohoku', 'kanto', 'chubu', 'kinki', 'chugoku', 'shikoku', 'kyushu-okinawa'];
+  for (var i = 0; i < ids.length; i++) {
+    if (isPrefInMintukuRegion_(p, ids[i])) return ids[i];
+  }
+  return '';
+}
+
+/**
+ * [みんつく] 現在地変更で地方が変わったら番号を付け直し（欠番は埋めない）
+ */
+function renumberMintukuOnRegionChange_(sheet, table, idx, oldLoc, newLoc) {
+  var oldId = prefectureToMintukuRegionId_(oldLoc);
+  var newId = prefectureToMintukuRegionId_(newLoc);
+  if (!newId || oldId === newId) return '';
+  ensureHeader_(sheet, table.headers, 'みんつく番号');
+  var label = mintukuRegionLabel_(newId);
+  if (!label) return '';
+  var seq = nextMintukuSeq_(table.rows, label);
+  var value = label + String(seq);
+  setCellByHeader_(sheet, table.headers, idx + 2, 'みんつく番号', value);
+  table.rows[idx]['みんつく番号'] = value;
+  return value;
 }
 
 /** [みんつく] 東京カレンダー日数差（初日=0） */
@@ -1010,6 +1060,32 @@ function updateProfile_(body) {
       if (existingGender && toBool_(table.rows[idx]['掲載中'])) return;
     }
     var value = profile[key];
+    if (key === 'location') {
+      var oldLoc = String(table.rows[idx]['現在地'] || '').trim();
+      var newLoc = String(value || '').trim();
+      if (!newLoc || newLoc === oldLoc) return;
+      ensureHeader_(sheet, table.headers, '現在地変更日');
+      if (oldLoc) {
+        // 初回入力以外＝変更。ロック中は拒否
+        var lock = getLocationChangeLock_(table.rows[idx]);
+        if (lock.locked) {
+          var locMsg = '現在地は変更後30日間、新たな変更はできません';
+          if (lock.nextDate) locMsg += '（次回変更可能日: ' + lock.nextDate + '）';
+          throw new Error(locMsg);
+        }
+        var changeDay = tokyoDateKey_(new Date());
+        setCellByHeader_(sheet, table.headers, rowNumber, '現在地', newLoc);
+        setCellByHeader_(sheet, table.headers, rowNumber, '現在地変更日', changeDay);
+        table.rows[idx]['現在地'] = newLoc;
+        table.rows[idx]['現在地変更日'] = changeDay;
+        renumberMintukuOnRegionChange_(sheet, table, idx, oldLoc, newLoc);
+        return;
+      }
+      // 初回入力: 変更日は記録しない（このあと1回は変更可能）
+      setCellByHeader_(sheet, table.headers, rowNumber, '現在地', newLoc);
+      table.rows[idx]['現在地'] = newLoc;
+      return;
+    }
     if (key === 'tags') {
       value = normalizeTagsForSave_(profile[key]);
     }
@@ -1596,6 +1672,7 @@ function mapUser_(r) {
     : [];
   const nickname = nicknameFromRow_(r);
   const realName = realNameFromRow_(r);
+  const locLock = getLocationChangeLock_(r);
 
   return {
     id: String(r['会員番号'] || ''),
@@ -1609,6 +1686,10 @@ function mapUser_(r) {
     jobTitle: String(r['職種'] || ''),
     location: String(r['現在地'] || ''),
     hometown: String(r['出身地'] || ''),
+    locationChangedAt: locLock.changedAt || String(r['現在地変更日'] || '').trim(),
+    locationChangeLocked: locLock.locked,
+    locationChangeNextDate: locLock.nextDate,
+    locationChangeDaysLeft: locLock.daysLeft,
     bio: String(r['自己紹介'] || ''),
     wantMeet: String(r['こんな人と繋がりたい'] || ''),
     avoidMeet: String(r['こんな人とは繋がりたくない'] || ''),
