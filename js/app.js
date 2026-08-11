@@ -2244,13 +2244,124 @@
     el.classList.remove("hidden");
   }
 
+  const BOOT_CACHE_KEY = "apomy_boot_cache_v1";
+
+  function readBootCache() {
+    try {
+      const raw = sessionStorage.getItem(BOOT_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeBootCache() {
+    try {
+      sessionStorage.setItem(
+        BOOT_CACHE_KEY,
+        JSON.stringify({
+          banners: state.banners || [],
+          masters: state.masters || {},
+          settings: state.settings || {},
+          dashboard: state.dashboard || null,
+          savedAt: Date.now()
+        })
+      );
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function hydrateBootCache() {
+    const cached = readBootCache();
+    if (!cached) return;
+    // 10分以内のキャッシュだけ使う
+    if (cached.savedAt && Date.now() - Number(cached.savedAt) > 10 * 60 * 1000) return;
+    if (Array.isArray(cached.banners) && !(state.banners && state.banners.length)) {
+      state.banners = cached.banners;
+    }
+    if (cached.masters && typeof cached.masters === "object" && (!state.masters || !Object.keys(state.masters).length)) {
+      state.masters = cached.masters;
+    }
+    if (cached.settings && typeof cached.settings === "object") {
+      state.settings = { ...(cached.settings || {}), ...(state.settings || {}) };
+    }
+    if (cached.dashboard && !state.dashboard) {
+      state.dashboard = cached.dashboard;
+    }
+  }
+
+  function applySalonSettingsFromState() {
+    state.salonUrl = String(state.settings["サロンURL"] || state.salonUrl || "").trim() || state.salonUrl;
+    let salonLabel =
+      String(state.settings["サロンボタン名"] || state.salonLabel || "").trim() || state.salonLabel;
+    if (salonLabel.endsWith("表示")) salonLabel = salonLabel.slice(0, -2).trim();
+    state.salonLabel = salonLabel || "井口智明オンラインサロン";
+    if (state.currentUser) updateMypageActionLabels(state.currentUser);
+  }
+
+  function paintAppShell() {
+    applySalonSettingsFromState();
+    applyMastersToFilterUI();
+    renderDashboard(state.dashboard);
+    renderAllBanners();
+    refreshConnectList();
+    renderMyPage(state.currentUser);
+  }
+
+  async function loadSecondaryDataInBackground() {
+    try {
+      const results = await Promise.allSettled([
+        GasAPI.fetchBanners(),
+        GasAPI.fetchMasters(),
+        GasAPI.fetchSettings()
+      ]);
+      const bannersRes = results[0].status === "fulfilled" ? results[0].value : null;
+      const mastersRes = results[1].status === "fulfilled" ? results[1].value : null;
+      const settingsRes = results[2].status === "fulfilled" ? results[2].value : null;
+
+      if (results.some((r) => r.status === "rejected" && isMaintenanceError(r.reason))) {
+        forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
+        return;
+      }
+
+      if (bannersRes?.data) state.banners = bannersRes.data || [];
+      if (mastersRes?.data) state.masters = mastersRes.data || {};
+      if (settingsRes?.data) state.settings = settingsRes.data || state.settings || {};
+
+      applySalonSettingsFromState();
+      applyMastersToFilterUI();
+      renderAllBanners();
+      if (state.currentUser) updateMypageActionLabels(state.currentUser);
+
+      try {
+        const dashboardRes = await GasAPI.fetchDashboard();
+        if (dashboardRes?.data) {
+          state.dashboard = dashboardRes.data;
+          renderDashboard(state.dashboard);
+        }
+      } catch (dashErr) {
+        console.warn("dashboard failed", dashErr);
+        if (isMaintenanceError(dashErr)) {
+          forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
+          return;
+        }
+      }
+      writeBootCache();
+    } catch (err) {
+      console.warn("secondary boot load failed", err);
+    }
+  }
+
   async function loadAllData() {
     showLoading(true);
     try {
       const identity = state.identity || {};
 
       // [みんつく] 先に me を完了（初回ログイン日の書き込み・期限判定）。
-      // users / dashboard と同時だと Sheets 競合で一覧取得が落ちやすい。
       // ただし Google ログイン直後は login_ 側で更新済みなので省略する。
       let meRes = null;
       const skipMe = skipMeTouchOnce;
@@ -2300,41 +2411,19 @@
         }
       }
 
-      // 会員シートを叩く users と dashboard は並列にしない（GAS/Sheets 競合でタイムアウトしやすい）
-      const results = await Promise.allSettled([
-        GasAPI.fetchBanners(),
-        GasAPI.fetchUsers(usersFetchParams()),
-        GasAPI.fetchMasters(),
-        GasAPI.fetchSettings()
-      ]);
+      // 前回のバナー／マスタ等があれば先に出して体感を速くする
+      hydrateBootCache();
 
-      const bannersRes = results[0].status === "fulfilled" ? results[0].value : null;
-      const usersRes = results[1].status === "fulfilled" ? results[1].value : null;
-      const mastersRes = results[2].status === "fulfilled" ? results[2].value : null;
-      const settingsRes = results[3].status === "fulfilled" ? results[3].value : null;
-
-      let dashboardRes = null;
+      // 最優先: 会員一覧だけ待って画面を開く
+      let usersRes = null;
       try {
-        dashboardRes = await GasAPI.fetchDashboard();
-      } catch (dashErr) {
-        console.warn("dashboard failed", dashErr);
-        if (isMaintenanceError(dashErr)) {
+        usersRes = await GasAPI.fetchUsers(usersFetchParams());
+      } catch (reason) {
+        console.error("users failed", reason);
+        if (isMaintenanceError(reason)) {
           forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
           return;
         }
-      }
-
-      const maintenanceHit = results.some(
-        (r) => r.status === "rejected" && isMaintenanceError(r.reason)
-      );
-      if (maintenanceHit) {
-        forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
-        return;
-      }
-
-      if (!usersRes) {
-        const reason = results[1].reason;
-        console.error("users failed", reason);
         if (isMintukuMode() && isMintukuExpiredError(reason)) {
           showMintukuExpiredScreen(reason);
           return;
@@ -2349,7 +2438,6 @@
           );
         } else {
           const detail = String(reason?.message || reason || "").trim();
-          // みんつくでは誤ったサンプル会員を出さない
           if (isMintukuMode()) {
             state.allUsers = [];
             showToast(
@@ -2367,46 +2455,11 @@
             );
           }
         }
-      } else {
+      }
+
+      if (usersRes) {
         state.allUsers = applyMintukuScope(usersRes.data || []);
       }
-
-      if (!bannersRes) {
-        console.error("banners failed", results[0].reason);
-        state.banners = [];
-      } else {
-        state.banners = bannersRes.data || [];
-      }
-
-      if (!mastersRes) {
-        console.error("masters failed", results[2].reason);
-        if (GasAPI.isLive) {
-          state.masters = state.masters && typeof state.masters === "object" ? state.masters : {};
-          showToast("マスタの取得に失敗しました。しばらくして再読み込みしてください");
-        } else {
-          const mockMasters = await MockAPI.fetchMasters();
-          state.masters = mockMasters.data || {};
-        }
-      } else {
-        state.masters = mastersRes.data || {};
-      }
-
-      if (settingsRes?.data) {
-        state.settings = settingsRes.data || {};
-      } else {
-        try {
-          const mockSettings = await MockAPI.fetchSettings();
-          state.settings = mockSettings.data || {};
-        } catch {
-          state.settings = {};
-        }
-      }
-      state.salonUrl = String(state.settings["サロンURL"] || state.salonUrl || "").trim() || state.salonUrl;
-      let salonLabel =
-        String(state.settings["サロンボタン名"] || state.salonLabel || "").trim() || state.salonLabel;
-      if (salonLabel.endsWith("表示")) salonLabel = salonLabel.slice(0, -2).trim();
-      state.salonLabel = salonLabel || "井口智明オンラインサロン";
-      if (state.currentUser) updateMypageActionLabels(state.currentUser);
 
       if (!state.currentUser) {
         const email = (identity.email || "").toLowerCase();
@@ -2421,31 +2474,19 @@
         }
       }
 
-      applyMastersToFilterUI();
-      if (dashboardRes?.data) {
-        state.dashboard = dashboardRes.data;
-      } else {
-        try {
-          const mockDash = await MockAPI.fetchDashboard();
-          state.dashboard = mockDash.data || null;
-        } catch {
-          state.dashboard = null;
-        }
-      }
-      renderDashboard(state.dashboard);
-      renderAllBanners();
-      refreshConnectList();
-      renderMyPage(state.currentUser);
-
+      paintAppShell();
       maybeOpenRequiredEdit();
-
       if (state.allUsers.length > 0) {
         console.log("[apomy] users loaded:", state.allUsers.length);
       }
+
+      // ここまで出したらローディングを閉じ、残りは裏で取得
+      forceHideLoading();
+      loadSecondaryDataInBackground();
+      return;
     } catch (err) {
       console.error(err);
       showToast("データの読み込みに失敗しました: " + (err.message || ""));
-      // 最後の手段: モック全表示（本番のバナー・マスタは上書きしない）
       try {
         const mockUsers = await MockAPI.fetchUsers({});
         state.allUsers = mockUsers.data || [];
@@ -2457,17 +2498,7 @@
         } else {
           state.banners = [];
         }
-        applyMastersToFilterUI();
-        try {
-          const mockDash = await MockAPI.fetchDashboard();
-          state.dashboard = mockDash.data || null;
-        } catch {
-          state.dashboard = null;
-        }
-        renderDashboard(state.dashboard);
-        renderAllBanners();
-        refreshConnectList();
-        renderMyPage(state.currentUser);
+        paintAppShell();
       } catch (e2) {
         console.error(e2);
       }

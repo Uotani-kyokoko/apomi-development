@@ -247,15 +247,8 @@ function getUsers_(p) {
       return true;
     })
     .map(function (r) {
-      var user = mapUser_(r);
-      // 非公開項目は一覧から除外
-      delete user.annualSpend;
-      delete user.realName;
-      delete user.locationChangedAt;
-      delete user.locationChangeLocked;
-      delete user.locationChangeNextDate;
-      delete user.locationChangeDaysLeft;
-      return user;
+      // 一覧専用の軽いマッピング（現在地ロック計算などを省略）
+      return mapUserListItem_(r);
     });
 }
 
@@ -1872,6 +1865,50 @@ function mapUser_(r) {
     mintukuNumber: String(r['みんつく番号'] || '').trim(),
     mintukuFirstLoginAt: String(r['みんつく初回ログイン日'] || '').trim(),
     mintukuPaid: isMintukuPaid_(r),
+    presidentMark: toBool_(r['社長マーク']),
+    presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
+    salonListing: toBool_(r['サロン掲載']),
+    salonListingStatus: String(r['サロン掲載状態'] || 'なし'),
+    snsLinks: extractSnsLinks_(r)
+  };
+}
+
+/**
+ * [共通] 一覧用の軽い会員マップ
+ * - 現在地ロック計算・非公開項目・課金判定を省略して高速化
+ */
+function mapUserListItem_(r) {
+  const tagsRaw = String(r['タグ'] || '').trim();
+  const tags = tagsRaw
+    ? tagsRaw.split(/[,、|／\t]+/).map(function (t) { return t.trim(); }).filter(Boolean)
+    : [];
+  const nickname = nicknameFromRow_(r);
+  return {
+    id: String(r['会員番号'] || ''),
+    email: String(r['Googleメール'] || ''),
+    name: nickname,
+    nickname: nickname,
+    gender: String(r['性別'] || ''),
+    ageGroup: String(r['年代'] || ''),
+    industry: String(r['業種'] || ''),
+    jobTitle: String(r['職種'] || ''),
+    location: String(r['現在地'] || ''),
+    hometown: String(r['出身地'] || ''),
+    bio: String(r['自己紹介'] || ''),
+    wantMeet: String(r['こんな人と繋がりたい'] || ''),
+    avoidMeet: String(r['こんな人とは繋がりたくない'] || ''),
+    femaleOnlyConnect: toBool_(r['女性限定']),
+    companyName: String(r['社名'] || ''),
+    tags: tags,
+    avatarUrl: String(r['プロフィール画像URL'] || ''),
+    lastLoginAt: String(r['最終ログイン日時'] || ''),
+    createdAt: String(r['登録日時'] || ''),
+    publishedAt: String(r['登録日時'] || ''),
+    isPublished: toBool_(r['掲載中']),
+    mintukuListed: Object.prototype.hasOwnProperty.call(r, 'みんつく掲載')
+      ? toBool_(r['みんつく掲載'])
+      : false,
+    mintukuNumber: String(r['みんつく番号'] || '').trim(),
     presidentMark: toBool_(r['社長マーク']),
     presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
     salonListing: toBool_(r['サロン掲載']),
