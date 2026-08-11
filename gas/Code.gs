@@ -322,6 +322,12 @@ function ensureMintukuNumber_(sheet, table, idx, regionId) {
   var current = String(table.rows[idx]['みんつく番号'] || '').trim();
   var parsed = parseMintukuNumber_(current);
   if (parsed && parsed.label === label && parsed.n > 0) {
+    // 列追加直後で空欄のときだけ ON（明示的な停止 FALSE は維持）
+    var listedRaw = table.rows[idx]['みんつく掲載'];
+    if (listedRaw === '' || listedRaw === null || listedRaw === undefined) {
+      setCellByHeader_(sheet, table.headers, idx + 2, 'みんつく掲載', true);
+      table.rows[idx]['みんつく掲載'] = true;
+    }
     return current;
   }
 

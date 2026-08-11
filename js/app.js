@@ -2188,12 +2188,49 @@
     showLoading(true);
     try {
       const identity = state.identity || {};
+
+      // [みんつく] 先に me を完了（初回ログイン日の書き込み・期限判定）。
+      // users / dashboard と同時だと Sheets 競合で一覧取得が落ちやすい。
+      let meRes = null;
+      if (identity.email || identity.memberNo) {
+        try {
+          meRes = await GasAPI.fetchCurrentUser(identityForApi(identity));
+        } catch (err) {
+          if (isAccessDeniedError(err)) {
+            forceLogoutForAccessDenied(err.message || err);
+            return;
+          }
+          if (isMaintenanceError(err)) {
+            forceLogoutForMaintenance(err.message || err);
+            return;
+          }
+          if (isMintukuMode() && isMintukuExpiredError(err)) {
+            showMintukuExpiredScreen(err);
+            return;
+          }
+          console.error("me failed", err);
+          showToast(err.message || "プロフィールの取得に失敗しました");
+        }
+      } else {
+        showToast("ログイン情報がありません");
+        return;
+      }
+
+      if (meRes?.data) {
+        const wasNew = Boolean(state.currentUser?.isNew);
+        state.currentUser = meRes.data;
+        if (wasNew) state.currentUser.isNew = true;
+        lastTouchAt = Date.now();
+        applyMyActivity(meRes.data.lastLoginAt);
+        if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
+          showMintukuExpiredScreen();
+          return;
+        }
+      }
+
       const results = await Promise.allSettled([
         GasAPI.fetchBanners(),
         GasAPI.fetchUsers(usersFetchParams()),
-        identity.email || identity.memberNo
-          ? GasAPI.fetchCurrentUser(identityForApi(identity))
-          : Promise.reject(new Error('ログイン情報がありません')),
         GasAPI.fetchMasters(),
         GasAPI.fetchSettings(),
         GasAPI.fetchDashboard()
@@ -2201,20 +2238,10 @@
 
       const bannersRes = results[0].status === "fulfilled" ? results[0].value : null;
       const usersRes = results[1].status === "fulfilled" ? results[1].value : null;
-      const meRes = results[2].status === "fulfilled" ? results[2].value : null;
-      const mastersRes = results[3].status === "fulfilled" ? results[3].value : null;
-      const settingsRes = results[4].status === "fulfilled" ? results[4].value : null;
-      const dashboardRes = results[5].status === "fulfilled" ? results[5].value : null;
+      const mastersRes = results[2].status === "fulfilled" ? results[2].value : null;
+      const settingsRes = results[3].status === "fulfilled" ? results[3].value : null;
+      const dashboardRes = results[4].status === "fulfilled" ? results[4].value : null;
 
-      // セッション復元中に拒否・メンテされた場合は一覧フォールバックせず即ログアウト
-      if (results[2].status === "rejected" && isAccessDeniedError(results[2].reason)) {
-        forceLogoutForAccessDenied(results[2].reason?.message || results[2].reason);
-        return;
-      }
-      if (results[2].status === "rejected" && isMaintenanceError(results[2].reason)) {
-        forceLogoutForMaintenance(results[2].reason?.message || results[2].reason);
-        return;
-      }
       const maintenanceHit = results.some(
         (r) => r.status === "rejected" && isMaintenanceError(r.reason)
       );
@@ -2223,16 +2250,31 @@
         return;
       }
 
-      // GAS失敗時はモックにフォールバック（画面が空にならないようにする）
       if (!usersRes) {
-        console.error("users failed", results[1].reason);
-        if (isMintukuMode() && isMintukuExpiredError(results[1].reason)) {
-          showMintukuExpiredScreen(results[1].reason);
+        const reason = results[1].reason;
+        console.error("users failed", reason);
+        if (isMintukuMode() && isMintukuExpiredError(reason)) {
+          showMintukuExpiredScreen(reason);
           return;
         }
-        const mockUsers = await MockAPI.fetchUsers({});
-        state.allUsers = applyMintukuScope(mockUsers.data || []);
-        showToast("会員データの取得に失敗したため、一時データを表示しています");
+        const detail = String(reason?.message || reason || "").trim();
+        // みんつくでは誤ったサンプル会員を出さない
+        if (isMintukuMode()) {
+          state.allUsers = [];
+          showToast(
+            detail
+              ? `会員データの取得に失敗しました: ${detail}`
+              : "会員データの取得に失敗しました"
+          );
+        } else {
+          const mockUsers = await MockAPI.fetchUsers({});
+          state.allUsers = mockUsers.data || [];
+          showToast(
+            detail
+              ? `会員データの取得に失敗したため、一時データを表示しています（${detail}）`
+              : "会員データの取得に失敗したため、一時データを表示しています"
+          );
+        }
       } else {
         state.allUsers = applyMintukuScope(usersRes.data || []);
       }
@@ -2245,9 +2287,8 @@
       }
 
       if (!mastersRes) {
-        console.error("masters failed", results[3].reason);
+        console.error("masters failed", results[2].reason);
         if (GasAPI.isLive) {
-          // 本番でモックマスタ（サンプルタグ）を混ぜない
           state.masters = state.masters && typeof state.masters === "object" ? state.masters : {};
           showToast("マスタの取得に失敗しました。しばらくして再読み込みしてください");
         } else {
@@ -2271,26 +2312,11 @@
       state.salonUrl = String(state.settings["サロンURL"] || state.salonUrl || "").trim() || state.salonUrl;
       let salonLabel =
         String(state.settings["サロンボタン名"] || state.salonLabel || "").trim() || state.salonLabel;
-      // 旧表記「〜表示」は落とす
       if (salonLabel.endsWith("表示")) salonLabel = salonLabel.slice(0, -2).trim();
       state.salonLabel = salonLabel || "井口智明オンラインサロン";
       if (state.currentUser) updateMypageActionLabels(state.currentUser);
 
-      if (meRes?.data) {
-        const wasNew = Boolean(state.currentUser?.isNew);
-        state.currentUser = meRes.data;
-        // me API は isNew を返さないため、ログイン時の新規フラグを保持
-        if (wasNew) state.currentUser.isNew = true;
-        lastTouchAt = Date.now();
-        applyMyActivity(meRes.data.lastLoginAt);
-
-        // [みんつく] 無料30日終了
-        if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
-          showMintukuExpiredScreen();
-          return;
-        }
-      } else if (!state.currentUser) {
-        // 自分の取得に失敗しても、一覧からメール一致を探す
+      if (!state.currentUser) {
         const email = (identity.email || "").toLowerCase();
         const found = state.allUsers.find(
           (u) =>
