@@ -253,11 +253,24 @@
         </div>
       </div>
 
-      <!-- 地域は現在地からブロック判定 → マスタ「地域リンク」のURLへ -->
+  <!-- 地域は現在地からブロック判定 → みんつくへ（Apomy） / 都道府県絞り込み（みんつく） -->
       <button type="button" id="btn-region-link" class="filter-link-card">
         <span id="region-link-label">地域を選ぶ</span>
         <i class="fa-solid fa-arrow-up-right-from-square"></i>
       </button>
+
+      <div id="mintuku-pref-filter" class="filter-card hidden" data-filter-card="mintuku-pref">
+        <button type="button" class="filter-card-toggle">
+          <span>都道府県で絞る</span>
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div class="filter-card-body">
+          <label class="edit-label" for="filter-mintuku-pref">都道府県</label>
+          <select id="filter-mintuku-pref" class="edit-input" name="mintukuPref">
+            <option value="all">すべて（この地方）</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <div class="filter-footer">
@@ -512,11 +525,11 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="js/env.js?v=20260805b"></script>
   <script src="js/config.js?v=20260805b"></script>
-  <script src="js/app-mode.js?v=20260810a"></script>
+  <script src="js/app-mode.js?v=20260811a"></script>
   <script src="js/auth.js?v=20260807d"></script>
   <script src="js/sample-users-240.js?v=20260803f"></script>
   <script src="js/mock-api.js?v=20260808a"></script>
-  <script src="js/gas-api.js?v=20260810a"></script>
-  <script src="js/app.js?v=20260810a"></script>
+  <script src="js/gas-api.js?v=20260811a"></script>
+  <script src="js/app.js?v=20260811a"></script>
 </body>
 </html>

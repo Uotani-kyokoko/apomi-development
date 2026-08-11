@@ -131,13 +131,17 @@ const GasAPI = (() => {
     },
 
     async fetchCurrentUser(identity = {}) {
-      if (!USE_GAS) return MockAPI.fetchCurrentUser();
+      if (!USE_GAS) return MockAPI.fetchCurrentUser(identity);
       const email = identity.email || '';
       const memberNo = identity.memberNo || identity.member_no || '';
       if (!email && !memberNo) {
         throw new Error('ログイン情報がありません');
       }
-      return get('me', { email, memberNo });
+      const params = { email, memberNo };
+      // [みんつく] me 呼び出し時に採番させる
+      if (identity.app) params.app = identity.app;
+      if (identity.region) params.region = identity.region;
+      return get('me', params);
     },
 
     async fetchMasters() {
@@ -237,7 +241,10 @@ const GasAPI = (() => {
       if (!USE_GAS) {
         return { success: true, data: { lastLoginAt: formatNow() } };
       }
-      return get('touch', { email, memberNo });
+      const params = { email, memberNo };
+      if (identity.app) params.app = identity.app;
+      if (identity.region) params.region = identity.region;
+      return get('touch', params);
     }
   };
 

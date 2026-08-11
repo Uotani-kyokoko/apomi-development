@@ -247,28 +247,81 @@ function isPrefInMintukuRegion_(location, regionId) {
   return prefs.indexOf(pref) >= 0;
 }
 
-/** [みんつく] 地方ID → 都道府県リスト */
-function mintukuRegionPrefs_(regionId) {
+/** [みんつく] 地方ID → 表示ラベル（採番接頭辞） */
+function mintukuRegionLabel_(regionId) {
   switch (String(regionId || '').trim().toLowerCase()) {
     case 'hokkaido':
-      return ['北海道'];
+      return '北海道';
     case 'tohoku':
-      return ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'];
+      return '東北';
     case 'kanto':
-      return ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'];
+      return '関東';
     case 'chubu':
-      return ['新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県'];
+      return '中部';
     case 'kinki':
-      return ['三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県'];
+      return '近畿';
     case 'chugoku':
-      return ['鳥取県', '島根県', '岡山県', '広島県', '山口県'];
+      return '中国';
     case 'shikoku':
-      return ['徳島県', '香川県', '愛媛県', '高知県'];
+      return '四国';
     case 'kyushu-okinawa':
-      return ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'];
+      return '九州・沖縄';
     default:
-      return [];
+      return '';
   }
+}
+
+/**
+ * [みんつく] 「関東12」→ { label: '関東', n: 12 }
+ */
+function parseMintukuNumber_(raw) {
+  var s = String(raw || '').trim();
+  var m = s.match(/^(.+?)(\d+)$/);
+  if (!m) return null;
+  return { label: m[1], n: Number(m[2]) };
+}
+
+/** [みんつく] 地方ごとの次番号 */
+function nextMintukuSeq_(rows, label) {
+  var max = 0;
+  (rows || []).forEach(function (r) {
+    var parsed = parseMintukuNumber_(r['みんつく番号']);
+    if (parsed && parsed.label === label && parsed.n > max) max = parsed.n;
+  });
+  return max + 1;
+}
+
+/**
+ * [みんつく] 初回アクセス時に地方番号を自動採番（アクセス順）
+ * 保存例: 関東1 / 近畿2
+ * @returns {string} みんつく番号（採番不要・失敗時は既存または空）
+ */
+function ensureMintukuNumber_(sheet, table, idx, regionId) {
+  var label = mintukuRegionLabel_(regionId);
+  if (!label || idx < 0) return '';
+
+  ensureHeader_(sheet, table.headers, 'みんつく番号');
+  ensureHeader_(sheet, table.headers, 'みんつく掲載');
+
+  var current = String(table.rows[idx]['みんつく番号'] || '').trim();
+  var parsed = parseMintukuNumber_(current);
+  if (parsed && parsed.label === label && parsed.n > 0) {
+    // 既にこの地方の番号あり → 掲載もONに寄せる
+    if (!toBool_(table.rows[idx]['みんつく掲載'])) {
+      setCellByHeader_(sheet, table.headers, idx + 2, 'みんつく掲載', true);
+      table.rows[idx]['みんつく掲載'] = true;
+    }
+    return current;
+  }
+
+  var seq = nextMintukuSeq_(table.rows, label);
+  var value = label + String(seq);
+  var rowNumber = idx + 2;
+  setCellByHeader_(sheet, table.headers, rowNumber, 'みんつく番号', value);
+  setCellByHeader_(sheet, table.headers, rowNumber, 'みんつく掲載', true);
+  table.rows[idx]['みんつく番号'] = value;
+  table.rows[idx]['みんつく掲載'] = true;
+  return value;
 }
 
 /**
@@ -410,6 +463,13 @@ function touchActivity_(body) {
   const now = formatDateTime_(new Date());
   const rowNumber = idx + 2;
   setCellByHeader_(sheet, table.headers, rowNumber, '最終ログイン日時', now);
+
+  // [みんつく] アクセス順に地方会員番号を自動採番
+  var appKind = String((body && body.app) || '').trim().toLowerCase();
+  var mintukuRegion = String((body && body.region) || '').trim().toLowerCase();
+  if (appKind === 'mintuku' && mintukuRegion) {
+    ensureMintukuNumber_(sheet, table, idx, mintukuRegion);
+  }
 
   const user = mapUser_(readObjects_(SHEET.USERS)[idx]);
   user.lastLoginAt = now;
@@ -1428,6 +1488,8 @@ function mapUser_(r) {
     mintukuListed: Object.prototype.hasOwnProperty.call(r, 'みんつく掲載')
       ? toBool_(r['みんつく掲載'])
       : false,
+    // [みんつく] 例: 関東1（画面では No.00001 に変換）
+    mintukuNumber: String(r['みんつく番号'] || '').trim(),
     presidentMark: toBool_(r['社長マーク']),
     presidentMarkStatus: String(r['社長マーク状態'] || 'なし'),
     salonListing: toBool_(r['サロン掲載']),

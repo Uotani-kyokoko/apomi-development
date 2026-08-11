@@ -56,7 +56,9 @@
       gender: "all",
       jobTitle: [],
       ageGroup: [],
-      tags: []
+      tags: [],
+      /** [みんつく] 都道府県絞り込み（all | 東京都 …） */
+      locationPref: "all"
     },
     /** 検索結果の表示件数（もっと見る用） */
     searchVisibleCount: SEARCH_RESULT_PAGE_SIZE,
@@ -93,7 +95,13 @@
   }
 
   function applyMintukuChrome() {
-    if (!isMintukuMode()) return;
+    if (!isMintukuMode()) {
+      const prefFilter = document.getElementById("mintuku-pref-filter");
+      if (prefFilter) prefFilter.classList.add("hidden");
+      const regionBtn = document.getElementById("btn-region-link");
+      if (regionBtn) regionBtn.classList.remove("hidden");
+      return;
+    }
     const name = mintukuDisplayName();
     document.title = name;
     const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
@@ -104,8 +112,84 @@
       catchEl.innerHTML = `${name}<br>同じ地方の人と繋がるマッチング。`;
     }
 
-    const regionBtn = $("#btn-region-link");
+    // ロゴ alt をみんつく名に
+    document.querySelectorAll('img[alt="apomy"], img[alt="Apomy"]').forEach((img) => {
+      img.setAttribute("alt", name);
+    });
+
+    const regionBtn = document.getElementById("btn-region-link");
     if (regionBtn) regionBtn.classList.add("hidden");
+    const prefFilter = document.getElementById("mintuku-pref-filter");
+    if (prefFilter) prefFilter.classList.remove("hidden");
+  }
+
+  function identityForApi(extra = {}) {
+    const base = { ...(state.identity || {}), ...extra };
+    if (isMintukuMode() && state.mintukuRegion) {
+      base.app = "mintuku";
+      base.region = state.mintukuRegion;
+    }
+    return base;
+  }
+
+  function mintukuRegionLabel() {
+    if (typeof AppMode === "undefined") return "";
+    const meta = AppMode.getRegionMeta(state.mintukuRegion);
+    return meta ? meta.label : "";
+  }
+
+  function parseMintukuNumber(raw) {
+    const s = String(raw || "").trim();
+    const m = s.match(/^(.+?)(\d+)$/);
+    if (!m) return null;
+    return { label: m[1], n: Number(m[2]) };
+  }
+
+  /** みんつく: みんつく番号の数字 / Apomy: 会員番号 */
+  function userMemberSortKey(user) {
+    if (isMintukuMode()) {
+      const parsed = parseMintukuNumber(user?.mintukuNumber);
+      const label = mintukuRegionLabel();
+      if (parsed && parsed.label === label && parsed.n > 0) return parsed.n;
+      return Number.MAX_SAFE_INTEGER; // 未採番は末尾
+    }
+    return memberNoNum(user?.id);
+  }
+
+  function formatMemberNo(idOrNum) {
+    const digits = String(idOrNum || "").replace(/\D/g, "");
+    if (!digits) return "No.00000";
+    return `No.${digits.padStart(5, "0")}`;
+  }
+
+  /** カード表示用。みんつくではみんつく番号のみ（Apomy番号は出さない） */
+  function formatUserMemberNo(user) {
+    if (isMintukuMode()) {
+      const parsed = parseMintukuNumber(user?.mintukuNumber);
+      const label = mintukuRegionLabel();
+      if (!parsed || parsed.label !== label || !parsed.n) return "No.-----";
+      return `No.${String(parsed.n).padStart(5, "0")}`;
+    }
+    return formatMemberNo(user?.id);
+  }
+
+  function memberNoNum(id) {
+    const n = parseInt(String(id || "").replace(/\D/g, ""), 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /** 会員No.の昇順（00001 → 00002 → …） */
+  function sortUsersByMemberNo(users) {
+    return (users || []).slice().sort((a, b) => userMemberSortKey(a) - userMemberSortKey(b));
+  }
+
+  function maxMemberNoAmong(users) {
+    let max = 0;
+    (users || []).forEach((u) => {
+      const n = userMemberSortKey(u);
+      if (n < Number.MAX_SAFE_INTEGER && n > max) max = n;
+    });
+    return max;
   }
 
   const $ = (sel) => document.querySelector(sel);
@@ -259,31 +343,6 @@
     return div.innerHTML;
   }
 
-  function formatMemberNo(id) {
-    const digits = String(id || "").replace(/\D/g, "");
-    if (!digits) return "No.00000";
-    return `No.${digits.padStart(5, "0")}`;
-  }
-
-  function memberNoNum(id) {
-    const n = parseInt(String(id || "").replace(/\D/g, ""), 10);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  /** 会員No.の昇順（00001 → 00002 → …） */
-  function sortUsersByMemberNo(users) {
-    return (users || []).slice().sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
-  }
-
-  function maxMemberNoAmong(users) {
-    let max = 0;
-    (users || []).forEach((u) => {
-      const n = memberNoNum(u.id);
-      if (n > max) max = n;
-    });
-    return max;
-  }
-
   /**
    * 条件に合う会員がいる No.帯だけ返す（空帯は出さない）
    */
@@ -297,7 +356,7 @@
       const from = i * CONNECT_BAND_SIZE + 1;
       const to = (i + 1) * CONNECT_BAND_SIZE;
       const has = matched.some((u) => {
-        const n = memberNoNum(u.id);
+        const n = userMemberSortKey(u);
         return n >= from && n <= to;
       });
       if (!has) continue;
@@ -753,7 +812,7 @@
     clearTimeout(touchTimer);
     touchTimer = setTimeout(async () => {
       try {
-        const res = await GasAPI.touchActivity(state.identity);
+        const res = await GasAPI.touchActivity(identityForApi());
         lastTouchAt = Date.now();
         applyMyActivity(res.data?.lastLoginAt);
       } catch (err) {
@@ -791,7 +850,7 @@
     return `
       <article class="profile-card ${genderClass}${presidentClass}${femaleOnlyClass}" data-user-id="${escapeHtml(user.id)}" data-gender="${genderKey}">
         <div class="profile-card-band" aria-hidden="true"></div>
-        <span class="profile-card-no">${escapeHtml(formatMemberNo(user.id))}</span>
+        <span class="profile-card-no">${escapeHtml(formatUserMemberNo(user))}</span>
         <div class="profile-card-body">
           <div class="profile-top-row">
             <img class="profile-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(user.name)}" loading="lazy" onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || "User")}&background=93c5fd&color=1e3a8a';">
@@ -1078,29 +1137,29 @@
     if (page.type === "range") {
       return list
         .filter((u) => {
-          const n = memberNoNum(u.id);
+          const n = userMemberSortKey(u);
           return n >= page.from && n <= page.to;
         })
-        .sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
+        .sort((a, b) => userMemberSortKey(a) - userMemberSortKey(b));
     }
     if (page.type === "president") {
       // 会員番号帯のうち社長マークあり（番号の繰り上がりなし）
       return list
         .filter((u) => {
           if (!u.presidentMark) return false;
-          const n = memberNoNum(u.id);
+          const n = userMemberSortKey(u);
           return n >= page.from && n <= page.to;
         })
-        .sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
+        .sort((a, b) => userMemberSortKey(a) - userMemberSortKey(b));
     }
     if (page.type === "salon") {
       return list
         .filter((u) => {
           if (!u.salonListing) return false;
-          const n = memberNoNum(u.id);
+          const n = userMemberSortKey(u);
           return n >= page.from && n <= page.to;
         })
-        .sort((a, b) => memberNoNum(a.id) - memberNoNum(b.id));
+        .sort((a, b) => userMemberSortKey(a) - userMemberSortKey(b));
     }
     return list;
   }
@@ -1824,6 +1883,26 @@
         ];
     const label = $("#region-link-label");
     if (label) label.textContent = "地域を選ぶ";
+
+    // [みんつく] いまの地方の都道府県だけを選択肢に
+    const prefSelect = $("#filter-mintuku-pref");
+    if (prefSelect && typeof AppMode !== "undefined") {
+      const meta = AppMode.getRegionMeta(state.mintukuRegion);
+      const prefs = meta ? meta.prefs.slice() : [];
+      const current = String(state.filters.locationPref || "all");
+      prefSelect.innerHTML =
+        `<option value="all">すべて（この地方）</option>` +
+        prefs
+          .map(
+            (p) =>
+              `<option value="${escapeHtml(p)}"${p === current ? " selected" : ""}>${escapeHtml(p)}</option>`
+          )
+          .join("");
+      if (current !== "all" && !prefs.includes(current)) {
+        state.filters.locationPref = "all";
+        prefSelect.value = "all";
+      }
+    }
   }
 
   /** 都道府県 → 地域ブロック名 */
@@ -1936,7 +2015,8 @@
       gender: "all",
       jobTitle: [],
       ageGroup: [],
-      tags: []
+      tags: [],
+      locationPref: "all"
     };
     applyMastersToFilterUI();
     $$(".filter-card").forEach((c) => c.classList.remove("open"));
@@ -1948,6 +2028,7 @@
     const industry = normalizeFilterList(filters.industry);
     const jobTitle = normalizeFilterList(filters.jobTitle);
     const tags = normalizeFilterList(filters.tags);
+    const locationPref = String(filters.locationPref || "all").trim();
 
     return (users || []).filter((u) => {
       // 性別は単一選択のため必須条件（その他 ↔ LGBTQ は同一扱い）
@@ -1966,6 +2047,10 @@
       if (isMintukuMode() && state.mintukuRegion && typeof AppMode !== "undefined") {
         if (!AppMode.isPrefectureInRegion(u.location, state.mintukuRegion)) return false;
       }
+      // [みんつく] 都道府県プルダウン
+      if (isMintukuMode() && locationPref && locationPref !== "all") {
+        if (String(u.location || "").trim() !== locationPref) return false;
+      }
       return true;
     });
   }
@@ -1976,6 +2061,7 @@
     if (normalizeFilterList(filters.industry).length) return true;
     if (normalizeFilterList(filters.jobTitle).length) return true;
     if (normalizeFilterList(filters.tags).length) return true;
+    if (isMintukuMode() && filters.locationPref && filters.locationPref !== "all") return true;
     return false;
   }
 
@@ -1995,6 +2081,9 @@
     normalizeFilterList(state.filters.tags).forEach((v) =>
       parts.push(String(tagLabel(v) || v).replace(/\n/g, ""))
     );
+    if (isMintukuMode() && state.filters.locationPref && state.filters.locationPref !== "all") {
+      parts.push(state.filters.locationPref);
+    }
     el.textContent = `絞り込み: ${parts.join(" / ")}（全 ${state.users.length} 件・No.順）`;
     el.classList.remove("hidden");
   }
@@ -2007,7 +2096,7 @@
         GasAPI.fetchBanners(),
         GasAPI.fetchUsers(usersFetchParams()),
         identity.email || identity.memberNo
-          ? GasAPI.fetchCurrentUser(identity)
+          ? GasAPI.fetchCurrentUser(identityForApi(identity))
           : Promise.reject(new Error('ログイン情報がありません')),
         GasAPI.fetchMasters(),
         GasAPI.fetchSettings(),
@@ -3377,7 +3466,8 @@
         ageGroup: getSelectedChipValues("#filter-age-chips"),
         industry: getSelectedChipValues("#filter-industry-chips"),
         jobTitle: getSelectedChipValues("#filter-job-chips"),
-        tags: getSelectedChipValues("#filter-tag-chips")
+        tags: getSelectedChipValues("#filter-tag-chips"),
+        locationPref: $("#filter-mintuku-pref")?.value || "all"
       };
       applyFilters();
     });
@@ -3528,7 +3618,7 @@
   async function init() {
     applyMintukuChrome();
     if (isMintukuMode() && !state.mintukuRegion) {
-      showToast("みんつくの地方が指定されていません。Apomyの「地域を選ぶ」から開いてください");
+      showToast(`みんつくの地方が指定されていません。「地域を選ぶ」から開いてください`);
     }
     bindEvents();
     // テスト用 ?splash=1 はログイン前後どちらでもすぐ見えるようにする

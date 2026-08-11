@@ -259,8 +259,25 @@ const MockAPI = (() => {
       });
     },
 
-    async fetchCurrentUser() {
-      return delay(currentUser);
+    async fetchCurrentUser(identity = {}) {
+      const user = { ...(currentUser || {}) };
+      // [みんつく] モックでもアクセス時に番号を付与
+      if (String(identity.app || "").toLowerCase() === "mintuku" && identity.region) {
+        if (typeof AppMode !== "undefined") {
+          const meta = AppMode.getRegionMeta(identity.region);
+          const label = meta ? meta.label : "";
+          const parsed = String(user.mintukuNumber || "").match(/^(.+?)(\d+)$/);
+          if (label && (!parsed || parsed[1] !== label)) {
+            user.mintukuNumber = label + "1";
+            user.mintukuListed = true;
+            if (currentUser) {
+              currentUser.mintukuNumber = user.mintukuNumber;
+              currentUser.mintukuListed = true;
+            }
+          }
+        }
+      }
+      return delay(user);
     },
 
     async updateProfile(payload = {}) {
