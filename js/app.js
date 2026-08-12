@@ -802,7 +802,9 @@
 
   let touchTimer = null;
   let lastTouchAt = 0;
-  const TOUCH_MIN_INTERVAL_MS = 60 * 1000; // 連打でGASを叩かない
+  const TOUCH_MIN_INTERVAL_MS = 90 * 1000; // 連打でGASを叩かない
+  let lastDashboardAt = 0;
+  const DASHBOARD_CACHE_MS = 5 * 60 * 1000;
 
   function scheduleTouchActivity(force = false) {
     if (!state.isLoggedIn || !state.identity) return;
@@ -949,15 +951,23 @@
   }
 
   async function loadDashboardStats() {
+    // 直近取得済みなら再取得しない（ホーム切替の体感を速く）
+    if (state.dashboard && Date.now() - lastDashboardAt < DASHBOARD_CACHE_MS) {
+      renderDashboard(state.dashboard);
+      return;
+    }
     try {
       const res = await GasAPI.fetchDashboard();
       state.dashboard = res.data || null;
+      lastDashboardAt = Date.now();
       renderDashboard(state.dashboard);
+      writeBootCache();
     } catch (err) {
       console.error(err);
       try {
         const mock = await MockAPI.fetchDashboard();
         state.dashboard = mock.data || null;
+        lastDashboardAt = Date.now();
         renderDashboard(state.dashboard);
       } catch (e2) {
         console.error(e2);
@@ -1272,10 +1282,108 @@
     const container = $("#mypage-profile");
     if (!user) {
       container.innerHTML = `<div class="empty-state"><p>プロフィールを読み込めませんでした</p></div>`;
+      renderMintukuPlanPanel(null);
       return;
     }
     container.innerHTML = renderProfileCard(user);
+    renderMintukuPlanPanel(user);
     updateMypageActionLabels(user);
+  }
+
+  /** [みんつく] 無料期間の経過日数・残り日数（マイページ） */
+  function getMintukuPlanInfo(user) {
+    if (!user) return null;
+    const firstAt = String(user.mintukuFirstLoginAt || "").trim();
+    const paid = Boolean(user.mintukuPaid);
+    let daysUsed = user.mintukuDaysUsed;
+    let daysLeft = user.mintukuDaysLeft;
+
+    if ((daysUsed === undefined || daysUsed === null) && firstAt) {
+      const first = new Date(firstAt.replace(/-/g, "/"));
+      if (!Number.isNaN(first.getTime())) {
+        const start = new Date(first.getFullYear(), first.getMonth(), first.getDate());
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        daysUsed = Math.max(0, Math.floor((today - start) / 86400000));
+        daysLeft = Math.max(0, 30 - daysUsed);
+      }
+    }
+
+    if (daysUsed === undefined || daysUsed === null) {
+      daysUsed = 0;
+      daysLeft = 30;
+    }
+    daysUsed = Number(daysUsed) || 0;
+    if (daysLeft === undefined || daysLeft === null) {
+      daysLeft = Math.max(0, 30 - daysUsed);
+    } else {
+      daysLeft = Number(daysLeft) || 0;
+    }
+
+    const expired = Boolean(user.mintukuExpired) || (!paid && daysUsed >= 30);
+    return {
+      firstAt,
+      paid,
+      daysUsed,
+      daysLeft,
+      expired,
+      ok: user.mintukuAccessOk !== false && !expired
+    };
+  }
+
+  function formatMintukuDateLabel(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "未記録";
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}/${m[2]}/${m[3]}`;
+    return s.slice(0, 10);
+  }
+
+  function renderMintukuPlanPanel(user) {
+    const el = $("#mypage-mintuku-plan");
+    if (!el) return;
+    if (!isMintukuMode() || !user) {
+      el.classList.add("hidden");
+      el.innerHTML = "";
+      return;
+    }
+    const info = getMintukuPlanInfo(user);
+    if (!info) {
+      el.classList.add("hidden");
+      el.innerHTML = "";
+      return;
+    }
+
+    let statusValue = "";
+    let note = "";
+    if (info.paid) {
+      statusValue = "有料契約中";
+      note = "課金有無が「はい」のため、無料期間終了後も利用できます。";
+    } else if (info.expired) {
+      statusValue = "無料期間終了";
+      note = "閲覧を続けるにはお問い合わせください。";
+    } else {
+      statusValue = `残り ${info.daysLeft} 日`;
+      note = "初回ログイン日から30日間は無料です。31日目以降は有料契約が必要です。";
+    }
+
+    el.innerHTML = `
+      <p class="mypage-mintuku-plan-title">みんつく利用状況</p>
+      <div class="mypage-mintuku-plan-row">
+        <span class="mypage-mintuku-plan-label">初回ログイン</span>
+        <span class="mypage-mintuku-plan-value">${formatMintukuDateLabel(info.firstAt)}</span>
+      </div>
+      <div class="mypage-mintuku-plan-row">
+        <span class="mypage-mintuku-plan-label">経過日数</span>
+        <span class="mypage-mintuku-plan-value">${info.daysUsed} 日目</span>
+      </div>
+      <div class="mypage-mintuku-plan-row">
+        <span class="mypage-mintuku-plan-label">無料期間</span>
+        <span class="mypage-mintuku-plan-value">${statusValue}</span>
+      </div>
+      <p class="mypage-mintuku-plan-note">${note}</p>
+    `;
+    el.classList.remove("hidden");
   }
 
   function updateMypageActionLabels(user) {
@@ -2291,6 +2399,7 @@
     }
     if (cached.dashboard && !state.dashboard) {
       state.dashboard = cached.dashboard;
+      lastDashboardAt = Number(cached.savedAt) || Date.now();
     }
   }
 
@@ -2341,6 +2450,7 @@
         const dashboardRes = await GasAPI.fetchDashboard();
         if (dashboardRes?.data) {
           state.dashboard = dashboardRes.data;
+          lastDashboardAt = Date.now();
           renderDashboard(state.dashboard);
         }
       } catch (dashErr) {
@@ -2414,6 +2524,9 @@
       // 前回のバナー／マスタ等があれば先に出して体感を速くする
       hydrateBootCache();
 
+      // 会員一覧を待ちつつ、バナー等は同時に裏で取る（待ち時間の重なりを減らす）
+      const secondaryPromise = loadSecondaryDataInBackground();
+
       // 最優先: 会員一覧だけ待って画面を開く
       let usersRes = null;
       try {
@@ -2480,9 +2593,9 @@
         console.log("[apomy] users loaded:", state.allUsers.length);
       }
 
-      // ここまで出したらローディングを閉じ、残りは裏で取得
+      // 会員が出たらローディング解除。secondary はすでに走っている
       forceHideLoading();
-      loadSecondaryDataInBackground();
+      void secondaryPromise;
       return;
     } catch (err) {
       console.error(err);

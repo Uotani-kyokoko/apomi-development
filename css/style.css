@@ -1334,6 +1334,57 @@ body.has-connect-banner-dock .app-main {
   margin-bottom: 8px;
 }
 
+/* [みんつく] 無料期間の経過・残り */
+.mypage-mintuku-plan {
+  margin: 4px 4px 12px;
+  padding: 14px 14px 12px;
+  border-radius: 12px;
+  background: #f3f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.mypage-mintuku-plan.hidden {
+  display: none;
+}
+
+.mypage-mintuku-plan-title {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.mypage-mintuku-plan-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.mypage-mintuku-plan-row:last-child {
+  margin-bottom: 0;
+}
+
+.mypage-mintuku-plan-label {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.mypage-mintuku-plan-value {
+  font-weight: 700;
+  text-align: right;
+}
+
+.mypage-mintuku-plan-note {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
 .mypage-actions {
   display: flex;
   flex-direction: column;
