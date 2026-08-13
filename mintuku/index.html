@@ -4,15 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#5B6CFF">
+  <meta name="theme-color" content="#111111">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="みんつく">
   <title>みんつく</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <!--
-    [みんつく] 入口のみ。実体UIは共通の ../index.html?app=mintuku&region=…
-    PWA用 manifest はフェーズ4で地方ごとに追加予定。
+    [みんつく] 入口のみ。実体UIは共通の ../index.html?app=mintuku&r=…
+    manifest は boot.js が地方ごとに差し替える。
   -->
 </head>
 <body>
   <p style="font-family:sans-serif;padding:1.5rem;color:#555">みんつくを読み込み中…</p>
-  <script src="js/boot.js?v=20260811a"></script>
+  <script src="js/boot.js?v=20260813a"></script>
 </body>
 </html>

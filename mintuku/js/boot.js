@@ -59,6 +59,21 @@
   }
 
   var token = REGION_TO_TOKEN[region] || region;
+
+  // ホーム追加用に、リダイレクト前に地方manifestをセット
+  try {
+    var existing = document.querySelector('link[rel="manifest"]');
+    if (!existing) {
+      existing = document.createElement("link");
+      existing.rel = "manifest";
+      document.head.appendChild(existing);
+    }
+    existing.href = "manifest-" + region + ".webmanifest";
+    document.title = "みんつく";
+  } catch (_) {
+    /* ignore */
+  }
+
   var q = new URLSearchParams();
   q.set("app", "mintuku");
   q.set("r", token);

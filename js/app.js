@@ -97,26 +97,47 @@
   }
 
   function applyMintukuChrome() {
+    const brandApomy = document.getElementById("login-brand-apomy");
+    const brandMintuku = document.getElementById("login-brand-mintuku");
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+    const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    const favicons = document.querySelectorAll('link[rel="icon"]');
+
     if (!isMintukuMode()) {
       const prefFilter = document.getElementById("mintuku-pref-filter");
       if (prefFilter) prefFilter.classList.add("hidden");
       const regionBtn = document.getElementById("btn-region-link");
       if (regionBtn) regionBtn.classList.remove("hidden");
+      brandApomy?.classList.remove("hidden");
+      brandMintuku?.classList.add("hidden");
+      document.documentElement.style.setProperty("--theme-color", "#5B6CFF");
       return;
     }
     const name = mintukuDisplayName();
     document.title = name;
     const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
     if (appleTitle) appleTitle.setAttribute("content", name);
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", "#111111");
 
-    const catchEl = document.querySelector(".login-catch");
-    if (catchEl) {
-      catchEl.innerHTML = `${name}<br>同じ地方の人と繋がるマッチング。`;
+    brandApomy?.classList.add("hidden");
+    brandMintuku?.classList.remove("hidden");
+
+    // [みんつく] PWA: 地方別 manifest / アイコン
+    if (manifestLink && state.mintukuRegion) {
+      manifestLink.setAttribute(
+        "href",
+        `mintuku/manifest-${state.mintukuRegion}.webmanifest?v=20260813a`
+      );
     }
-
-    // ロゴ alt をみんつく名に
-    document.querySelectorAll('img[alt="apomy"], img[alt="Apomy"]').forEach((img) => {
-      img.setAttribute("alt", name);
+    if (appleIcon) appleIcon.setAttribute("href", "mintuku/icons/apple-touch-icon.png");
+    favicons.forEach((link) => {
+      const sizes = link.getAttribute("sizes") || "";
+      if (sizes.indexOf("512") >= 0) {
+        link.setAttribute("href", "mintuku/icons/icon-512.png");
+      } else {
+        link.setAttribute("href", "mintuku/icons/icon-192.png");
+      }
     });
 
     const regionBtn = document.getElementById("btn-region-link");
@@ -1290,25 +1311,47 @@
     updateMypageActionLabels(user);
   }
 
-  /** [みんつく] 無料期間の経過日数・残り日数（マイページ） */
+  /** [みんつく] 無料期間／課金後の経過日数（マイページ） */
   function getMintukuPlanInfo(user) {
     if (!user) return null;
     const firstAt = String(user.mintukuFirstLoginAt || "").trim();
-    const paid = Boolean(user.mintukuPaid);
-    let daysUsed = user.mintukuDaysUsed;
-    let daysLeft = user.mintukuDaysLeft;
+    const paidStartAt = String(user.mintukuPaidStartAt || "").trim();
+    const paid = Boolean(paidStartAt) || Boolean(user.mintukuPaid);
 
-    if ((daysUsed === undefined || daysUsed === null) && firstAt) {
-      const first = new Date(firstAt.replace(/-/g, "/"));
-      if (!Number.isNaN(first.getTime())) {
-        const start = new Date(first.getFullYear(), first.getMonth(), first.getDate());
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        daysUsed = Math.max(0, Math.floor((today - start) / 86400000));
-        daysLeft = Math.max(0, 30 - daysUsed);
-      }
+    const calcDays = (raw) => {
+      if (!raw) return null;
+      const d = new Date(String(raw).replace(/-/g, "/"));
+      if (Number.isNaN(d.getTime())) return null;
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return Math.max(0, Math.floor((today - start) / 86400000));
+    };
+
+    if (paidStartAt) {
+      let paidDays =
+        user.mintukuPaidDaysUsed !== undefined && user.mintukuPaidDaysUsed !== null
+          ? Number(user.mintukuPaidDaysUsed)
+          : calcDays(paidStartAt);
+      if (paidDays === null || Number.isNaN(paidDays)) paidDays = 0;
+      return {
+        mode: "paid",
+        firstAt,
+        paidStartAt,
+        paid: true,
+        daysUsed: paidDays,
+        daysLeft: 0,
+        expired: false,
+        ok: true
+      };
     }
 
+    let daysUsed = user.mintukuDaysUsed;
+    let daysLeft = user.mintukuDaysLeft;
+    if ((daysUsed === undefined || daysUsed === null) && firstAt) {
+      daysUsed = calcDays(firstAt);
+      if (daysUsed !== null) daysLeft = Math.max(0, 30 - daysUsed);
+    }
     if (daysUsed === undefined || daysUsed === null) {
       daysUsed = 0;
       daysLeft = 30;
@@ -1319,11 +1362,12 @@
     } else {
       daysLeft = Number(daysLeft) || 0;
     }
-
     const expired = Boolean(user.mintukuExpired) || (!paid && daysUsed >= 30);
     return {
+      mode: "free",
       firstAt,
-      paid,
+      paidStartAt: "",
+      paid: false,
       daysUsed,
       daysLeft,
       expired,
@@ -1354,21 +1398,28 @@
       return;
     }
 
-    let statusValue = "";
+    let rowsHtml = "";
     let note = "";
-    if (info.paid) {
-      statusValue = "有料契約中";
-      note = "課金有無が「はい」のため、無料期間終了後も利用できます。";
-    } else if (info.expired) {
-      statusValue = "無料期間終了";
-      note = "閲覧を続けるにはお問い合わせください。";
+    if (info.mode === "paid") {
+      rowsHtml = `
+      <div class="mypage-mintuku-plan-row">
+        <span class="mypage-mintuku-plan-label">課金開始日</span>
+        <span class="mypage-mintuku-plan-value">${formatMintukuDateLabel(info.paidStartAt)}</span>
+      </div>
+      <div class="mypage-mintuku-plan-row">
+        <span class="mypage-mintuku-plan-label">課金からの経過</span>
+        <span class="mypage-mintuku-plan-value">${info.daysUsed} 日目</span>
+      </div>
+      <div class="mypage-mintuku-plan-row">
+        <span class="mypage-mintuku-plan-label">利用状況</span>
+        <span class="mypage-mintuku-plan-value">有料契約中</span>
+      </div>`;
+      note = "課金開始日が入っているため、課金後の経過日数を表示しています。";
     } else {
-      statusValue = `残り ${info.daysLeft} 日`;
-      note = "初回ログイン日から30日間は無料です。31日目以降は有料契約が必要です。";
-    }
-
-    el.innerHTML = `
-      <p class="mypage-mintuku-plan-title">みんつく利用状況</p>
+      let statusValue = info.expired
+        ? "無料期間終了"
+        : `残り ${info.daysLeft} 日`;
+      rowsHtml = `
       <div class="mypage-mintuku-plan-row">
         <span class="mypage-mintuku-plan-label">初回ログイン</span>
         <span class="mypage-mintuku-plan-value">${formatMintukuDateLabel(info.firstAt)}</span>
@@ -1380,7 +1431,15 @@
       <div class="mypage-mintuku-plan-row">
         <span class="mypage-mintuku-plan-label">無料期間</span>
         <span class="mypage-mintuku-plan-value">${statusValue}</span>
-      </div>
+      </div>`;
+      note = info.expired
+        ? "閲覧を続けるにはお問い合わせください。"
+        : "初回ログイン日から30日間は無料です。課金開始日が入ると課金後の経過表示に切り替わります。";
+    }
+
+    el.innerHTML = `
+      <p class="mypage-mintuku-plan-title">みんつく利用状況</p>
+      ${rowsHtml}
       <p class="mypage-mintuku-plan-note">${note}</p>
     `;
     el.classList.remove("hidden");
