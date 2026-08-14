@@ -253,6 +253,9 @@ function getUsers_(p) {
   if (isPresident) {
     assertPresidentViewerAccessLight_(p);
   }
+  if (!isMintuku && !isPresident) {
+    assertApomyViewerAccessLight_(p);
+  }
 
   var rows;
   try {
@@ -699,8 +702,19 @@ function assertApomyLoginAllowed_(row, appKind) {
   if (toBool_(row['掲載中'])) return;
   if (!isRegistrationComplete_(row)) return;
   throw new Error(
-    'APOMY_UNPUBLISHED:Apomyの掲載が停止されています。みんつくから「Apomyの掲載を再開」するか、オーナーへお問合せください。'
+    'APOMY_UNPUBLISHED:掲載が停止されているためログインできません'
   );
+}
+
+/** [Apomy] 閲覧者チェック（本人行のみ。一覧全件は読まない） */
+function assertApomyViewerAccessLight_(p) {
+  p = p || {};
+  var memberNo = String(p.memberNo || p.member_no || '').trim();
+  var email = String(p.email || '').trim();
+  if (!memberNo && !email) return;
+  var ctx = openUserCtx_(memberNo, email);
+  var appKind = String(p.app || 'apomy').trim().toLowerCase();
+  assertApomyLoginAllowed_(ctx.row, appKind);
 }
 
 /**

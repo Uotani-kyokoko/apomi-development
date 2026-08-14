@@ -1748,11 +1748,38 @@
 
   function isApomyUnpublishedError(err) {
     const msg = String(err?.message || err || "");
-    return msg.indexOf("APOMY_UNPUBLISHED:") === 0 || msg.indexOf("Apomyの掲載が停止") >= 0;
+    return (
+      msg.indexOf("APOMY_UNPUBLISHED:") === 0 ||
+      msg.indexOf("掲載が停止されているためログインできません") >= 0 ||
+      msg.indexOf("Apomyの掲載が停止") >= 0
+    );
+  }
+
+  function apomyUnpublishedMessage(raw) {
+    const msg = String(raw || "").replace(/^APOMY_UNPUBLISHED:/, "").trim();
+    if (msg.indexOf("掲載が停止されているためログインできません") >= 0) return msg;
+    return "掲載が停止されているためログインできません";
+  }
+
+  /** [Apomy] 掲載停止済みの完了会員（GAS assertApomyLoginAllowed_ と同条件） */
+  function isApomyUnpublishedBlockedUser(user) {
+    if (isMintukuMode() || isPresidentMode() || !user) return false;
+    if (user.isNew) return false;
+    if (user.isPublished !== false) return false;
+    return !needsProfileSetup(user);
+  }
+
+  /** @returns {boolean} 続行してよいとき true */
+  function guardApomyAccess(user) {
+    if (!isApomyUnpublishedBlockedUser(user)) return true;
+    handleApomyUnpublished();
+    return false;
   }
 
   function handleApomyUnpublished(message) {
-    showToast(message || "Apomyの掲載が停止されています");
+    showToast(apomyUnpublishedMessage(message));
+    invalidateUsersCache();
+    state.allUsers = [];
     try {
       Session.clear();
     } catch (_) {
@@ -2954,6 +2981,10 @@
           handlePresidentDenied();
           throw reason;
         }
+        if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(reason)) {
+          handleApomyUnpublished(reason.message);
+          throw reason;
+        }
         const detail = String(reason?.message || reason || "").trim();
         if (!GasAPI.isLive) {
           const mockUsers = await MockAPI.fetchUsers({});
@@ -3024,6 +3055,7 @@
         if (wasNew) state.currentUser.isNew = true;
         lastTouchAt = Date.now();
         applyMyActivity(meRes.data.lastLoginAt);
+        if (!guardApomyAccess(state.currentUser)) return;
         if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
         if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
@@ -3031,6 +3063,7 @@
           return;
         }
       } else if (skipMe && state.currentUser) {
+        if (!guardApomyAccess(state.currentUser)) return;
         if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
         if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && state.currentUser.mintukuAccessOk === false) {
@@ -4159,6 +4192,7 @@
         memberNo: user.id,
         name: user.nickname || user.name || ""
       });
+      if (!guardApomyAccess(user)) return;
       showToast("ログインしました");
       applyMyActivity(user.lastLoginAt);
       lastTouchAt = Date.now();
@@ -4312,7 +4346,7 @@
     }
   }
 
-  function tryRestoreSession() {
+  async function tryRestoreSession() {
     const saved = Session.load();
     if (!saved?.email && !saved?.memberNo) {
       showLogin();
@@ -4322,8 +4356,34 @@
       email: saved.email || "",
       memberNo: saved.memberNo || ""
     };
-    showToast("ようこそ、" + (saved.name || "会員") + "さん");
-    showApp();
+    showLoading(true);
+    try {
+      const meRes = await GasAPI.fetchCurrentUser(identityForApi(state.identity));
+      const user = meRes.data;
+      if (!guardApomyAccess(user)) return;
+      state.currentUser = user;
+      const welcomeName = displayNameOf(user) || saved.name || "会員";
+      showToast("ようこそ、" + welcomeName + "さん");
+      await showApp();
+    } catch (err) {
+      console.error(err);
+      if (isAccessDeniedError(err)) {
+        forceLogoutForAccessDenied(err.message || err);
+      } else if (isMaintenanceError(err)) {
+        forceLogoutForMaintenance(err.message || err);
+      } else if (isMintukuMode() && isMintukuExpiredError(err)) {
+        showMintukuExpiredScreen(err);
+      } else if (isPresidentMode() && isPresidentDeniedError(err)) {
+        handlePresidentDenied();
+      } else if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(err)) {
+        handleApomyUnpublished(err.message);
+      } else {
+        showToast(err.message || "セッションの復元に失敗しました");
+        showLogin();
+      }
+    } finally {
+      forceHideLoading();
+    }
   }
 
   function bindEvents() {
@@ -4720,7 +4780,7 @@
 
     const handled = await checkAndApplyMaintenanceGate();
     if (!handled) {
-      tryRestoreSession();
+      await tryRestoreSession();
     }
   }
 
