@@ -18,7 +18,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260813a">
+  <link rel="stylesheet" href="css/style.css?v=20260814c">
   <!-- GSI は早めに読み込み（ログインボタン表示を速くする） -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -43,6 +43,14 @@
           『Apomy』プロフィールと連動します。<br>
           会える距離の方だけと繋がりたい方は、マイページでみんつくの掲載を調整してください。
         </p>
+      </div>
+      <div id="login-brand-president" class="login-brand login-brand-president hidden">
+        <div class="login-president-title" aria-label="PRESIDENT MATE">
+          <span class="login-president-line1">PRESIDENT</span>
+          <span class="login-president-line2">MATE</span>
+        </div>
+        <p class="login-president-catch">決済者ではなく、社長限定のマッチングサービス</p>
+        <p class="login-president-sub">OMO戦略</p>
       </div>
       <div id="google-btn-host" class="google-btn-host"></div>
       <p id="login-hint" class="login-hint is-loading">Googleログインを読み込み中…</p>
@@ -174,6 +182,8 @@
           <button id="btn-resume-apomy-from-mintuku" class="mypage-link hidden" type="button">Apomyの掲載を再開</button>
           <button id="btn-stop-mintuku-listing" class="mypage-link hidden" type="button">みんつくの掲載を停止</button>
           <button id="btn-resume-mintuku-listing" class="mypage-link hidden" type="button">みんつくの掲載を再開</button>
+          <button id="btn-stop-president-listing" class="mypage-link hidden" type="button">プレジデントメイトの掲載を停止</button>
+          <button id="btn-resume-president-listing" class="mypage-link hidden" type="button">プレジデントメイトの掲載を再開</button>
         </div>
       </section>
 
@@ -292,6 +302,11 @@
         <i class="fa-solid fa-arrow-up-right-from-square"></i>
       </button>
 
+      <button type="button" id="btn-president-mate-link" class="filter-link-card">
+        <span>プレジデントメイト</span>
+        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+      </button>
+
       <div id="mintuku-pref-filter" class="filter-card hidden" data-filter-card="mintuku-pref">
         <button type="button" class="filter-card-toggle">
           <span>都道府県で絞る</span>
@@ -326,14 +341,14 @@
 
     <form id="edit-form" class="edit-body">
       <div class="edit-card" id="edit-real-name-card">
-        <label class="edit-label" for="edit-real-name">本名（フルネーム）</label>
+        <label class="edit-label" for="edit-real-name">本名（フルネーム）<span class="req-mark" aria-hidden="true">＊</span></label>
         <input id="edit-real-name" name="realName" type="text" class="edit-input" maxlength="40" autocomplete="name">
         <p id="edit-real-name-note-first" class="edit-help-text hidden">※公開されません。登録後の変更はできません。</p>
         <p id="edit-real-name-note-locked" class="edit-help-text hidden">※本名は公開されません。変更は公式LINEへお問合せください。</p>
       </div>
 
       <div class="edit-card" id="edit-nickname-card">
-        <label class="edit-label" for="edit-nickname">ニックネーム</label>
+        <label class="edit-label" for="edit-nickname">ニックネーム<span class="req-mark" aria-hidden="true">＊</span></label>
         <input id="edit-nickname" name="nickname" type="text" class="edit-input" maxlength="40" autocomplete="nickname">
         <p class="edit-help-text">※マイページ・他の会員に表示されます。あとから変更できます。</p>
       </div>
@@ -345,28 +360,28 @@
       </div>
 
       <div class="edit-card">
-        <p class="edit-label">性別</p>
+        <p class="edit-label">性別<span class="req-mark" aria-hidden="true">＊</span></p>
         <div class="chip-grid" id="edit-gender-chips"></div>
         <p id="edit-gender-note" class="edit-help-text"></p>
       </div>
 
       <div class="edit-card">
-        <p class="edit-label">年代</p>
+        <p class="edit-label">年代<span class="req-mark" aria-hidden="true">＊</span></p>
         <div class="chip-grid" id="edit-age-chips"></div>
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-industry">業種</label>
+        <label class="edit-label" for="edit-industry">業種<span class="req-mark" aria-hidden="true">＊</span></label>
         <select id="edit-industry" name="industry" class="filter-select"></select>
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-job">職種</label>
+        <label class="edit-label" for="edit-job">職種<span class="req-mark" aria-hidden="true">＊</span></label>
         <select id="edit-job" name="jobTitle" class="filter-select"></select>
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-location">現在地</label>
+        <label class="edit-label" for="edit-location">現在地<span class="req-mark" aria-hidden="true">＊</span></label>
         <select id="edit-location" name="location" class="filter-select"></select>
         <p id="edit-location-help" class="edit-help-text">お引越しする際は現在地の変更とオーナーへお問合せください</p>
       </div>
@@ -416,7 +431,7 @@
       </div>
 
       <div class="edit-card">
-        <label class="edit-label" for="edit-line-url">個人LINE</label>
+        <label class="edit-label" for="edit-line-url">個人LINE<span class="req-mark" aria-hidden="true">＊</span></label>
         <input id="edit-line-url" type="url" class="edit-input" inputmode="url" placeholder="https://line.me/...">
         <p class="edit-help-text">個人の LINE URL を入力してください（公式LINE は不可）。</p>
       </div>
@@ -438,7 +453,7 @@
       </div>
 
       <div id="edit-privacy-card" class="edit-card hidden">
-        <p class="edit-label">プライバシーポリシー</p>
+        <p class="edit-label">プライバシーポリシー<span class="req-mark" aria-hidden="true">＊</span></p>
         <div id="edit-privacy-body" class="privacy-scroll" role="region" aria-label="プライバシーポリシー本文"></div>
         <label class="edit-check-label" for="edit-privacy-agree">
           <input id="edit-privacy-agree" type="checkbox" class="edit-check-input">
@@ -557,10 +572,10 @@
 
   <script src="js/env.js?v=20260805b"></script>
   <script src="js/config.js?v=20260805b"></script>
-  <script src="js/app-mode.js?v=20260811b"></script>
+  <script src="js/app-mode.js?v=20260814c"></script>
   <script src="js/auth.js?v=20260807d"></script>
   <script src="js/mock-api.js?v=20260812a"></script>
-  <script src="js/gas-api.js?v=20260812b"></script>
-  <script src="js/app.js?v=20260813a"></script>
+  <script src="js/gas-api.js?v=20260814c"></script>
+  <script src="js/app.js?v=20260814c"></script>
 </body>
 </html>

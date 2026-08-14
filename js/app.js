@@ -22,6 +22,12 @@
   let welcomeSplashShown = false;
   /** ログイン直後は me/touch を1回スキップ（シート二重書き込み・タイムアウト対策） */
   let skipMeTouchOnce = false;
+  /** 会員一覧のセッションキャッシュ（繋がる表示時のみ取得） */
+  const USERS_CACHE_KEY = "apomy_users_cache_v1";
+  const USERS_CACHE_TTL_MS = 5 * 60 * 1000;
+  let usersLoadedAt = 0;
+  let usersCacheKey = "";
+  let usersFetchPromise = null;
 
   /** 繋がるページの会員番号帯（1ページあたり） */
   const CONNECT_BAND_SIZE = 100;
@@ -34,8 +40,13 @@
   const state = {
     isLoggedIn: false,
     activeTab: "home",
-    /** apomy | mintuku */
-    appKind: bootMode.app === "mintuku" ? "mintuku" : "apomy",
+    /** apomy | mintuku | president */
+    appKind:
+      bootMode.app === "mintuku"
+        ? "mintuku"
+        : bootMode.app === "president"
+          ? "president"
+          : "apomy",
     /** みんつく地方ID（例: kanto）。Apomy時は空 */
     mintukuRegion: bootMode.app === "mintuku" ? bootMode.region || "" : "",
     users: [],
@@ -72,6 +83,20 @@
     return state.appKind === "mintuku";
   }
 
+  function isPresidentMode() {
+    return state.appKind === "president";
+  }
+
+  /** [プレジデント] 空欄・TRUE＝掲載、FALSEのみ非表示 */
+  function isPresidentMateListed(user) {
+    if (!user) return false;
+    if (user.presidentMateListed === false) return false;
+    if (user.presidentMateListed === true) return true;
+    const raw = user.presidentMateListed;
+    if (raw === "" || raw === null || raw === undefined) return true;
+    return Boolean(raw);
+  }
+
   function mintukuDisplayName() {
     if (typeof AppMode === "undefined") return "みんつく";
     return AppMode.displayName(state.mintukuRegion);
@@ -84,6 +109,10 @@
       params.app = "mintuku";
       params.region = state.mintukuRegion;
     }
+    if (isPresidentMode()) {
+      params.app = "president";
+    }
+    // 性別・業種などの詳細絞り込みはフロント側（一覧は掲載／地方だけサーバで絞る）
     return params;
   }
 
@@ -97,33 +126,65 @@
   }
 
   function applyMintukuChrome() {
+    applyAppChrome();
+  }
+
+  function applyAppChrome() {
     const brandApomy = document.getElementById("login-brand-apomy");
     const brandMintuku = document.getElementById("login-brand-mintuku");
+    const brandPresident = document.getElementById("login-brand-president");
     const manifestLink = document.querySelector('link[rel="manifest"]');
     const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
     const favicons = document.querySelectorAll('link[rel="icon"]');
-
-    if (!isMintukuMode()) {
-      const prefFilter = document.getElementById("mintuku-pref-filter");
-      if (prefFilter) prefFilter.classList.add("hidden");
-      const regionBtn = document.getElementById("btn-region-link");
-      if (regionBtn) regionBtn.classList.remove("hidden");
-      brandApomy?.classList.remove("hidden");
-      brandMintuku?.classList.add("hidden");
-      document.documentElement.style.setProperty("--theme-color", "#5B6CFF");
-      return;
-    }
-    const name = mintukuDisplayName();
-    document.title = name;
-    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-    if (appleTitle) appleTitle.setAttribute("content", name);
+    const prefFilter = document.getElementById("mintuku-pref-filter");
+    const regionBtn = document.getElementById("btn-region-link");
+    const presidentBtn = document.getElementById("btn-president-mate-link");
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.setAttribute("content", "#111111");
+    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
 
     brandApomy?.classList.add("hidden");
+    brandMintuku?.classList.add("hidden");
+    brandPresident?.classList.add("hidden");
+
+    if (isPresidentMode()) {
+      document.title = "プレジデントメイト";
+      if (appleTitle) appleTitle.setAttribute("content", "PRESIDENT MATE");
+      if (themeMeta) themeMeta.setAttribute("content", "#1a1a1a");
+      document.documentElement.style.setProperty("--theme-color", "#1a1a1a");
+      brandPresident?.classList.remove("hidden");
+      if (manifestLink) {
+        manifestLink.setAttribute("href", "president/manifest.webmanifest?v=20260814c");
+      }
+      if (appleIcon) appleIcon.setAttribute("href", "president/icons/apple-touch-icon.png");
+      favicons.forEach((link) => {
+        const sizes = link.getAttribute("sizes") || "";
+        if (sizes.indexOf("512") >= 0) {
+          link.setAttribute("href", "president/icons/icon-512.png");
+        } else {
+          link.setAttribute("href", "president/icons/icon-192.png");
+        }
+      });
+      regionBtn?.classList.add("hidden");
+      presidentBtn?.classList.add("hidden");
+      prefFilter?.classList.add("hidden");
+      return;
+    }
+
+    if (!isMintukuMode()) {
+      brandApomy?.classList.remove("hidden");
+      document.documentElement.style.setProperty("--theme-color", "#5B6CFF");
+      prefFilter?.classList.add("hidden");
+      regionBtn?.classList.remove("hidden");
+      presidentBtn?.classList.remove("hidden");
+      return;
+    }
+
+    const name = mintukuDisplayName();
+    document.title = name;
+    if (appleTitle) appleTitle.setAttribute("content", name);
+    if (themeMeta) themeMeta.setAttribute("content", "#111111");
     brandMintuku?.classList.remove("hidden");
 
-    // [みんつく] PWA: 地方別 manifest / アイコン
     if (manifestLink && state.mintukuRegion) {
       manifestLink.setAttribute(
         "href",
@@ -140,10 +201,9 @@
       }
     });
 
-    const regionBtn = document.getElementById("btn-region-link");
-    if (regionBtn) regionBtn.classList.add("hidden");
-    const prefFilter = document.getElementById("mintuku-pref-filter");
-    if (prefFilter) prefFilter.classList.remove("hidden");
+    regionBtn?.classList.add("hidden");
+    presidentBtn?.classList.add("hidden");
+    prefFilter?.classList.remove("hidden");
   }
 
   function identityForApi(extra = {}) {
@@ -151,6 +211,9 @@
     if (isMintukuMode() && state.mintukuRegion) {
       base.app = "mintuku";
       base.region = state.mintukuRegion;
+    }
+    if (isPresidentMode()) {
+      base.app = "president";
     }
     return base;
   }
@@ -168,13 +231,25 @@
     return { label: m[1], n: Number(m[2]) };
   }
 
-  /** みんつく: みんつく番号の数字 / Apomy: 会員番号 */
+  function parsePresidentNumber(raw) {
+    const s = String(raw || "").trim();
+    const m = s.match(/^社長(\d+)$/);
+    if (!m) return null;
+    return { n: Number(m[1]) };
+  }
+
+  /** みんつく: みんつく番号 / プレジデント: プレジデント番号 / Apomy: 会員番号 */
   function userMemberSortKey(user) {
     if (isMintukuMode()) {
       const parsed = parseMintukuNumber(user?.mintukuNumber);
       const label = mintukuRegionLabel();
       if (parsed && parsed.label === label && parsed.n > 0) return parsed.n;
-      return Number.MAX_SAFE_INTEGER; // 未採番は末尾
+      return Number.MAX_SAFE_INTEGER;
+    }
+    if (isPresidentMode()) {
+      const parsed = parsePresidentNumber(user?.presidentNumber);
+      if (parsed && parsed.n > 0) return parsed.n;
+      return Number.MAX_SAFE_INTEGER;
     }
     return memberNoNum(user?.id);
   }
@@ -185,12 +260,17 @@
     return `No.${digits.padStart(5, "0")}`;
   }
 
-  /** カード表示用。みんつくではみんつく番号のみ（Apomy番号は出さない） */
+  /** カード表示用 */
   function formatUserMemberNo(user) {
     if (isMintukuMode()) {
       const parsed = parseMintukuNumber(user?.mintukuNumber);
       const label = mintukuRegionLabel();
       if (!parsed || parsed.label !== label || !parsed.n) return "No.-----";
+      return `No.${String(parsed.n).padStart(5, "0")}`;
+    }
+    if (isPresidentMode()) {
+      const parsed = parsePresidentNumber(user?.presidentNumber);
+      if (!parsed || !parsed.n) return "No.-----";
       return `No.${String(parsed.n).padStart(5, "0")}`;
     }
     return formatMemberNo(user?.id);
@@ -394,6 +474,22 @@
    */
   function buildConnectMenu(users = state.allUsers) {
     const list = users || [];
+
+    // [プレジデント] 社長帯のみ（プレジデント番号順の帯）
+    if (isPresidentMode()) {
+      const menu = [{ id: "latest", label: "最新ユーザー", type: "latest" }];
+      occupiedBands(list, () => true).forEach((b) => {
+        menu.push({
+          id: `pres-${b.index}`,
+          label: `社長 No.${b.from}～No.${b.to}`,
+          type: "president",
+          from: b.from,
+          to: b.to
+        });
+      });
+      return menu;
+    }
+
     const maxNo = Math.max(maxMemberNoAmong(list), 1);
     const bandCount = Math.max(1, Math.ceil(maxNo / CONNECT_BAND_SIZE));
     const menu = [{ id: "latest", label: "最新ユーザー", type: "latest" }];
@@ -1376,11 +1472,69 @@
   }
 
   function formatMintukuDateLabel(raw) {
-    const s = String(raw || "").trim();
-    if (!s) return "未記録";
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return `${m[1]}/${m[2]}/${m[3]}`;
-    return s.slice(0, 10);
+    if (raw === undefined || raw === null || raw === "") return "未記録";
+
+    const months = {
+      jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+      apr: 4, april: 4, may: 5, jun: 6, june: 6,
+      jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+      oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12
+    };
+
+    let y = 0;
+    let mo = 0;
+    let d = 0;
+
+    if (Object.prototype.toString.call(raw) === "[object Date]" && !isNaN(raw.getTime())) {
+      // Asia/Tokyo 基準で年月日を取る
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tokyo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(raw);
+      const get = (t) => Number((parts.find((p) => p.type === t) || {}).value || 0);
+      y = get("year");
+      mo = get("month");
+      d = get("day");
+    } else {
+      const s = String(raw).trim();
+      if (!s) return "未記録";
+
+      let m =
+        s.match(/^(\d{4})[-\/.年](\d{1,2})[-\/.月](\d{1,2})/) ||
+        s.match(/^(\d{4})(\d{2})(\d{2})/);
+      if (m) {
+        y = Number(m[1]);
+        mo = Number(m[2]);
+        d = Number(m[3]);
+      } else {
+        // "Thu Aug 13 2026 ..." / "Aug 13, 2026"
+        m = s.match(/\b([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/);
+        if (m && months[m[1].toLowerCase()]) {
+          mo = months[m[1].toLowerCase()];
+          d = Number(m[2]);
+          y = Number(m[3]);
+        } else {
+          m = s.match(/\b([A-Za-z]{3,9})\s+(\d{1,2})\b/);
+          if (m && months[m[1].toLowerCase()]) {
+            mo = months[m[1].toLowerCase()];
+            d = Number(m[2]);
+            y = new Date().getFullYear();
+          } else {
+            const dt = new Date(s);
+            if (!isNaN(dt.getTime())) {
+              y = dt.getFullYear();
+              mo = dt.getMonth() + 1;
+              d = dt.getDate();
+            }
+          }
+        }
+      }
+    }
+
+    if (!y || !mo || !d) return "未記録";
+    return `${y}年${String(mo).padStart(2, "0")}月${String(d).padStart(2, "0")}日`;
   }
 
   function renderMintukuPlanPanel(user) {
@@ -1403,7 +1557,7 @@
     if (info.mode === "paid") {
       rowsHtml = `
       <div class="mypage-mintuku-plan-row">
-        <span class="mypage-mintuku-plan-label">課金開始日</span>
+        <span class="mypage-mintuku-plan-label">みんつく課金開始日</span>
         <span class="mypage-mintuku-plan-value">${formatMintukuDateLabel(info.paidStartAt)}</span>
       </div>
       <div class="mypage-mintuku-plan-row">
@@ -1414,7 +1568,7 @@
         <span class="mypage-mintuku-plan-label">利用状況</span>
         <span class="mypage-mintuku-plan-value">有料契約中</span>
       </div>`;
-      note = "課金開始日が入っているため、課金後の経過日数を表示しています。";
+      note = "みんつく課金開始日が入っているため、課金後の経過日数を表示しています。";
     } else {
       let statusValue = info.expired
         ? "無料期間終了"
@@ -1434,7 +1588,7 @@
       </div>`;
       note = info.expired
         ? "閲覧を続けるにはお問い合わせください。"
-        : "初回ログイン日から30日間は無料です。課金開始日が入ると課金後の経過表示に切り替わります。";
+        : "初回ログイン日から30日間は無料です。みんつく課金開始日が入ると課金後の経過表示に切り替わります。";
     }
 
     el.innerHTML = `
@@ -1453,6 +1607,8 @@
     const resumeApomyMintuku = $("#btn-resume-apomy-from-mintuku");
     const stopMintuku = $("#btn-stop-mintuku-listing");
     const resumeMintuku = $("#btn-resume-mintuku-listing");
+    const mintukuOnlyWrap = $("#mypage-mintuku-only");
+    const mintukuOnlyChk = $("#chk-mintuku-only");
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
     const salonName = state.salonLabel || "井口智明オンラインサロン";
@@ -1489,11 +1645,38 @@
       }
     }
 
-    // [みんつく] 掲載スイッチ分離 / [Apomy] 従来の掲載停止1つ
+    // [みんつく] 掲載スイッチ分離 / [プレジデント] PM掲載 / [Apomy] 従来の掲載停止1つ
     const published = user?.isPublished !== false;
     const mintukuOn = Boolean(user?.mintukuListed);
-    if (isMintukuMode()) {
+    const mintukuOnly = Boolean(user?.mintukuOnly);
+    const presidentOn = isPresidentMateListed(user);
+    const stopPresident = $("#btn-stop-president-listing");
+    const resumePresident = $("#btn-resume-president-listing");
+
+    if (isPresidentMode()) {
       stopApomy?.classList.add("hidden");
+      stopApomyMintuku?.classList.add("hidden");
+      resumeApomyMintuku?.classList.add("hidden");
+      stopMintuku?.classList.add("hidden");
+      resumeMintuku?.classList.add("hidden");
+      mintukuOnlyWrap?.classList.add("hidden");
+      salonBtn?.classList.add("hidden");
+      presidentBtn?.classList.add("hidden");
+      if (presidentOn) {
+        stopPresident?.classList.remove("hidden");
+        resumePresident?.classList.add("hidden");
+      } else {
+        stopPresident?.classList.add("hidden");
+        resumePresident?.classList.remove("hidden");
+      }
+    } else if (isMintukuMode()) {
+      stopApomy?.classList.add("hidden");
+      stopPresident?.classList.add("hidden");
+      resumePresident?.classList.add("hidden");
+      mintukuOnlyWrap?.classList.remove("hidden");
+      if (mintukuOnlyChk && mintukuOnlyChk.checked !== mintukuOnly) {
+        mintukuOnlyChk.checked = mintukuOnly;
+      }
       if (published) {
         stopApomyMintuku?.classList.remove("hidden");
         resumeApomyMintuku?.classList.add("hidden");
@@ -1514,6 +1697,11 @@
       resumeApomyMintuku?.classList.add("hidden");
       stopMintuku?.classList.add("hidden");
       resumeMintuku?.classList.add("hidden");
+      mintukuOnlyWrap?.classList.add("hidden");
+      stopPresident?.classList.add("hidden");
+      resumePresident?.classList.add("hidden");
+      salonBtn?.classList.remove("hidden");
+      presidentBtn?.classList.remove("hidden");
     }
   }
 
@@ -1527,6 +1715,29 @@
     return msg.indexOf("MINTUKU_REGION_DENIED:") === 0 || msg.indexOf("現在地が一致する会員のみ") >= 0;
   }
 
+  function isPresidentDeniedError(err) {
+    const msg = String(err?.message || err || "");
+    return (
+      msg.indexOf("PRESIDENT_DENIED:") === 0 ||
+      msg.indexOf("社長マークの承認") >= 0
+    );
+  }
+
+  function handlePresidentDenied() {
+    showToast("Apomyにて社長マークの承認をお願いします");
+    try {
+      Session.clear();
+    } catch (_) {
+      /* ignore */
+    }
+    state.isLoggedIn = false;
+    state.currentUser = null;
+    state.identity = null;
+    setTimeout(() => {
+      window.location.assign("index.html");
+    }, 1400);
+  }
+
   /**
    * [みんつく] Apomy掲載をみんつくから停止した人だけ、Apomy起動時にみんつくへ誘導
    * （新規・未完成プロフィール・単なる掲載停止は Apomy に残す）
@@ -1538,12 +1749,14 @@
     if (user.isPublished !== false) return false;
     if (!user.mintukuListed) return false;
     if (!String(user.mintukuNumber || "").trim()) return false;
-    // みんつく側の「Apomy掲載を停止」を押したときだけ立てる旗
-    let shouldRedirect = false;
+    // みんつく側の「Apomy掲載を停止」／「みんつく限定」ON のとき誘導
+    let shouldRedirect = Boolean(user.mintukuOnly);
     try {
-      shouldRedirect = localStorage.getItem("apomy_open_mintuku_after_stop") === "1";
+      if (localStorage.getItem("apomy_open_mintuku_after_stop") === "1") {
+        shouldRedirect = true;
+      }
     } catch (_) {
-      shouldRedirect = false;
+      /* ignore */
     }
     if (!shouldRedirect) return false;
     // 復旧用: ?stay=1 で Apomy に留まる
@@ -1650,7 +1863,11 @@
     range.classList.toggle("hidden", tabId !== "connect");
 
     if (tabId === "home") {
-      title.textContent = isMintukuMode() ? `${mintukuDisplayName()} HOME` : "apomy HOME";
+      title.textContent = isMintukuMode()
+        ? `${mintukuDisplayName()} HOME`
+        : isPresidentMode()
+          ? "PRESIDENT MATE HOME"
+          : "apomy HOME";
       title.classList.remove("hidden");
     } else if (tabId === "mypage") {
       title.textContent = "マイページ";
@@ -1804,17 +2021,20 @@
     updateHeader(tabId);
     scheduleTouchActivity();
 
-    // データが空ならタブ切替時に再取得
-    if (
-      (tabId === "connect" || tabId === "mypage" || tabId === "home") &&
-      (!state.allUsers || state.allUsers.length === 0)
-    ) {
-      loadAllData();
-    } else if (tabId === "connect") {
-      refreshConnectList();
-    } else if (tabId === "mypage") {
+    if (tabId === "connect") {
+      void ensureConnectUsersLoaded()
+        .then(() => refreshConnectList())
+        .catch((err) => {
+          console.error(err);
+          showToast(err.message || "会員一覧の取得に失敗しました");
+        });
+      return;
+    }
+    if (tabId === "mypage") {
       renderMyPage(state.currentUser);
-    } else if (tabId === "home") {
+      return;
+    }
+    if (tabId === "home") {
       renderAllBanners();
       renderDashboard(state.dashboard);
       loadDashboardStats();
@@ -2036,8 +2256,48 @@
   }
 
   async function openFilterScreen() {
-    await refreshMastersFromServer();
-    $("#filter-screen").classList.remove("hidden");
+    // ローディング（z-index 999）が残っているとボタン／画面が押せない・見えない
+    forceHideLoading();
+
+    const screen = $("#filter-screen");
+    if (!screen) {
+      showToast("絞り込み画面を開けませんでした");
+      return;
+    }
+    // 先に表示（マスタ適用やGAS待ちで失敗しても「無反応」にしない）
+    screen.classList.remove("hidden");
+
+    try {
+      applyMastersToFilterUI();
+    } catch (err) {
+      console.warn("applyMastersToFilterUI failed", err);
+    }
+
+    // マスタは裏で更新。初回だけ未取得なら取得後にチップを描き直す
+    if (!state.masters || !Object.keys(state.masters).length) {
+      void refreshMastersFromServer()
+        .then((ok) => {
+          if (ok) {
+            try {
+              applyMastersToFilterUI();
+            } catch (err) {
+              console.warn("applyMastersToFilterUI failed", err);
+            }
+          }
+        })
+        .catch((err) => console.warn("masters refresh failed", err));
+    } else {
+      void refreshMastersFromServer().catch((err) =>
+        console.warn("masters refresh failed", err)
+      );
+    }
+
+    // 絞り込み適用用に一覧も裏で温める（画面表示は待たない）
+    if (!state.allUsers || state.allUsers.length === 0) {
+      void ensureConnectUsersLoaded({ silent: true }).catch((err) =>
+        console.warn("prefetch users failed", err)
+      );
+    }
   }
 
   function closeFilterScreen() {
@@ -2047,7 +2307,12 @@
   function uniqueOptions(options) {
     const seen = new Set();
     const out = [];
-    (options || []).forEach((o) => {
+    const list = Array.isArray(options)
+      ? options
+      : options == null || options === ""
+        ? []
+        : [options];
+    list.forEach((o) => {
       // {value,label} でも文字列単体でも受け付ける
       const value = String(
         o && typeof o === "object" ? o.value ?? o.label ?? "" : o || ""
@@ -2211,7 +2476,7 @@
     const prefSelect = $("#filter-mintuku-pref");
     if (prefSelect && typeof AppMode !== "undefined") {
       const meta = AppMode.getRegionMeta(state.mintukuRegion);
-      const prefs = meta ? meta.prefs.slice() : [];
+      const prefs = Array.isArray(meta?.prefs) ? meta.prefs.slice() : [];
       const current = String(state.filters.locationPref || "all");
       prefSelect.innerHTML =
         `<option value="all">すべて（この地方）</option>` +
@@ -2374,6 +2639,11 @@
       if (isMintukuMode() && locationPref && locationPref !== "all") {
         if (String(u.location || "").trim() !== locationPref) return false;
       }
+      // [プレジデント] 二重チェック（サーバでも絞る）
+      if (isPresidentMode()) {
+        if (!u.presidentMark) return false;
+        if (!isPresidentMateListed(u)) return false;
+      }
       return true;
     });
   }
@@ -2483,7 +2753,7 @@
   async function loadSecondaryDataInBackground() {
     try {
       const results = await Promise.allSettled([
-        GasAPI.fetchBanners(),
+        GasAPI.fetchBanners(identityForApi()),
         GasAPI.fetchMasters(),
         GasAPI.fetchSettings()
       ]);
@@ -2525,6 +2795,137 @@
     }
   }
 
+  function currentUsersCacheKey() {
+    const filterKey = JSON.stringify(usersFetchParams());
+    return `${
+      isMintukuMode()
+        ? `mintuku:${state.mintukuRegion}`
+        : isPresidentMode()
+          ? "president"
+          : "apomy"
+    }|${filterKey}`;
+  }
+
+  function invalidateUsersCache() {
+    usersLoadedAt = 0;
+    usersCacheKey = "";
+    try {
+      sessionStorage.removeItem(USERS_CACHE_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function readUsersSessionCache(expectedKey) {
+    try {
+      const raw = sessionStorage.getItem(USERS_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.key !== expectedKey) return null;
+      if (Date.now() - Number(parsed.at || 0) > USERS_CACHE_TTL_MS) return null;
+      if (!Array.isArray(parsed.users)) return null;
+      return parsed.users;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeUsersSessionCache(key, users) {
+    try {
+      sessionStorage.setItem(
+        USERS_CACHE_KEY,
+        JSON.stringify({
+          key,
+          at: Date.now(),
+          users: users || []
+        })
+      );
+    } catch (_) {
+      /* quota 超過時はメモリキャッシュのみ */
+    }
+  }
+
+  /**
+   * 繋がる用の会員一覧を必要時だけ取得（ログインでは呼ばない）
+   * @param {{ force?: boolean, silent?: boolean }} [options]
+   */
+  async function ensureConnectUsersLoaded(options = {}) {
+    const force = Boolean(options.force);
+    const silent = Boolean(options.silent);
+    const key = currentUsersCacheKey();
+
+    if (
+      !force &&
+      usersCacheKey === key &&
+      Array.isArray(state.allUsers) &&
+      state.allUsers.length > 0 &&
+      Date.now() - usersLoadedAt < USERS_CACHE_TTL_MS
+    ) {
+      return state.allUsers;
+    }
+
+    if (!force) {
+      const cached = readUsersSessionCache(key);
+      if (cached) {
+        state.allUsers = applyMintukuScope(cached);
+        usersLoadedAt = Date.now();
+        usersCacheKey = key;
+        return state.allUsers;
+      }
+    }
+
+    if (usersFetchPromise) return usersFetchPromise;
+
+    usersFetchPromise = (async () => {
+      if (!silent) showLoading(true);
+      try {
+        const res = await GasAPI.fetchUsers(usersFetchParams());
+        state.allUsers = applyMintukuScope(res.data || []);
+        usersLoadedAt = Date.now();
+        usersCacheKey = key;
+        writeUsersSessionCache(key, state.allUsers);
+        console.log("[apomy] users loaded (connect):", state.allUsers.length);
+        return state.allUsers;
+      } catch (reason) {
+        if (isMaintenanceError(reason)) {
+          forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
+          throw reason;
+        }
+        if (isMintukuMode() && isMintukuExpiredError(reason)) {
+          showMintukuExpiredScreen(reason);
+          throw reason;
+        }
+        if (isMintukuMode() && isMintukuRegionDeniedError(reason)) {
+          if (redirectMintukuToOwnRegion(state.currentUser)) throw reason;
+          state.allUsers = [];
+          throw reason;
+        }
+        if (isPresidentMode() && isPresidentDeniedError(reason)) {
+          handlePresidentDenied();
+          throw reason;
+        }
+        const detail = String(reason?.message || reason || "").trim();
+        if (!GasAPI.isLive) {
+          const mockUsers = await MockAPI.fetchUsers({});
+          state.allUsers = mockUsers.data || [];
+          usersLoadedAt = Date.now();
+          usersCacheKey = key;
+          return state.allUsers;
+        }
+        throw new Error(
+          detail
+            ? `会員データの取得に失敗しました: ${detail}`
+            : "会員データの取得に失敗しました"
+        );
+      } finally {
+        usersFetchPromise = null;
+        if (!silent) showLoading(false);
+      }
+    })();
+
+    return usersFetchPromise;
+  }
+
   async function loadAllData() {
     showLoading(true);
     try {
@@ -2549,6 +2950,10 @@
           }
           if (isMintukuMode() && isMintukuExpiredError(err)) {
             showMintukuExpiredScreen(err);
+            return;
+          }
+          if (isPresidentMode() && isPresidentDeniedError(err)) {
+            handlePresidentDenied();
             return;
           }
           console.error("me failed", err);
@@ -2580,79 +2985,19 @@
         }
       }
 
+      if (!state.currentUser && (identity.email || identity.memberNo)) {
+        showToast("マイページ用プロフィールを取得できませんでした");
+      }
+
       // 前回のバナー／マスタ等があれば先に出して体感を速くする
       hydrateBootCache();
 
-      // 会員一覧を待ちつつ、バナー等は同時に裏で取る（待ち時間の重なりを減らす）
+      // 会員一覧はログインでは取らない（繋がるタブ表示時に Lazy Load）
       const secondaryPromise = loadSecondaryDataInBackground();
-
-      // 最優先: 会員一覧だけ待って画面を開く
-      let usersRes = null;
-      try {
-        usersRes = await GasAPI.fetchUsers(usersFetchParams());
-      } catch (reason) {
-        console.error("users failed", reason);
-        if (isMaintenanceError(reason)) {
-          forceLogoutForMaintenance("メンテナンス中です。ご迷惑をおかけします。");
-          return;
-        }
-        if (isMintukuMode() && isMintukuExpiredError(reason)) {
-          showMintukuExpiredScreen(reason);
-          return;
-        }
-        if (isMintukuMode() && isMintukuRegionDeniedError(reason)) {
-          if (redirectMintukuToOwnRegion(state.currentUser)) return;
-          state.allUsers = [];
-          showToast(
-            String(reason?.message || reason || "")
-              .replace(/^MINTUKU_REGION_DENIED:/, "")
-              .trim() || "この地方のみんつくは利用できません"
-          );
-        } else {
-          const detail = String(reason?.message || reason || "").trim();
-          if (isMintukuMode()) {
-            state.allUsers = [];
-            showToast(
-              detail
-                ? `会員データの取得に失敗しました: ${detail}`
-                : "会員データの取得に失敗しました"
-            );
-          } else {
-            const mockUsers = await MockAPI.fetchUsers({});
-            state.allUsers = mockUsers.data || [];
-            showToast(
-              detail
-                ? `会員データの取得に失敗したため、一時データを表示しています（${detail}）`
-                : "会員データの取得に失敗したため、一時データを表示しています"
-            );
-          }
-        }
-      }
-
-      if (usersRes) {
-        state.allUsers = applyMintukuScope(usersRes.data || []);
-      }
-
-      if (!state.currentUser) {
-        const email = (identity.email || "").toLowerCase();
-        const found = state.allUsers.find(
-          (u) =>
-            (email && String(u.email || "").toLowerCase() === email) ||
-            (identity.memberNo && String(u.id) === String(identity.memberNo))
-        );
-        state.currentUser = found || null;
-        if (!state.currentUser) {
-          showToast("マイページ用プロフィールを取得できませんでした");
-        }
-      }
 
       paintAppShell();
       maybeOpenRequiredEdit();
-      if (state.allUsers.length > 0) {
-        console.log("[apomy] users loaded:", state.allUsers.length);
-      }
 
-      // 会員が出たらローディング解除。secondary はすでに走っている
       forceHideLoading();
       void secondaryPromise;
       return;
@@ -2660,8 +3005,6 @@
       console.error(err);
       showToast("データの読み込みに失敗しました: " + (err.message || ""));
       try {
-        const mockUsers = await MockAPI.fetchUsers({});
-        state.allUsers = mockUsers.data || [];
         if (!GasAPI.isLive) {
           const mockBanners = await MockAPI.fetchBanners();
           const mockMasters = await MockAPI.fetchMasters();
@@ -2680,16 +3023,27 @@
   }
 
   async function applyFilters() {
-    showLoading(true);
     scheduleTouchActivity();
     state.searchVisibleCount = SEARCH_RESULT_PAGE_SIZE;
+    let loadingShown = false;
     try {
-      // 最新の会員一覧を取得し、フロントでページ＋絞り込み
-      const res = await GasAPI.fetchUsers(usersFetchParams());
-      state.allUsers = applyMintukuScope(res.data || []);
+      // 一覧が無ければ取得（進行中の取得があればそれ待ち。force禁止＝キャッシュ／再利用）
+      // ※ここでの再取得が「絞り込みが遅い」主因だった
+      if (!state.allUsers || state.allUsers.length === 0) {
+        showLoading(true);
+        loadingShown = true;
+        await ensureConnectUsersLoaded({ silent: true });
+      }
       refreshConnectList();
       closeFilterScreen();
-      switchTab("connect");
+      if (state.activeTab !== "connect") {
+        state.activeTab = "connect";
+        $$(".tab-panel").forEach((p) => p.classList.remove("active"));
+        $("#tab-connect")?.classList.add("active");
+        $$(".nav-item").forEach((n) => n.classList.remove("active"));
+        $(`.nav-item[data-tab="connect"]`)?.classList.add("active");
+        updateHeader("connect");
+      }
       if (state.users.length === 0) {
         showToast("条件に一致する人がいません");
       } else {
@@ -2697,9 +3051,9 @@
       }
     } catch (err) {
       console.error(err);
-      showToast("検索に失敗しました");
+      showToast(err.message || "検索に失敗しました");
     } finally {
-      showLoading(false);
+      if (loadingShown) showLoading(false);
     }
   }
 
@@ -2816,6 +3170,9 @@
   function welcomeMessagesForMode() {
     if (isMintukuMode()) {
       return [`${mintukuDisplayName()}へようこそ！`, "同じ地方の人と繋がろう"];
+    }
+    if (isPresidentMode()) {
+      return ["PRESIDENT MATEへようこそ！", "社長限定のマッチング"];
     }
     return WELCOME_MESSAGES;
   }
@@ -3068,18 +3425,11 @@
     if (!el) return;
     const allBtn = el.querySelector('.chip[data-value="all"]');
     if (allBtn) allBtn.remove();
-    if (selectedValue) {
-      const match = el.querySelector(`.chip[data-value="${CSS.escape(selectedValue)}"]`);
-      if (match) {
-        el.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
-        match.classList.add("selected");
-      } else if (el.querySelector(".chip")) {
-        el.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
-        el.querySelector(".chip").classList.add("selected");
-      }
-    } else if (el.querySelector(".chip") && !el.querySelector(".chip.selected")) {
-      el.querySelector(".chip").classList.add("selected");
-    }
+    el.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
+    const current = String(selectedValue || "").trim();
+    if (!current || current === "all" || current === "すべて") return;
+    const match = el.querySelector(`.chip[data-value="${CSS.escape(current)}"]`);
+    if (match) match.classList.add("selected");
   }
 
   function canEditGender(user = state.currentUser) {
@@ -3350,6 +3700,10 @@
       showToast("性別を選択してください");
       return;
     }
+    if (!profile.ageGroup || profile.ageGroup === "all") {
+      showToast("年代を選択してください");
+      return;
+    }
     const privacyCard = $("#edit-privacy-card");
     if (privacyCard && !privacyCard.classList.contains("hidden")) {
       if (!$("#edit-privacy-agree")?.checked) {
@@ -3403,7 +3757,8 @@
       const res = await GasAPI.updateProfile({
         memberNo: state.identity?.memberNo || state.currentUser?.id || "",
         email: state.identity?.email || state.currentUser?.email || "",
-        profile: profilePayload
+        profile: profilePayload,
+        publish: shouldPublish
       });
       // GAS未再デプロイ時でもフォーム値を落とさない
       state.currentUser = {
@@ -3425,17 +3780,17 @@
       if (!state.currentUser.snsLinks) {
         state.currentUser.snsLinks = profilePayload.snsLinks || [];
       }
-      applyMyActivity(state.currentUser.lastLoginAt);
-
       if (shouldPublish) {
-        const pub = await GasAPI.resumeListing({
-          memberNo: state.identity?.memberNo || state.currentUser?.id || "",
-          email: state.identity?.email || state.currentUser?.email || ""
-        });
-        state.currentUser.isPublished = pub.data?.isPublished !== false;
+        state.currentUser.isPublished = res.data?.isPublished !== false;
         state.currentUser.isNew = false;
-        applyMyActivity(pub.data?.lastLoginAt || state.currentUser.lastLoginAt);
+        if (res.data?.mintukuListed !== undefined) {
+          state.currentUser.mintukuListed = Boolean(res.data.mintukuListed);
+        }
+        if (res.data?.mintukuNumber) {
+          state.currentUser.mintukuNumber = String(res.data.mintukuNumber);
+        }
       }
+      applyMyActivity(state.currentUser.lastLoginAt);
 
       const idx = state.allUsers.findIndex((u) => u.id === state.currentUser.id);
       if (idx >= 0) {
@@ -3453,6 +3808,7 @@
       });
       state.editRequired = false;
       $("#edit-screen").classList.add("hidden");
+      invalidateUsersCache();
       showToast(shouldPublish ? "保存して掲載を開始しました" : "プロフィールを保存しました");
     } catch (err) {
       console.error(err);
@@ -3633,6 +3989,7 @@
     state.identity = null;
     state.isLoggedIn = false;
     state.editRequired = false;
+    invalidateUsersCache();
     showAccessDeniedScreen();
   }
 
@@ -3656,6 +4013,7 @@
     state.identity = null;
     state.isLoggedIn = false;
     state.editRequired = false;
+    invalidateUsersCache();
     showMaintenanceScreen();
   }
 
@@ -3679,6 +4037,7 @@
     state.identity = null;
     state.isLoggedIn = false;
     state.editRequired = false;
+    invalidateUsersCache();
     showToast("ログアウトしました");
     showLogin();
   }
@@ -3728,6 +4087,9 @@
         loginPayload.app = "mintuku";
         loginPayload.region = state.mintukuRegion;
       }
+      if (isPresidentMode()) {
+        loginPayload.app = "president";
+      }
       const loginRes = await GasAPI.loginWithGoogle(loginPayload);
       const user = loginRes.data;
       state.identity = {
@@ -3752,6 +4114,8 @@
         forceLogoutForAccessDenied(err.message);
       } else if (isMaintenanceError(err)) {
         forceLogoutForMaintenance(err.message);
+      } else if (isPresidentMode() && isPresidentDeniedError(err)) {
+        handlePresidentDenied();
       } else {
         showToast(err.message || "ログインに失敗しました");
       }
@@ -3924,11 +4288,14 @@
       item.addEventListener("click", () => switchTab(item.dataset.tab));
     });
 
-    $("#search-open-btn").addEventListener("click", () => {
+    $("#search-open-btn")?.addEventListener("click", () => {
       scheduleTouchActivity();
-      openFilterScreen();
+      void openFilterScreen().catch((err) => {
+        console.error(err);
+        showToast(err.message || "絞り込み画面を開けませんでした");
+      });
     });
-    $("#filter-back").addEventListener("click", closeFilterScreen);
+    $("#filter-back")?.addEventListener("click", closeFilterScreen);
 
     $$(".filter-card-toggle").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -3957,6 +4324,21 @@
 
     $("#btn-region-link")?.addEventListener("click", () => {
       openRegionByCurrentLocation();
+    });
+
+    $("#btn-president-mate-link")?.addEventListener("click", () => {
+      scheduleTouchActivity();
+      if (isMintukuMode() || isPresidentMode()) return;
+      const user = state.currentUser;
+      if (user?.presidentMark) {
+        const url =
+          typeof AppMode !== "undefined" && AppMode.presidentEntryUrl
+            ? AppMode.presidentEntryUrl()
+            : "president/index.html";
+        window.location.assign(url);
+        return;
+      }
+      showToast("社長承認者のみアクセスできます。マイページから社長申請して下さい。");
     });
 
     $("#btn-search").addEventListener("click", () => {
@@ -4097,6 +4479,7 @@
           state.currentUser.isPublished = false;
         }
         applyMyActivity(res.data?.lastLoginAt);
+        invalidateUsersCache();
         showToast("掲載を停止しました。再開するにはプロフィールを保存してください");
         openEditScreen({ required: true });
       } catch (err) {
@@ -4123,6 +4506,7 @@
         }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
+        invalidateUsersCache();
         showToast("Apomyの掲載を停止しました（みんつくには残ります）");
       } catch (err) {
         console.error(err);
@@ -4133,12 +4517,20 @@
     });
 
     $("#btn-resume-apomy-from-mintuku")?.addEventListener("click", async () => {
-      if (!confirm("Apomy（全国）の掲載を再開しますか？")) return;
+      if (!confirm("Apomy（全国）の掲載を再開しますか？\n（みんつく限定にしていた場合は解除されます）")) return;
       try {
         showLoading(true);
         const res = await GasAPI.resumeListing(identityForApi());
         if (state.currentUser) {
           state.currentUser.isPublished = res.data?.isPublished !== false;
+          if (res.data?.mintukuOnly !== undefined) {
+            state.currentUser.mintukuOnly = Boolean(res.data.mintukuOnly);
+          } else {
+            state.currentUser.mintukuOnly = false;
+          }
+          if (res.data?.mintukuListed !== undefined) {
+            state.currentUser.mintukuListed = Boolean(res.data.mintukuListed);
+          }
         }
         try {
           localStorage.removeItem("apomy_open_mintuku_after_stop");
@@ -4147,10 +4539,77 @@
         }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
+        invalidateUsersCache();
         showToast("Apomyの掲載を再開しました");
       } catch (err) {
         console.error(err);
         showToast(err.message || "再開に失敗しました");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    $("#chk-mintuku-only")?.addEventListener("change", async (e) => {
+      const chk = e.target;
+      const want = Boolean(chk.checked);
+      const prev = Boolean(state.currentUser?.mintukuOnly);
+      if (want === prev) return;
+      if (want) {
+        if (
+          !confirm(
+            "会える距離の範囲だけで繋がる「みんつく限定」にします。\nApomy（全国）の掲載は停止し、みんつく掲載はオンのままです。"
+          )
+        ) {
+          chk.checked = prev;
+          return;
+        }
+      } else if (
+        !confirm(
+          "みんつく限定を解除します。\nApomyの掲載は自動では再開しません（必要なら「Apomyの掲載を再開」から行ってください）。"
+        )
+      ) {
+        chk.checked = prev;
+        return;
+      }
+      try {
+        showLoading(true);
+        const res = await GasAPI.setMintukuOnly({
+          ...identityForApi(),
+          mintukuOnly: want
+        });
+        if (state.currentUser) {
+          state.currentUser.mintukuOnly = res.data?.mintukuOnly !== undefined
+            ? Boolean(res.data.mintukuOnly)
+            : want;
+          if (res.data?.isPublished !== undefined) {
+            state.currentUser.isPublished = Boolean(res.data.isPublished);
+          } else if (want) {
+            state.currentUser.isPublished = false;
+          }
+          if (res.data?.mintukuListed !== undefined) {
+            state.currentUser.mintukuListed = Boolean(res.data.mintukuListed);
+          } else if (want) {
+            state.currentUser.mintukuListed = true;
+          }
+          if (res.data?.mintukuNumber) {
+            state.currentUser.mintukuNumber = String(res.data.mintukuNumber);
+          }
+        }
+        if (want) {
+          try {
+            localStorage.setItem("apomy_open_mintuku_after_stop", "1");
+          } catch (_) {
+            /* ignore */
+          }
+        }
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        invalidateUsersCache();
+        showToast(want ? "みんつく限定にしました" : "みんつく限定を解除しました");
+      } catch (err) {
+        console.error(err);
+        chk.checked = prev;
+        showToast(err.message || "設定に失敗しました");
       } finally {
         showLoading(false);
       }
@@ -4166,6 +4625,7 @@
         }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
+        invalidateUsersCache();
         showToast("みんつくの掲載を停止しました");
       } catch (err) {
         console.error(err);
@@ -4185,7 +4645,52 @@
         }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
+        invalidateUsersCache();
         showToast("みんつくの掲載を再開しました");
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "再開に失敗しました");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    $("#btn-stop-president-listing")?.addEventListener("click", async () => {
+      if (!confirm("プレジデントメイトの掲載を停止しますか？")) return;
+      try {
+        showLoading(true);
+        const res = await GasAPI.stopPresidentListing(identityForApi());
+        if (state.currentUser) {
+          state.currentUser.presidentMateListed = false;
+        }
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        invalidateUsersCache();
+        showToast("プレジデントメイトの掲載を停止しました");
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "停止に失敗しました");
+      } finally {
+        showLoading(false);
+      }
+    });
+
+    $("#btn-resume-president-listing")?.addEventListener("click", async () => {
+      if (!confirm("プレジデントメイトの掲載を再開しますか？")) return;
+      try {
+        showLoading(true);
+        const res = await GasAPI.resumePresidentListing(identityForApi());
+        if (state.currentUser) {
+          state.currentUser.presidentMateListed =
+            res.data?.presidentMateListed !== false;
+          if (res.data?.presidentNumber) {
+            state.currentUser.presidentNumber = res.data.presidentNumber;
+          }
+        }
+        applyMyActivity(res.data?.lastLoginAt);
+        updateMypageActionLabels(state.currentUser);
+        invalidateUsersCache();
+        showToast("プレジデントメイトの掲載を再開しました");
       } catch (err) {
         console.error(err);
         showToast(err.message || "再開に失敗しました");

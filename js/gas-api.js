@@ -12,6 +12,7 @@ const GasAPI = (() => {
 
   const USE_GAS = Boolean(GAS_URL) && !FORCE_SAMPLE_USERS;
   const REQUEST_TIMEOUT_MS = 45000;
+  const USERS_TIMEOUT_MS = 90000;
 
   async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
@@ -28,7 +29,32 @@ const GasAPI = (() => {
     }
   }
 
-  async function get(action, params = {}) {
+  function parseGasJsonResponse(text) {
+    const raw = String(text || '').trim();
+    if (!raw) {
+      throw new Error('GAS応答が空です（再デプロイや権限・実行時間を確認してください）');
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      const plain = raw
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 180);
+      const lower = plain.toLowerCase();
+      if (lower.indexOf('exceeded') >= 0 || plain.indexOf('最大実行時間') >= 0) {
+        throw new Error('GASの実行時間が上限を超えました。再デプロイ後にもう一度お試しください');
+      }
+      throw new Error(
+        plain
+          ? `GAS応答がJSONではありません: ${plain}`
+          : 'GAS応答がJSONではありません（デプロイや権限を確認してください）'
+      );
+    }
+  }
+
+  async function get(action, params = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     const url = new URL(GAS_URL);
     url.searchParams.set('action', action);
     url.searchParams.set('_ts', String(Date.now())); // キャッシュ防止
@@ -51,19 +77,14 @@ const GasAPI = (() => {
       redirect: 'follow',
       credentials: 'omit',
       cache: 'no-store'
-    });
+    }, timeoutMs);
     const text = await res.text();
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch (err) {
-      throw new Error('GAS応答がJSONではありません（デプロイや権限を確認してください）');
-    }
+    const json = parseGasJsonResponse(text);
     if (!json.success) throw new Error(json.error || 'APIエラー');
     return json;
   }
 
-  async function post(action, body = {}) {
+  async function post(action, body = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     const payload = { action, ...body };
     if (!payload.email && typeof Session !== 'undefined') {
       try {
@@ -76,16 +97,14 @@ const GasAPI = (() => {
     }
     const res = await fetchWithTimeout(GAS_URL, {
       method: 'POST',
+      redirect: 'follow',
+      credentials: 'omit',
+      cache: 'no-store',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
-    });
+    }, timeoutMs);
     const text = await res.text();
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch (err) {
-      throw new Error('GAS応答がJSONではありません（デプロイや権限を確認してください）');
-    }
+    const json = parseGasJsonResponse(text);
     if (!json.success) throw new Error(json.error || 'APIエラー');
     return json;
   }
@@ -121,13 +140,15 @@ const GasAPI = (() => {
           params[key] = params[key].filter(Boolean).join('、');
         }
       });
-      // [みんつく] app / region はそのまま query に載せる（GAS側でも地方絞り込み）
-      return get('users', params);
+      // POST + 長めタイムアウト（一覧JSONが巨大でGET/短時間が失敗しやすい）
+      return post('users', params, USERS_TIMEOUT_MS);
     },
 
-    async fetchBanners() {
+    async fetchBanners(identity = {}) {
       if (!USE_GAS) return MockAPI.fetchBanners();
-      return get('banners');
+      const params = {};
+      if (identity.app) params.app = identity.app;
+      return get('banners', params);
     },
 
     async fetchCurrentUser(identity = {}) {
@@ -191,10 +212,12 @@ const GasAPI = (() => {
     async updateProfile(payload) {
       if (!USE_GAS) return MockAPI.updateProfile(payload);
       // POST（text/plain）で送る。旧デプロイだと updateProfile が無いので再デプロイ必須
+      // publish=true なら保存＋掲載＋みんつく採番を1リクエストで完結
       return post('updateProfile', {
         memberNo: payload.memberNo || '',
         email: payload.email || '',
-        profile: payload.profile || payload
+        profile: payload.profile || payload,
+        publish: Boolean(payload.publish)
       });
     },
 
@@ -249,6 +272,42 @@ const GasAPI = (() => {
         return { success: true, data: { mintukuListed: true } };
       }
       return post('resumeMintukuListing', payload);
+    },
+
+    /** [みんつく] みんつく限定 ON/OFF（Apomy非掲載＋みんつく掲載） */
+    async setMintukuOnly(payload) {
+      if (!USE_GAS) {
+        const only = Boolean(payload && (payload.mintukuOnly || payload.only));
+        return {
+          success: true,
+          data: {
+            mintukuOnly: only,
+            isPublished: only ? false : undefined,
+            mintukuListed: only ? true : undefined,
+            lastLoginAt: formatNow()
+          }
+        };
+      }
+      return post('setMintukuOnly', payload);
+    },
+
+    /** [プレジデント] プレジデントメイト掲載のみ停止 */
+    async stopPresidentListing(payload) {
+      if (!USE_GAS) {
+        return { success: true, data: { presidentMateListed: false } };
+      }
+      return post('stopPresidentListing', payload);
+    },
+
+    /** [プレジデント] プレジデントメイト掲載のみ再開 */
+    async resumePresidentListing(payload) {
+      if (!USE_GAS) {
+        return {
+          success: true,
+          data: { presidentMateListed: true, presidentNumber: '社長1' }
+        };
+      }
+      return post('resumePresidentListing', payload);
     },
 
     /** 操作のたびに最終ログイン日時を更新（デバウンス用） */

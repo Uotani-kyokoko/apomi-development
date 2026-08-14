@@ -350,6 +350,14 @@ const MockAPI = (() => {
       });
       // 旧フィールドは残さない
       delete currentUser.sns;
+      if (payload.publish) {
+        currentUser.isPublished = true;
+        currentUser.isNew = false;
+        currentUser.mintukuListed = true;
+        if (!currentUser.mintukuNumber && currentUser.location) {
+          currentUser.mintukuNumber = "モック1";
+        }
+      }
       const idx = users.findIndex((u) => u.id === currentUser.id);
       if (idx >= 0) users[idx] = { ...currentUser };
       return delay({ ...currentUser });

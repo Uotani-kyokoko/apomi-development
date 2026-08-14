@@ -1,7 +1,8 @@
 /**
- * [共通] Apomy / みんつくの起動モードと地方定義
+ * [共通] Apomy / みんつく / プレジデントメイトの起動モードと地方定義
  * - Apomy: 全国（既存）
  * - みんつく: ?app=mintuku&r=（不透明トークン）※旧 ?region=kanto も互換
+ * - プレジデント: ?app=president
  */
 (function (global) {
   "use strict";
@@ -129,7 +130,7 @@
       const params = new URLSearchParams(url && url.search ? url.search : "");
       const rawApp = String(params.get("app") || "apomy").trim().toLowerCase();
       if (rawApp === "mintuku") app = "mintuku";
-      // 新: r= / 旧互換: region=
+      else if (rawApp === "president" || rawApp === "presidentmate") app = "president";
       region = resolveRegionId(params.get("r") || params.get("region") || "");
     } catch (_) {
       /* ignore */
@@ -158,11 +159,6 @@
     return meta.prefs.indexOf(String(prefecture || "").trim()) >= 0;
   }
 
-  /**
-   * みんつく入口URL（同じオリジン・不透明トークン）
-   * @param {string} regionId
-   * @param {{ fromMintukuDir?: boolean }} [opts]
-   */
   function mintukuEntryUrl(regionId, opts) {
     const token = regionToken(regionId) || String(regionId || "");
     const q = "r=" + encodeURIComponent(token);
@@ -172,7 +168,11 @@
     return "mintuku/index.html?" + q;
   }
 
-  /** 実アプリ本体（共通UI）へのURL */
+  function presidentEntryUrl(opts) {
+    if (opts && opts.fromPresidentDir) return "./index.html";
+    return "president/index.html";
+  }
+
   function appShellUrl(regionId) {
     const q = new URLSearchParams();
     q.set("app", "mintuku");
@@ -180,6 +180,10 @@
     if (token) q.set("r", token);
     else if (regionId) q.set("region", regionId);
     return "../index.html?" + q.toString();
+  }
+
+  function presidentAppShellUrl() {
+    return "../index.html?app=president";
   }
 
   function detect() {
@@ -200,6 +204,8 @@
     prefectureToRegionId: prefectureToRegionId,
     isPrefectureInRegion: isPrefectureInRegion,
     mintukuEntryUrl: mintukuEntryUrl,
-    appShellUrl: appShellUrl
+    presidentEntryUrl: presidentEntryUrl,
+    appShellUrl: appShellUrl,
+    presidentAppShellUrl: presidentAppShellUrl
   };
 })(typeof window !== "undefined" ? window : globalThis);

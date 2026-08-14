@@ -130,6 +130,62 @@ img {
   font-weight: 500;
 }
 
+/* [プレジデント] ログインブランド */
+.login-brand-president {
+  margin: 0 0 40px;
+}
+
+.login-president-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: min(86vw, 300px);
+  margin: 24px auto 18px;
+  font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: 0.02em;
+}
+
+.login-president-line1 {
+  align-self: stretch;
+  text-align: left;
+  font-size: clamp(1.55rem, 7.2vw, 2.05rem);
+  background: linear-gradient(90deg, #111 0%, #111 55%, #c9a227 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.login-president-line2 {
+  font-size: clamp(1.55rem, 7.2vw, 2.05rem);
+  background: linear-gradient(90deg, #a67c00, #e0c36a 45%, #8a6a12);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.login-president-catch {
+  margin: 0 auto 6px;
+  max-width: 300px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.55;
+  color: #111;
+  text-align: left;
+}
+
+.login-president-sub {
+  margin: 0 auto 8px;
+  max-width: 300px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #111;
+  text-align: right;
+}
+
 .google-btn-host {
   display: flex;
   justify-content: center;
@@ -1410,6 +1466,44 @@ body.has-connect-banner-dock .app-main {
   color: #64748b;
 }
 
+/* [みんつく] みんつく限定チェック */
+.mypage-mintuku-only {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 4px 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mypage-mintuku-only.hidden {
+  display: none;
+}
+
+.mypage-mintuku-only input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #0f766e;
+}
+
+.mypage-mintuku-only-text {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.mypage-mintuku-only-text strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.92rem;
+}
+
 .mypage-actions {
   display: flex;
   flex-direction: column;
@@ -1577,7 +1671,8 @@ body.has-connect-banner-dock .app-main {
 .filter-screen {
   position: fixed;
   inset: 0;
-  z-index: 400;
+  /* loading-overlay(999) より上：取得中でも絞り込みを開ける */
+  z-index: 1100;
   background: var(--bg-soft);
   max-width: 480px;
   margin: 0 auto;
@@ -1871,6 +1966,15 @@ body.has-connect-banner-dock .app-main {
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
+}
+
+/* 必須項目の朱書き ＊（全角・大きめ） */
+.edit-label .req-mark {
+  color: #dc2626;
+  font-weight: 800;
+  font-size: 1.15em;
+  margin-left: 4px;
+  line-height: 1;
 }
 
 .edit-input,
