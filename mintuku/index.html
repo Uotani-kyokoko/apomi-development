@@ -10,6 +10,31 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="みんつく">
   <title>みんつく</title>
+  <script>
+    (function () {
+      var TOKEN_TO_REGION = {
+        m8h3k9qx: "hokkaido",
+        m8t7n2wp: "tohoku",
+        m8k4r1vz: "kanto",
+        m8c5p6yd: "chubu",
+        m8n9s0ue: "kinki",
+        m8g2b8af: "chugoku",
+        m8s1d4jh: "shikoku",
+        m8y6o3lm: "kyushu-okinawa"
+      };
+      var p = new URLSearchParams(location.search);
+      var raw = String(p.get("r") || p.get("region") || "")
+        .trim()
+        .toLowerCase();
+      var region = TOKEN_TO_REGION[raw] || raw;
+      if (!region) return;
+      var link = document.createElement("link");
+      link.rel = "manifest";
+      link.href = "manifest-" + region + ".webmanifest?v=20260814p";
+      document.head.appendChild(link);
+      document.title = "みんつく";
+    })();
+  </script>
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <!--

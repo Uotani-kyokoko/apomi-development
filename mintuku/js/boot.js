@@ -79,5 +79,40 @@
   q.set("r", token);
   if (params.get("splash") === "1") q.set("splash", "1");
 
-  window.location.replace("../index.html?" + q.toString());
+  var mainUrl = "../index.html?" + q.toString();
+
+  function goMain(withInstall) {
+    var url = withInstall ? mainUrl + "&install=1" : mainUrl;
+    window.location.replace(url);
+  }
+
+  if (params.get("install") === "1") {
+    var done = false;
+    function finish() {
+      if (done) return;
+      done = true;
+      goMain(true);
+    }
+    window.addEventListener(
+      "beforeinstallprompt",
+      function (e) {
+        e.preventDefault();
+        try {
+          e.prompt();
+          if (e.userChoice && e.userChoice.finally) {
+            e.userChoice.finally(finish);
+          } else {
+            setTimeout(finish, 400);
+          }
+        } catch (_) {
+          finish();
+        }
+      },
+      { once: true }
+    );
+    setTimeout(finish, 5000);
+    return;
+  }
+
+  window.location.replace(mainUrl);
 })();

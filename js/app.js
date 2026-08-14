@@ -156,7 +156,7 @@
       document.documentElement.style.setProperty("--theme-color", "#ffffff");
       brandPresident?.classList.remove("hidden");
       if (manifestLink) {
-        manifestLink.setAttribute("href", "president/manifest.webmanifest?v=20260814f");
+        manifestLink.setAttribute("href", "president/manifest.webmanifest?v=20260814p");
       }
       if (appleIcon) appleIcon.setAttribute("href", "president/icons/apple-touch-icon.png");
       favicons.forEach((link) => {
@@ -180,7 +180,7 @@
       if (themeMeta) themeMeta.setAttribute("content", "#5B6CFF");
       document.documentElement.style.setProperty("--theme-color", "#5B6CFF");
       if (manifestLink) {
-        manifestLink.setAttribute("href", "manifest.webmanifest?v=20260814n");
+        manifestLink.setAttribute("href", "manifest.webmanifest?v=20260814p");
       }
       if (appleIcon) appleIcon.setAttribute("href", "icons/apple-touch-icon.png");
       favicons.forEach((link) => {
@@ -206,7 +206,7 @@
     if (manifestLink && state.mintukuRegion) {
       manifestLink.setAttribute(
         "href",
-        `mintuku/manifest-${state.mintukuRegion}.webmanifest?v=20260813a`
+        `mintuku/manifest-${state.mintukuRegion}.webmanifest?v=20260814p`
       );
     }
     if (appleIcon) appleIcon.setAttribute("href", "mintuku/icons/apple-touch-icon.png");
@@ -1998,6 +1998,87 @@
 
   /* ---------- PWA インストール（Apomy / みんつく / PM を別アプリとして追加） ---------- */
   let deferredInstallPrompt = null;
+  let deferredInstallPromptKey = "";
+
+  function installRetryStorageKey() {
+    return `apomy_install_retry_${getInstallAppKey()}`;
+  }
+
+  function clearInstallRetryFlag() {
+    try {
+      sessionStorage.removeItem(installRetryStorageKey());
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function getInstallEntryUrl() {
+    if (isPresidentMode()) {
+      return "president/index.html?install=1";
+    }
+    if (isMintukuMode() && state.mintukuRegion && typeof AppMode !== "undefined") {
+      const token = AppMode.regionToken(state.mintukuRegion) || state.mintukuRegion;
+      return `mintuku/index.html?r=${encodeURIComponent(token)}&install=1`;
+    }
+    const params = new URLSearchParams(window.location.search);
+    params.set("install", "1");
+    const qs = params.toString();
+    return `${window.location.pathname}?${qs}`;
+  }
+
+  function syncDeferredInstallPromptForMode() {
+    if (deferredInstallPrompt && deferredInstallPromptKey !== getInstallAppKey()) {
+      deferredInstallPrompt = null;
+      deferredInstallPromptKey = "";
+    }
+  }
+
+  async function runDeferredInstallPrompt() {
+    if (!deferredInstallPrompt) return false;
+    try {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      deferredInstallPromptKey = "";
+      updateInstallButtonVisibility();
+      if (choice?.outcome === "accepted") {
+        clearInstallRetryFlag();
+        showToast(`${getInstallAppLabel()}をホーム画面に追加しました`);
+      }
+      return true;
+    } catch (err) {
+      console.warn(err);
+      deferredInstallPrompt = null;
+      deferredInstallPromptKey = "";
+      return false;
+    }
+  }
+
+  function tryAutoInstallFromQuery() {
+    if (isIosDevice()) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("install") !== "1") return;
+
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      params.delete("install");
+      const qs = params.toString();
+      const next = `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`;
+      window.history.replaceState(null, "", next);
+    };
+
+    const onPrompt = (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      deferredInstallPromptKey = getInstallAppKey();
+      void runDeferredInstallPrompt().finally(finish);
+    };
+
+    window.addEventListener("beforeinstallprompt", onPrompt, { once: true });
+    setTimeout(finish, 5000);
+  }
 
   function isRunningStandalone() {
     try {
@@ -2056,6 +2137,7 @@
   }
 
   function updateInstallButtonVisibility() {
+    syncDeferredInstallPromptForMode();
     const btn = $("#btn-install-app");
     if (!btn) return;
     const show = state.activeTab === "mypage" && canShowInstallButton();
@@ -2093,21 +2175,30 @@
   }
 
   async function handleInstallAppClick() {
+    syncDeferredInstallPromptForMode();
     if (deferredInstallPrompt) {
-      try {
-        deferredInstallPrompt.prompt();
-        const choice = await deferredInstallPrompt.userChoice;
-        deferredInstallPrompt = null;
-        updateInstallButtonVisibility();
-        if (choice?.outcome === "accepted") {
-          showToast(`${getInstallAppLabel()}をホーム画面に追加しました`);
-        }
-      } catch (err) {
-        console.warn(err);
-        openInstallGuide();
-      }
-      return;
+      const ok = await runDeferredInstallPrompt();
+      if (ok) return;
     }
+
+    if (!isIosDevice()) {
+      let retried = false;
+      try {
+        retried = sessionStorage.getItem(installRetryStorageKey()) === "1";
+      } catch {
+        /* ignore */
+      }
+      if (!retried) {
+        try {
+          sessionStorage.setItem(installRetryStorageKey(), "1");
+        } catch {
+          /* ignore */
+        }
+        window.location.href = getInstallEntryUrl();
+        return;
+      }
+    }
+
     openInstallGuide();
   }
 
@@ -2115,10 +2206,13 @@
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       deferredInstallPrompt = e;
+      deferredInstallPromptKey = getInstallAppKey();
       updateInstallButtonVisibility();
     });
     window.addEventListener("appinstalled", () => {
       deferredInstallPrompt = null;
+      deferredInstallPromptKey = "";
+      clearInstallRetryFlag();
       closeInstallGuide();
       updateInstallButtonVisibility();
       showToast(`${getInstallAppLabel()}をホーム画面に追加しました`);
@@ -4445,6 +4539,7 @@
   function bindEvents() {
     bindDevLogoutOnHeaderTitle();
     bindInstallAppEvents();
+    tryAutoInstallFromQuery();
     bindConnectJumpEvents();
 
     $("#access-denied-back-login")?.addEventListener("click", () => {

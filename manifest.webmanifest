@@ -3,7 +3,7 @@
   "short_name": "apomy",
   "description": "ビジネスマッチング",
   "id": "/apomy",
-  "start_url": "./index.html",
+  "start_url": "./index.html?app=apomy",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
