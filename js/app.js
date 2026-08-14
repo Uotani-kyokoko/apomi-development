@@ -146,14 +146,17 @@
     brandMintuku?.classList.add("hidden");
     brandPresident?.classList.add("hidden");
 
+    document.body.classList.toggle("app-president", isPresidentMode());
+    document.body.classList.toggle("app-mintuku", isMintukuMode());
+
     if (isPresidentMode()) {
       document.title = "プレジデントメイト";
       if (appleTitle) appleTitle.setAttribute("content", "PRESIDENT MATE");
-      if (themeMeta) themeMeta.setAttribute("content", "#1a1a1a");
-      document.documentElement.style.setProperty("--theme-color", "#1a1a1a");
+      if (themeMeta) themeMeta.setAttribute("content", "#ffffff");
+      document.documentElement.style.setProperty("--theme-color", "#ffffff");
       brandPresident?.classList.remove("hidden");
       if (manifestLink) {
-        manifestLink.setAttribute("href", "president/manifest.webmanifest?v=20260814c");
+        manifestLink.setAttribute("href", "president/manifest.webmanifest?v=20260814d");
       }
       if (appleIcon) appleIcon.setAttribute("href", "president/icons/apple-touch-icon.png");
       favicons.forEach((link) => {
@@ -964,7 +967,9 @@
         : genderKey === "other"
           ? "gender-other"
           : "gender-male";
-    const presidentClass = user.presidentMark ? " is-president" : "";
+    // プレジデントメイトは全員社長のため帯の暗色カードは使わず白背景のまま
+    const presidentClass =
+      user.presidentMark && !isPresidentMode() ? " is-president" : "";
     const femaleOnlyClass = isFemaleOnlyConnect(user) ? " female-only" : "";
     const avatar = normalizeAvatarUrl(user.avatarUrl, user.name);
 
@@ -3738,6 +3743,10 @@
     }
     if (!profile.jobTitle) {
       showToast("職種を選択してください");
+      return;
+    }
+    if (!profile.annualSpend) {
+      showToast("人脈拡大の為の年間経費（非公開）を選択してください");
       return;
     }
     if (profile._snsError) {

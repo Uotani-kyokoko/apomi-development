@@ -46,6 +46,13 @@ body {
   overflow-x: hidden;
 }
 
+/* プレジデントメイト: 画面背景は白 */
+body.app-president {
+  --bg-soft: #ffffff;
+  --bg-page: #ffffff;
+  background: #ffffff;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
