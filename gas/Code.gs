@@ -57,10 +57,10 @@ var MAINTENANCE_MESSAGE =
 
 
 // コンテナバインド（スプレッドシートに紐付いたスクリプト）なら空文字のままでOK
-// === BEGIN ENV (prod) ===
-const SPREADSHEET_ID = '1Asat_NahAxVEIwfF0nlDl7BgNGU3M2InXIGJ_2FZXl8';
-const AVATAR_FOLDER_ID = '1leOZAJ8EZI9cZO3E_Eo6MyHabidRDnNm';
-const APPLICATION_FOLDER_ID = '16LAv_PthEplEv6GJo_DoU-NkF0pCBZAr';
+// === BEGIN ENV (dev) ===
+const SPREADSHEET_ID = '1JNnkjKwUwNY9OnCAkIvZE_5yOi0xJyUcHzdpBWhhu64';
+const AVATAR_FOLDER_ID = '1Dl3UOzrbFwvK8FGUEK7ZVjZ95qUqIXvV';
+const APPLICATION_FOLDER_ID = '1KH9tpnep8-0RFGjpC45kiciVRWH6c26g';
 // === END ENV ===
 
 
@@ -422,6 +422,7 @@ function assertMintukuViewerAccessLight_(p, regionIdOpt) {
   if (!email && !memberNo) return;
 
   var ctx = openUserCtx_(memberNo, email);
+  assertMintukuLoginAllowed_(ctx.row, 'mintuku');
   var access = evaluateMintukuAccess_(ctx.row);
   if (!access.ok) {
     throw new Error(
@@ -704,6 +705,44 @@ function assertApomyLoginAllowed_(row, appKind) {
   if (!isRegistrationComplete_(row)) return;
   throw new Error(
     'APOMY_UNPUBLISHED:掲載が停止されているためログインできません'
+  );
+}
+
+/** シート上で明示的に FALSE か（空欄は未設定扱い） */
+function isExplicitFalse_(v) {
+  if (v === false || v === 0) return true;
+  var s = String(v == null ? '' : v).trim().toUpperCase();
+  return s === 'FALSE' || s === '0' || s === 'NO' || s === '×' || s === 'いいえ';
+}
+
+/**
+ * [みんつく] みんつく掲載=FALSE の完了会員はみんつくからログイン不可
+ * ※空欄は初回利用として許可。Apomy掲載停止とは独立
+ */
+function assertMintukuLoginAllowed_(row, appKind) {
+  var kind = String(appKind || '').trim().toLowerCase();
+  if (kind !== 'mintuku') return;
+  if (!isExplicitFalse_(row['みんつく掲載'])) return;
+  if (!isRegistrationComplete_(row)) return;
+  throw new Error(
+    'MINTUKU_UNPUBLISHED:掲載が停止されているためログインできません'
+  );
+}
+
+/**
+ * [プレジデント] プレジデントメイト掲載=FALSE の完了会員は PM からログイン不可
+ * ※空欄は掲載扱い。社長マーク未承認は従来どおり PRESIDENT_DENIED
+ */
+function assertPresidentLoginAllowed_(row, appKind) {
+  var kind = String(appKind || '').trim().toLowerCase();
+  if (kind !== 'president' && kind !== 'presidentmate') return;
+  if (!toBool_(row['社長マーク'])) {
+    throw new Error('PRESIDENT_DENIED:Apomyにて社長マークの承認をお願いします');
+  }
+  if (!isExplicitFalse_(row['プレジデントメイト掲載'])) return;
+  if (!isRegistrationComplete_(row)) return;
+  throw new Error(
+    'PRESIDENT_UNPUBLISHED:掲載が停止されているためログインできません'
   );
 }
 
@@ -1138,9 +1177,7 @@ function assertPresidentViewerAccessLight_(p) {
   var email = String(p.email || '').trim();
   if (!memberNo && !email) return; // 未ログインは FE 側で弾く
   var ctx = openUserCtx_(memberNo, email);
-  if (!toBool_(ctx.row['社長マーク'])) {
-    throw new Error('PRESIDENT_DENIED:Apomyにて社長マークの承認をお願いします');
-  }
+  assertPresidentLoginAllowed_(ctx.row, 'president');
 }
 
 /** [プレジデント] 掲載のON/OFF */
@@ -1428,6 +1465,8 @@ function touchActivity_(body) {
 
   var appKindTouch = String((body && body.app) || '').trim().toLowerCase();
   assertApomyLoginAllowed_(ctx.row, appKindTouch);
+  assertMintukuLoginAllowed_(ctx.row, appKindTouch);
+  assertPresidentLoginAllowed_(ctx.row, appKindTouch);
 
   const now = formatDateTime_(new Date());
   setCtxValue_(ctx, '最終ログイン日時', now);
@@ -1735,6 +1774,8 @@ function login_(body) {
   if (rowNumber >= 2) {
     var ctx = loadUserRowCtx_(sheet, headers, rowNumber);
     assertApomyLoginAllowed_(ctx.row, appKind);
+    assertMintukuLoginAllowed_(ctx.row, appKind);
+    assertPresidentLoginAllowed_(ctx.row, appKind);
     setCtxValue_(ctx, '最終ログイン日時', now);
     if (googleId) setCtxValue_(ctx, 'GoogleID', googleId);
     if (picture) {

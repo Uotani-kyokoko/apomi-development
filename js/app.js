@@ -1633,7 +1633,7 @@
     const stopApomy = $("#btn-stop-listing");
     const stopApomyMintuku = $("#btn-stop-apomy-from-mintuku");
     const resumeApomyMintuku = $("#btn-resume-apomy-from-mintuku");
-    const resumeMintuku = $("#btn-resume-mintuku-listing");
+    const stopPresident = $("#btn-stop-president-listing");
     if (stopApomyMintuku) {
       stopApomyMintuku.textContent = "全国の人とはつながりたくない方";
     }
@@ -1673,17 +1673,14 @@
       }
     }
 
-    // [みんつく] 掲載スイッチ分離 / [プレジデント] PM掲載 / [Apomy] 従来の掲載停止1つ
+    // [みんつく] 自アプリの掲載停止・再開はボタンではできない（スプシのみ）
+    // [プレジデント] 停止のみ可。再開はオーナーへ
     const published = user?.isPublished !== false;
-    const mintukuOn = Boolean(user?.mintukuListed);
     const presidentOn = isPresidentMateListed(user);
-    const stopPresident = $("#btn-stop-president-listing");
-    const resumePresident = $("#btn-resume-president-listing");
 
     if (isPresidentMode()) {
       stopApomy?.classList.add("hidden");
       resumeApomyMintuku?.classList.add("hidden");
-      resumeMintuku?.classList.add("hidden");
       salonBtn?.classList.add("hidden");
       presidentBtn?.classList.add("hidden");
       if (published) {
@@ -1695,15 +1692,12 @@
       }
       if (presidentOn) {
         stopPresident?.classList.remove("hidden");
-        resumePresident?.classList.add("hidden");
       } else {
         stopPresident?.classList.add("hidden");
-        resumePresident?.classList.remove("hidden");
       }
     } else if (isMintukuMode()) {
       stopApomy?.classList.add("hidden");
       stopPresident?.classList.add("hidden");
-      resumePresident?.classList.add("hidden");
       if (published) {
         stopApomyMintuku?.classList.remove("hidden");
         resumeApomyMintuku?.classList.add("hidden");
@@ -1711,18 +1705,11 @@
         stopApomyMintuku?.classList.add("hidden");
         resumeApomyMintuku?.classList.remove("hidden");
       }
-      if (mintukuOn) {
-        resumeMintuku?.classList.add("hidden");
-      } else {
-        resumeMintuku?.classList.remove("hidden");
-      }
     } else {
       stopApomy?.classList.remove("hidden");
       stopApomyMintuku?.classList.add("hidden");
       resumeApomyMintuku?.classList.add("hidden");
-      resumeMintuku?.classList.add("hidden");
       stopPresident?.classList.add("hidden");
-      resumePresident?.classList.add("hidden");
       salonBtn?.classList.remove("hidden");
       presidentBtn?.classList.remove("hidden");
     }
@@ -1746,38 +1733,49 @@
     );
   }
 
-  function isApomyUnpublishedError(err) {
+  function isListingUnpublishedError(err) {
     const msg = String(err?.message || err || "");
     return (
       msg.indexOf("APOMY_UNPUBLISHED:") === 0 ||
+      msg.indexOf("MINTUKU_UNPUBLISHED:") === 0 ||
+      msg.indexOf("PRESIDENT_UNPUBLISHED:") === 0 ||
       msg.indexOf("掲載が停止されているためログインできません") >= 0 ||
       msg.indexOf("Apomyの掲載が停止") >= 0
     );
   }
 
-  function apomyUnpublishedMessage(raw) {
-    const msg = String(raw || "").replace(/^APOMY_UNPUBLISHED:/, "").trim();
+  function listingUnpublishedMessage(raw) {
+    const msg = String(raw || "")
+      .replace(/^APOMY_UNPUBLISHED:/, "")
+      .replace(/^MINTUKU_UNPUBLISHED:/, "")
+      .replace(/^PRESIDENT_UNPUBLISHED:/, "")
+      .trim();
     if (msg.indexOf("掲載が停止されているためログインできません") >= 0) return msg;
     return "掲載が停止されているためログインできません";
   }
 
-  /** [Apomy] 掲載停止済みの完了会員（GAS assertApomyLoginAllowed_ と同条件） */
-  function isApomyUnpublishedBlockedUser(user) {
-    if (isMintukuMode() || isPresidentMode() || !user) return false;
-    if (user.isNew) return false;
-    if (user.isPublished !== false) return false;
-    return !needsProfileSetup(user);
+  /** 掲載停止済みの完了会員（GAS の login assert と同条件） */
+  function isListingUnpublishedBlockedUser(user) {
+    if (!user || user.isNew) return false;
+    if (needsProfileSetup(user)) return false;
+    if (isMintukuMode()) {
+      return user.mintukuListed === false && Boolean(String(user.mintukuFirstLoginAt || "").trim());
+    }
+    if (isPresidentMode()) {
+      return !isPresidentMateListed(user);
+    }
+    return user.isPublished === false;
   }
 
   /** @returns {boolean} 続行してよいとき true */
-  function guardApomyAccess(user) {
-    if (!isApomyUnpublishedBlockedUser(user)) return true;
-    handleApomyUnpublished();
+  function guardListingAccess(user) {
+    if (!isListingUnpublishedBlockedUser(user)) return true;
+    handleListingUnpublished();
     return false;
   }
 
-  function handleApomyUnpublished(message) {
-    showToast(apomyUnpublishedMessage(message));
+  function handleListingUnpublished(message) {
+    showToast(listingUnpublishedMessage(message));
     invalidateUsersCache();
     state.allUsers = [];
     try {
@@ -2981,8 +2979,8 @@
           handlePresidentDenied();
           throw reason;
         }
-        if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(reason)) {
-          handleApomyUnpublished(reason.message);
+        if (isListingUnpublishedError(reason)) {
+          handleListingUnpublished(reason.message);
           throw reason;
         }
         const detail = String(reason?.message || reason || "").trim();
@@ -3037,8 +3035,8 @@
             handlePresidentDenied();
             return;
           }
-          if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(err)) {
-            handleApomyUnpublished(err.message);
+          if (isListingUnpublishedError(err)) {
+            handleListingUnpublished(err.message);
             return;
           }
           console.error("me failed", err);
@@ -3055,7 +3053,7 @@
         if (wasNew) state.currentUser.isNew = true;
         lastTouchAt = Date.now();
         applyMyActivity(meRes.data.lastLoginAt);
-        if (!guardApomyAccess(state.currentUser)) return;
+        if (!guardListingAccess(state.currentUser)) return;
         if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
         if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
@@ -3063,7 +3061,7 @@
           return;
         }
       } else if (skipMe && state.currentUser) {
-        if (!guardApomyAccess(state.currentUser)) return;
+        if (!guardListingAccess(state.currentUser)) return;
         if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
         if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && state.currentUser.mintukuAccessOk === false) {
@@ -4192,7 +4190,7 @@
         memberNo: user.id,
         name: user.nickname || user.name || ""
       });
-      if (!guardApomyAccess(user)) return;
+      if (!guardListingAccess(user)) return;
       showToast("ログインしました");
       applyMyActivity(user.lastLoginAt);
       lastTouchAt = Date.now();
@@ -4207,8 +4205,8 @@
         forceLogoutForMaintenance(err.message);
       } else if (isPresidentMode() && isPresidentDeniedError(err)) {
         handlePresidentDenied();
-      } else if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(err)) {
-        handleApomyUnpublished(err.message);
+      } else if (isListingUnpublishedError(err)) {
+        handleListingUnpublished(err.message);
       } else {
         showToast(err.message || "ログインに失敗しました");
       }
@@ -4360,7 +4358,7 @@
     try {
       const meRes = await GasAPI.fetchCurrentUser(identityForApi(state.identity));
       const user = meRes.data;
-      if (!guardApomyAccess(user)) return;
+      if (!guardListingAccess(user)) return;
       state.currentUser = user;
       const welcomeName = displayNameOf(user) || saved.name || "会員";
       showToast("ようこそ、" + welcomeName + "さん");
@@ -4375,8 +4373,8 @@
         showMintukuExpiredScreen(err);
       } else if (isPresidentMode() && isPresidentDeniedError(err)) {
         handlePresidentDenied();
-      } else if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(err)) {
-        handleApomyUnpublished(err.message);
+      } else if (isListingUnpublishedError(err)) {
+        handleListingUnpublished(err.message);
       } else {
         showToast(err.message || "セッションの復元に失敗しました");
         showLogin();
@@ -4670,28 +4668,8 @@
       }
     });
 
-    $("#btn-resume-mintuku-listing")?.addEventListener("click", async () => {
-      if (!confirm("みんつくの掲載を再開しますか？")) return;
-      try {
-        showLoading(true);
-        const res = await GasAPI.resumeMintukuListing(identityForApi());
-        if (state.currentUser) {
-          state.currentUser.mintukuListed = res.data?.mintukuListed !== false;
-        }
-        applyMyActivity(res.data?.lastLoginAt);
-        updateMypageActionLabels(state.currentUser);
-        invalidateUsersCache();
-        showToast("みんつくの掲載を再開しました");
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "再開に失敗しました");
-      } finally {
-        showLoading(false);
-      }
-    });
-
     $("#btn-stop-president-listing")?.addEventListener("click", async () => {
-      if (!confirm("プレジデントメイトの掲載を停止しますか？")) return;
+      if (!confirm("掲載を停止してよいですか？※再開する際はオーナーへ連絡ください")) return;
       try {
         showLoading(true);
         const res = await GasAPI.stopPresidentListing(identityForApi());
@@ -4699,36 +4677,22 @@
           state.currentUser.presidentMateListed = false;
         }
         applyMyActivity(res.data?.lastLoginAt);
-        updateMypageActionLabels(state.currentUser);
         invalidateUsersCache();
         showToast("プレジデントメイトの掲載を停止しました");
+        try {
+          Session.clear();
+        } catch (_) {
+          /* ignore */
+        }
+        state.isLoggedIn = false;
+        state.currentUser = null;
+        state.identity = null;
+        state.allUsers = [];
+        $("#app-screen")?.classList.add("hidden");
+        $("#login-screen")?.classList.remove("hidden");
       } catch (err) {
         console.error(err);
         showToast(err.message || "停止に失敗しました");
-      } finally {
-        showLoading(false);
-      }
-    });
-
-    $("#btn-resume-president-listing")?.addEventListener("click", async () => {
-      if (!confirm("プレジデントメイトの掲載を再開しますか？")) return;
-      try {
-        showLoading(true);
-        const res = await GasAPI.resumePresidentListing(identityForApi());
-        if (state.currentUser) {
-          state.currentUser.presidentMateListed =
-            res.data?.presidentMateListed !== false;
-          if (res.data?.presidentNumber) {
-            state.currentUser.presidentNumber = res.data.presidentNumber;
-          }
-        }
-        applyMyActivity(res.data?.lastLoginAt);
-        updateMypageActionLabels(state.currentUser);
-        invalidateUsersCache();
-        showToast("プレジデントメイトの掲載を再開しました");
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "再開に失敗しました");
       } finally {
         showLoading(false);
       }
