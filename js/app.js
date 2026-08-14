@@ -4612,7 +4612,7 @@
         window.location.assign(url);
         return;
       }
-      showToast("社長申請許可された方のみ、\nアクセス可能となっています。");
+      showToast("社長申請許可された方のみ、アクセス可能となっています。");
     });
 
     $("#btn-search").addEventListener("click", () => {
