@@ -221,6 +221,17 @@
     return base;
   }
 
+  function dashboardFetchParams() {
+    const params = {};
+    if (isMintukuMode() && state.mintukuRegion) {
+      params.app = "mintuku";
+      params.region = state.mintukuRegion;
+    } else if (isPresidentMode()) {
+      params.app = "president";
+    }
+    return params;
+  }
+
   function mintukuRegionLabel() {
     if (typeof AppMode === "undefined") return "";
     const meta = AppMode.getRegionMeta(state.mintukuRegion);
@@ -924,6 +935,7 @@
   let lastTouchAt = 0;
   const TOUCH_MIN_INTERVAL_MS = 90 * 1000; // 連打でGASを叩かない
   let lastDashboardAt = 0;
+  let lastDashboardKey = "";
   const DASHBOARD_CACHE_MS = 5 * 60 * 1000;
 
   function scheduleTouchActivity(force = false) {
@@ -1028,6 +1040,10 @@
     const returning = $("#dash-returning");
     const bars = $("#dash-bars");
     const chartTotal = $("#dash-chart-total");
+    const compactDash = isMintukuMode() || isPresidentMode();
+    $$(".dash-card-extra").forEach((card) => {
+      card.classList.toggle("hidden", compactDash);
+    });
 
     if (!data) {
       if (total) total.textContent = "—";
@@ -1073,23 +1089,30 @@
   }
 
   async function loadDashboardStats() {
+    const dashKey = JSON.stringify(dashboardFetchParams());
     // 直近取得済みなら再取得しない（ホーム切替の体感を速く）
-    if (state.dashboard && Date.now() - lastDashboardAt < DASHBOARD_CACHE_MS) {
+    if (
+      state.dashboard &&
+      Date.now() - lastDashboardAt < DASHBOARD_CACHE_MS &&
+      lastDashboardKey === dashKey
+    ) {
       renderDashboard(state.dashboard);
       return;
     }
     try {
-      const res = await GasAPI.fetchDashboard();
+      const res = await GasAPI.fetchDashboard(dashboardFetchParams());
       state.dashboard = res.data || null;
       lastDashboardAt = Date.now();
+      lastDashboardKey = dashKey;
       renderDashboard(state.dashboard);
       writeBootCache();
     } catch (err) {
       console.error(err);
       try {
-        const mock = await MockAPI.fetchDashboard();
+        const mock = await MockAPI.fetchDashboard(dashboardFetchParams());
         state.dashboard = mock.data || null;
         lastDashboardAt = Date.now();
+        lastDashboardKey = dashKey;
         renderDashboard(state.dashboard);
       } catch (e2) {
         console.error(e2);
@@ -1610,8 +1633,10 @@
     const stopApomy = $("#btn-stop-listing");
     const stopApomyMintuku = $("#btn-stop-apomy-from-mintuku");
     const resumeApomyMintuku = $("#btn-resume-apomy-from-mintuku");
-    const stopMintuku = $("#btn-stop-mintuku-listing");
     const resumeMintuku = $("#btn-resume-mintuku-listing");
+    if (stopApomyMintuku) {
+      stopApomyMintuku.textContent = "全国の人とはつながりたくない方";
+    }
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
     const salonName = state.salonLabel || "井口智明オンラインサロン";
@@ -1657,12 +1682,17 @@
 
     if (isPresidentMode()) {
       stopApomy?.classList.add("hidden");
-      stopApomyMintuku?.classList.add("hidden");
       resumeApomyMintuku?.classList.add("hidden");
-      stopMintuku?.classList.add("hidden");
       resumeMintuku?.classList.add("hidden");
       salonBtn?.classList.add("hidden");
       presidentBtn?.classList.add("hidden");
+      if (published) {
+        stopApomyMintuku?.classList.remove("hidden");
+        resumeApomyMintuku?.classList.add("hidden");
+      } else {
+        stopApomyMintuku?.classList.add("hidden");
+        resumeApomyMintuku?.classList.remove("hidden");
+      }
       if (presidentOn) {
         stopPresident?.classList.remove("hidden");
         resumePresident?.classList.add("hidden");
@@ -1682,17 +1712,14 @@
         resumeApomyMintuku?.classList.remove("hidden");
       }
       if (mintukuOn) {
-        stopMintuku?.classList.remove("hidden");
         resumeMintuku?.classList.add("hidden");
       } else {
-        stopMintuku?.classList.add("hidden");
         resumeMintuku?.classList.remove("hidden");
       }
     } else {
       stopApomy?.classList.remove("hidden");
       stopApomyMintuku?.classList.add("hidden");
       resumeApomyMintuku?.classList.add("hidden");
-      stopMintuku?.classList.add("hidden");
       resumeMintuku?.classList.add("hidden");
       stopPresident?.classList.add("hidden");
       resumePresident?.classList.add("hidden");
@@ -2008,6 +2035,13 @@
     });
   }
 
+  function updateFilterOpenBar() {
+    const bar = $("#filter-open-bar");
+    if (!bar) return;
+    const show = state.activeTab === "home" || state.activeTab === "connect";
+    bar.classList.toggle("hidden", !show);
+  }
+
   function switchTab(tabId) {
     state.activeTab = tabId;
     $$(".tab-panel").forEach((p) => p.classList.remove("active"));
@@ -2015,6 +2049,7 @@
     $$(".nav-item").forEach((n) => n.classList.remove("active"));
     $(`.nav-item[data-tab="${tabId}"]`)?.classList.add("active");
     updateHeader(tabId);
+    updateFilterOpenBar();
     scheduleTouchActivity();
 
     if (tabId === "connect") {
@@ -2772,10 +2807,11 @@
       if (state.currentUser) updateMypageActionLabels(state.currentUser);
 
       try {
-        const dashboardRes = await GasAPI.fetchDashboard();
+        const dashboardRes = await GasAPI.fetchDashboard(dashboardFetchParams());
         if (dashboardRes?.data) {
           state.dashboard = dashboardRes.data;
           lastDashboardAt = Date.now();
+          lastDashboardKey = JSON.stringify(dashboardFetchParams());
           renderDashboard(state.dashboard);
         }
       } catch (dashErr) {
@@ -3356,7 +3392,7 @@
 
     fillPrefectureSelect("#edit-location", user.location || "");
     fillPrefectureSelect("#edit-hometown", user.hometown || "");
-    applyLocationEditLockState(user);
+    applyLocationEditState(user);
     fillAnnualSpendSelect(user.annualSpend || "");
     // 初回登録、または未掲載の必須入力（掲載停止後の再掲載含む）で表示
     const showPrivacy = Boolean(user.isNew) || (required && user.isPublished === false);
@@ -3534,6 +3570,13 @@
     img.src = normalizeAvatarUrl(url, state.currentUser?.name || "User");
   }
 
+  function getEditLocationValue(user = state.currentUser) {
+    if (canEditLocation(user)) {
+      return ($("#edit-location").value || "").trim();
+    }
+    return String(user?.location || "").trim();
+  }
+
   function collectEditForm() {
     syncEditSnsFromDom();
     const lineRaw = ($("#edit-line-url")?.value || "").trim();
@@ -3568,7 +3611,7 @@
       ageGroup: getSelectedChipValue("#edit-age-chips"),
       industry: $("#edit-industry").value || "",
       jobTitle: ($("#edit-job")?.value || "").trim(),
-      location: ($("#edit-location").value || "").trim(),
+      location: getEditLocationValue(),
       hometown: ($("#edit-hometown").value || "").trim(),
       avatarUrl: ($("#edit-avatar").value || "").trim(),
       bio,
@@ -3660,25 +3703,25 @@
     }
   }
 
-  function applyLocationEditLockState(user) {
+  function canEditLocation(user) {
+    if (!user) return false;
+    return !String(user?.location || "").trim();
+  }
+
+  function updateLocationEditState(user = state.currentUser) {
     const sel = $("#edit-location");
     const help = $("#edit-location-help");
-    if (!sel) return;
-    const locked = Boolean(user?.locationChangeLocked);
-    sel.disabled = locked;
+    const editable = canEditLocation(user);
+    if (sel) sel.disabled = !editable;
     if (help) {
-      if (locked) {
-        const next = String(user.locationChangeNextDate || "").trim();
-        help.textContent = next
-          ? `現在地は変更後30日間、新たな変更はできません（次回変更可能日: ${next}）`
-          : "現在地は変更後30日間、新たな変更はできません";
-      } else if (String(user?.location || "").trim()) {
-        help.textContent =
-          "現在地を変更すると、変更後30日間は新たな変更はできません。地方が変わる場合はみんつく番号も付け直されます。";
-      } else {
-        help.textContent = "お引越しする際は現在地の変更とオーナーへお問合せください";
-      }
+      help.textContent = editable
+        ? "※現在地選択が可能なのは初回のみです"
+        : "※現在地を変更する際はオーナーへ連絡してください。";
     }
+  }
+
+  function applyLocationEditState(user) {
+    updateLocationEditState(user);
   }
 
   async function saveProfile(e) {
@@ -3714,19 +3757,12 @@
     const prevLocation = String(state.currentUser?.location || "").trim();
     const nextLocation = String(profile.location || "").trim();
     if (prevLocation && nextLocation && prevLocation !== nextLocation) {
-      if (state.currentUser?.locationChangeLocked) {
-        const next = String(state.currentUser.locationChangeNextDate || "").trim();
-        showToast(
-          next
-            ? `現在地は変更後30日間、新たな変更はできません（次回変更可能日: ${next}）`
-            : "現在地は変更後30日間、新たな変更はできません"
-        );
-        return;
-      }
-      const ok = confirm(
-        "現在地は変更後30日間、新たな変更はできません。\n変更してよろしいですか？"
-      );
-      if (!ok) return;
+      showToast("現在地を変更する際はオーナーへ連絡してください。");
+      return;
+    }
+    if (!canEditLocation(state.currentUser) && nextLocation !== prevLocation) {
+      showToast("現在地を変更する際はオーナーへ連絡してください。");
+      return;
     }
     if (!profile.industry) {
       showToast("業種を選択してください");
@@ -4490,9 +4526,12 @@
       }
     });
 
-    // [みんつく] Apomy掲載のみ停止（みんつくには残る）
+    // [みんつく / PM] Apomy掲載のみ停止（地方・PM掲載は残る）
     $("#btn-stop-apomy-from-mintuku")?.addEventListener("click", async () => {
-      if (!confirm("Apomy（全国）の掲載だけを停止しますか？\nみんつくには引き続き掲載されます。")) return;
+      const msg = isPresidentMode()
+        ? "Apomyの掲載を停止します。※プレジデントメイトの掲載は残ります。"
+        : "Apomyの掲載を停止します。※みんつくの掲載は残ります。";
+      if (!confirm(msg)) return;
       try {
         showLoading(true);
         const res = await GasAPI.stopListing(identityForApi());
@@ -4539,26 +4578,6 @@
       } catch (err) {
         console.error(err);
         showToast(err.message || "再開に失敗しました");
-      } finally {
-        showLoading(false);
-      }
-    });
-
-    $("#btn-stop-mintuku-listing")?.addEventListener("click", async () => {
-      if (!confirm("みんつくの掲載を停止しますか？")) return;
-      try {
-        showLoading(true);
-        const res = await GasAPI.stopMintukuListing(identityForApi());
-        if (state.currentUser) {
-          state.currentUser.mintukuListed = false;
-        }
-        applyMyActivity(res.data?.lastLoginAt);
-        updateMypageActionLabels(state.currentUser);
-        invalidateUsersCache();
-        showToast("みんつくの掲載を停止しました");
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "停止に失敗しました");
       } finally {
         showLoading(false);
       }

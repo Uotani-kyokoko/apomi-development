@@ -175,10 +175,10 @@ const GasAPI = (() => {
       return get('settings');
     },
 
-    async fetchDashboard() {
-      if (!USE_GAS) return MockAPI.fetchDashboard();
+    async fetchDashboard(params = {}) {
+      if (!USE_GAS) return MockAPI.fetchDashboard(params);
       try {
-        return await get('dashboard');
+        return await get('dashboard', params);
       } catch (err) {
         // 旧デプロイ時は未掲載込み一覧からフロント集計
         console.warn('[apomy] dashboard API fallback', err);

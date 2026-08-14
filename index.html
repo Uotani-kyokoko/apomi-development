@@ -18,7 +18,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260814g">
+  <link rel="stylesheet" href="css/style.css?v=20260814h">
   <!-- GSI は早めに読み込み（ログインボタン表示を速くする） -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -116,6 +116,14 @@
       </button>
     </header>
 
+    <div id="filter-open-bar" class="filter-open-bar hidden">
+      <button id="search-open-btn" class="search-bar-btn" type="button">
+        <i class="fa-solid fa-sliders"></i>
+        <span>条件から絞り込む</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </button>
+    </div>
+
     <main class="app-main">
 
       <!-- ホームタブ -->
@@ -136,12 +144,12 @@
               <p class="dash-value" id="dash-new">—</p>
               <p class="dash-unit">人</p>
             </article>
-            <article class="dash-card" role="listitem">
+            <article class="dash-card dash-card-extra" role="listitem">
               <p class="dash-label">昨日の掲載停止者</p>
               <p class="dash-value" id="dash-unpublished">—</p>
               <p class="dash-unit">人</p>
             </article>
-            <article class="dash-card" role="listitem">
+            <article class="dash-card dash-card-extra" role="listitem">
               <p class="dash-label">昨日の再参加者</p>
               <p class="dash-value" id="dash-returning">—</p>
               <p class="dash-unit">人</p>
@@ -155,11 +163,6 @@
             <div id="dash-bars" class="dash-bars" aria-hidden="true"></div>
           </div>
         </section>
-        <button id="search-open-btn" class="search-bar-btn" type="button">
-          <i class="fa-solid fa-sliders"></i>
-          <span>条件から絞り込む</span>
-          <i class="fa-solid fa-chevron-down"></i>
-        </button>
         <div id="banner-list" class="banner-list"></div>
       </section>
 
@@ -178,9 +181,8 @@
           <button id="btn-salon" class="mypage-link" type="button">井口智明オンラインサロン掲載を申請</button>
           <button id="btn-president-badge" class="mypage-link" type="button">社長マーク掲載を申請</button>
           <button id="btn-stop-listing" class="mypage-link" type="button">掲載停止</button>
-          <button id="btn-stop-apomy-from-mintuku" class="mypage-link hidden" type="button">Apomyの掲載を停止</button>
+          <button id="btn-stop-apomy-from-mintuku" class="mypage-link hidden" type="button">全国の人とはつながりたくない方</button>
           <button id="btn-resume-apomy-from-mintuku" class="mypage-link hidden" type="button">Apomyの掲載を再開</button>
-          <button id="btn-stop-mintuku-listing" class="mypage-link hidden" type="button">みんつくの掲載を停止</button>
           <button id="btn-resume-mintuku-listing" class="mypage-link hidden" type="button">みんつくの掲載を再開</button>
           <button id="btn-stop-president-listing" class="mypage-link hidden" type="button">プレジデントメイトの掲載を停止</button>
           <button id="btn-resume-president-listing" class="mypage-link hidden" type="button">プレジデントメイトの掲載を再開</button>
@@ -383,7 +385,7 @@
       <div class="edit-card">
         <label class="edit-label" for="edit-location">現在地<span class="req-mark" aria-hidden="true">＊</span></label>
         <select id="edit-location" name="location" class="filter-select"></select>
-        <p id="edit-location-help" class="edit-help-text">お引越しする際は現在地の変更とオーナーへお問合せください</p>
+        <p id="edit-location-help" class="edit-help-text">※現在地選択が可能なのは初回のみです</p>
       </div>
 
       <div class="edit-card">
@@ -572,10 +574,10 @@
 
   <script src="js/env.js?v=20260805b"></script>
   <script src="js/config.js?v=20260805b"></script>
-  <script src="js/app-mode.js?v=20260814g"></script>
+  <script src="js/app-mode.js?v=20260814h"></script>
   <script src="js/auth.js?v=20260807d"></script>
   <script src="js/mock-api.js?v=20260812a"></script>
-  <script src="js/gas-api.js?v=20260814g"></script>
-  <script src="js/app.js?v=20260814g"></script>
+  <script src="js/gas-api.js?v=20260814h"></script>
+  <script src="js/app.js?v=20260814h"></script>
 </body>
 </html>

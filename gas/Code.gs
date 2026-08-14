@@ -27,8 +27,8 @@
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  *
  * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=…（または r=トークン）で地方一覧。
- * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無 / みんつく課金開始日 / 現在地変更日
- * 現在地変更日: 初回入力後の「変更」時に記録。以降30日間は変更不可（GASで強制）
+ * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無 / みんつく課金開始日
+ * 現在地: 初回のみアプリで設定。変更はオーナー手動。手動変更後の初回ログインでみんつく番号を付け直し
  * みんつく課金開始日: 日付あり＝有料。無料期間は初回ログイン基準、課金後はこの日起算で経過表示
  * Apomy掲載開始時: みんつく掲載=TRUE＋現在地からみんつく番号を採番
  * 一覧: Apomyは掲載中のみ／みんつくはみんつく掲載のみ（相互に独立）
@@ -110,7 +110,7 @@ function doGet(e) {
         data = touchActivity_(p);
         break;
       case 'dashboard':
-        data = getDashboard_();
+        data = getDashboard_(p);
         break;
       case 'ping':
         data = { ok: true, message: 'apomy GAS is alive' };
@@ -656,26 +656,22 @@ function ensureMintukuFirstLogin_(sheet, table, idx) {
   return key;
 }
 
-/** [共通] 現在地変更ロック（変更後30日） */
-var LOCATION_CHANGE_LOCK_DAYS = 30;
-
-function getLocationChangeLock_(row) {
-  var raw = String((row && row['現在地変更日']) || '').trim();
-  if (!raw) {
-    return { locked: false, daysLeft: 0, nextDate: '', changedAt: '' };
-  }
-  var days = mintukuDaysSinceFirst_(raw);
-  if (days < LOCATION_CHANGE_LOCK_DAYS) {
-    var first = parseDate_(raw);
-    var next = first ? addDays_(first, LOCATION_CHANGE_LOCK_DAYS) : null;
-    return {
-      locked: true,
-      daysLeft: LOCATION_CHANGE_LOCK_DAYS - days,
-      nextDate: next ? tokyoDateKey_(next) : '',
-      changedAt: raw
-    };
-  }
-  return { locked: false, daysLeft: 0, nextDate: '', changedAt: raw };
+/**
+ * [みんつく] オーナー手動で現在地変更後: 初回ログイン時に番号接頭辞を現在地に合わせる
+ * ※みんつく番号が無い場合は触らない（採番は従来フロー）
+ */
+function syncMintukuNumberToLocationCtx_(ctx) {
+  if (!ctx) return '';
+  var current = String(ctx.row['みんつく番号'] || '').trim();
+  if (!current) return '';
+  var loc = String(ctx.row['現在地'] || '').trim();
+  if (!loc) return current;
+  var regionId = prefectureToMintukuRegionId_(loc);
+  if (!regionId) return current;
+  var label = mintukuRegionLabel_(regionId);
+  var parsed = parseMintukuNumber_(current);
+  if (parsed && parsed.label === label) return current;
+  return ensureMintukuNumberCtx_(ctx, regionId);
 }
 
 /** 都道府県 → みんつく地方ID */
@@ -1128,38 +1124,51 @@ function setPresidentListed_(body, listed, typeLabel) {
   };
 }
 
-/**
- * ホームダッシュボード用集計（Asia/Tokyo）
- * - 登録人数: 会員シート全件
- * - 昨日の新規: 登録日時が昨日
- * - 昨日の掲載停止者: 掲載中=FALSE かつ 最終ログイン日時が昨日 かつ 本名が空でない
- *   （本名空＝プロフィール未完了の未登録扱いは除外）
- * - 再参加者: 昨日ログインがあり、登録日が昨日より前、かつ掲載中=TRUE
- * - newLast7Days: 直近7日の新規登録（棒グラフ用）
- */
-function getDashboard_() {
-  // 集計に必要な列だけ読む
-  const rows = readUsersColumnsRows_([
-    '会員番号',
-    '登録日時',
-    '最終ログイン日時',
-    '掲載中',
-    '本名'
-  ]);
-  const today = tokyoDateKey_(new Date());
-  const yesterday = tokyoDateKey_(addDays_(new Date(), -1));
+/** ダッシュボード: app / region で Apomy・みんつく・PM を出し分け */
+function getDashboard_(p) {
+  p = p || {};
+  var appKind = String(p.app || 'apomy').trim().toLowerCase();
+  if (appKind === 'mintuku') {
+    var regionId = resolveMintukuRegionId_(p.region || p.r || '');
+    if (regionId) return getMintukuDashboard_(regionId);
+  }
+  if (appKind === 'president' || appKind === 'presidentmate') {
+    return getPresidentDashboard_();
+  }
+  return getApomyDashboard_();
+}
 
-  var totalRegistered = rows.length;
-  var yesterdayNew = 0;
-  var unpublished = 0;
-  var yesterdayReturning = 0;
+function buildDashboardDayCounts_() {
   var dayCounts = {};
   var i;
   for (i = 0; i < 7; i++) {
     dayCounts[tokyoDateKey_(addDays_(new Date(), -6 + i))] = 0;
   }
+  return dayCounts;
+}
 
-  rows.forEach(function (r) {
+function buildDashboardSeries_(dayCounts) {
+  return Object.keys(dayCounts).sort().map(function (key) {
+    return {
+      date: key,
+      label: key.slice(5).replace('-', '/'),
+      count: dayCounts[key]
+    };
+  });
+}
+
+function aggregateDashboardRows_(rows, matchFn) {
+  const today = tokyoDateKey_(new Date());
+  const yesterday = tokyoDateKey_(addDays_(new Date(), -1));
+  var totalRegistered = 0;
+  var yesterdayNew = 0;
+  var unpublished = 0;
+  var yesterdayReturning = 0;
+  var dayCounts = buildDashboardDayCounts_();
+
+  (rows || []).forEach(function (r) {
+    if (!matchFn(r)) return;
+    totalRegistered += 1;
     const createdKey = tokyoDateKey_(parseDate_(r['登録日時']));
     const loginKey = tokyoDateKey_(parseDate_(r['最終ログイン日時']));
     const isPublished = toBool_(r['掲載中']);
@@ -1174,22 +1183,62 @@ function getDashboard_() {
     }
   });
 
-  const newLast7Days = Object.keys(dayCounts).sort().map(function (key) {
-    return {
-      date: key,
-      label: key.slice(5).replace('-', '/'), // MM/DD
-      count: dayCounts[key]
-    };
-  });
-
   return {
     asOf: today,
     totalRegistered: totalRegistered,
     yesterdayNew: yesterdayNew,
     unpublished: unpublished,
     yesterdayReturning: yesterdayReturning,
-    newLast7Days: newLast7Days
+    newLast7Days: buildDashboardSeries_(dayCounts)
   };
+}
+
+/** [みんつく] みんつく番号の接頭辞（例: 関東）で集計 */
+function getMintukuDashboard_(regionId) {
+  var label = mintukuRegionLabel_(regionId);
+  if (!label) {
+    return {
+      asOf: tokyoDateKey_(new Date()),
+      totalRegistered: 0,
+      yesterdayNew: 0,
+      unpublished: 0,
+      yesterdayReturning: 0,
+      newLast7Days: buildDashboardSeries_(buildDashboardDayCounts_())
+    };
+  }
+  var rows = readUsersColumnsRows_(['みんつく番号', '登録日時']);
+  return aggregateDashboardRows_(rows, function (r) {
+    var parsed = parseMintukuNumber_(r['みんつく番号']);
+    return parsed && parsed.label === label;
+  });
+}
+
+/** [プレジデント] 社長マーク=TRUE で集計 */
+function getPresidentDashboard_() {
+  var rows = readUsersColumnsRows_(['社長マーク', '登録日時']);
+  return aggregateDashboardRows_(rows, function (r) {
+    return toBool_(r['社長マーク']);
+  });
+}
+
+/**
+ * [Apomy] ホームダッシュボード用集計（Asia/Tokyo）
+ * - 登録人数: 会員シート全件
+ * - 昨日の新規: 登録日時が昨日
+ * - 昨日の掲載停止者: 掲載中=FALSE かつ 最終ログイン日時が昨日 かつ 本名が空でない
+ * - 再参加者: 昨日ログインがあり、登録日が昨日より前、かつ掲載中=TRUE
+ */
+function getApomyDashboard_() {
+  var rows = readUsersColumnsRows_([
+    '会員番号',
+    '登録日時',
+    '最終ログイン日時',
+    '掲載中',
+    '本名'
+  ]);
+  return aggregateDashboardRows_(rows, function () {
+    return true;
+  });
 }
 
 function addDays_(date, days) {
@@ -1301,6 +1350,7 @@ function touchActivity_(body) {
   if (toBool_(ctx.row['掲載中'])) {
     ensureMintukuOnApomyPublishCtx_(ctx);
   }
+  syncMintukuNumberToLocationCtx_(ctx);
 
   var appKind = String((body && body.app) || '').trim().toLowerCase();
   var mintukuRegion = resolveMintukuRegionId_((body && (body.region || body.r)) || '');
@@ -1618,6 +1668,7 @@ function login_(body) {
       }
       ensurePresidentNumberCtx_(ctx);
     }
+    syncMintukuNumberToLocationCtx_(ctx);
     flushUserCtx_(ctx);
 
     const user = mapUser_(ctx.row);
@@ -1790,24 +1841,12 @@ function updateProfile_(body) {
     if (key === 'location') {
       var oldLoc = String(ctx.row['現在地'] || '').trim();
       var newLoc = String(value || '').trim();
-      if (!newLoc || newLoc === oldLoc) return;
-      ensureHeaderInCtx_(ctx, '現在地変更日');
-      if (oldLoc) {
-        var lock = getLocationChangeLock_(ctx.row);
-        if (lock.locked) {
-          var locMsg = '現在地は変更後30日間、新たな変更はできません';
-          if (lock.nextDate) locMsg += '（次回変更可能日: ' + lock.nextDate + '）';
-          throw new Error(locMsg);
-        }
-        var changeDay = tokyoDateKey_(new Date());
-        setCtxValue_(ctx, '現在地', newLoc);
-        setCtxValue_(ctx, '現在地変更日', changeDay);
-        renumberMintukuOnRegionChangeCtx_(ctx, oldLoc, newLoc);
-        return;
+      if (!newLoc) return;
+      if (oldLoc && newLoc !== oldLoc) {
+        throw new Error('現在地を変更する際はオーナーへ連絡してください。');
       }
-      setCtxValue_(ctx, '現在地', newLoc);
-      if (toBool_(ctx.row['掲載中']) || wantPublish) {
-        // 掲載済み／このリクエストで掲載する場合は採番側で扱う
+      if (!oldLoc) {
+        setCtxValue_(ctx, '現在地', newLoc);
       }
       return;
     }
@@ -2469,7 +2508,6 @@ function mapUser_(r) {
     : [];
   const nickname = nicknameFromRow_(r);
   const realName = realNameFromRow_(r);
-  const locLock = getLocationChangeLock_(r);
 
   return {
     id: String(r['会員番号'] || ''),
@@ -2483,10 +2521,6 @@ function mapUser_(r) {
     jobTitle: String(r['職種'] || ''),
     location: String(r['現在地'] || ''),
     hometown: String(r['出身地'] || ''),
-    locationChangedAt: locLock.changedAt || String(r['現在地変更日'] || '').trim(),
-    locationChangeLocked: locLock.locked,
-    locationChangeNextDate: locLock.nextDate,
-    locationChangeDaysLeft: locLock.daysLeft,
     bio: String(r['自己紹介'] || ''),
     wantMeet: String(r['こんな人と繋がりたい'] || ''),
     avoidMeet: String(r['こんな人とは繋がりたくない'] || ''),
