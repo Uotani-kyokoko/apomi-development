@@ -1746,6 +1746,25 @@
     );
   }
 
+  function isApomyUnpublishedError(err) {
+    const msg = String(err?.message || err || "");
+    return msg.indexOf("APOMY_UNPUBLISHED:") === 0 || msg.indexOf("Apomyの掲載が停止") >= 0;
+  }
+
+  function handleApomyUnpublished(message) {
+    showToast(message || "Apomyの掲載が停止されています");
+    try {
+      Session.clear();
+    } catch (_) {
+      /* ignore */
+    }
+    state.isLoggedIn = false;
+    state.currentUser = null;
+    state.identity = null;
+    $("#app-screen")?.classList.add("hidden");
+    $("#login-screen")?.classList.remove("hidden");
+  }
+
   function handlePresidentDenied() {
     showToast("Apomyにて社長マークの承認をお願いします");
     try {
@@ -2038,8 +2057,7 @@
   function updateFilterOpenBar() {
     const bar = $("#filter-open-bar");
     if (!bar) return;
-    const show = state.activeTab === "home" || state.activeTab === "connect";
-    bar.classList.toggle("hidden", !show);
+    bar.classList.toggle("hidden", state.activeTab !== "connect");
   }
 
   function switchTab(tabId) {
@@ -2988,6 +3006,10 @@
             handlePresidentDenied();
             return;
           }
+          if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(err)) {
+            handleApomyUnpublished(err.message);
+            return;
+          }
           console.error("me failed", err);
           showToast(err.message || "プロフィールの取得に失敗しました");
         }
@@ -3167,7 +3189,6 @@
   function needsProfileSetup(user) {
     if (!user) return false;
     if (user.isNew) return true;
-    if (user.isPublished === false) return true;
     if (!displayNameOf(user)) return true;
     if (!String(user.realName || "").trim()) return true;
     return false;
@@ -3786,7 +3807,7 @@
     }
     const { _snsError, _textError, ...profilePayload } = profile;
 
-    const shouldPublish = state.editRequired || state.currentUser?.isPublished === false;
+    const shouldPublish = Boolean(state.editRequired);
 
     showLoading(true);
     try {
@@ -4152,6 +4173,8 @@
         forceLogoutForMaintenance(err.message);
       } else if (isPresidentMode() && isPresidentDeniedError(err)) {
         handlePresidentDenied();
+      } else if (!isMintukuMode() && !isPresidentMode() && isApomyUnpublishedError(err)) {
+        handleApomyUnpublished(err.message);
       } else {
         showToast(err.message || "ログインに失敗しました");
       }
@@ -4324,13 +4347,17 @@
       item.addEventListener("click", () => switchTab(item.dataset.tab));
     });
 
-    $("#search-open-btn")?.addEventListener("click", () => {
-      scheduleTouchActivity();
-      void openFilterScreen().catch((err) => {
-        console.error(err);
-        showToast(err.message || "絞り込み画面を開けませんでした");
+    const bindFilterOpen = (sel) => {
+      $(sel)?.addEventListener("click", () => {
+        scheduleTouchActivity();
+        void openFilterScreen().catch((err) => {
+          console.error(err);
+          showToast(err.message || "絞り込み画面を開けませんでした");
+        });
       });
-    });
+    };
+    bindFilterOpen("#search-open-btn");
+    bindFilterOpen("#search-open-btn-home");
     $("#filter-back")?.addEventListener("click", closeFilterScreen);
 
     $$(".filter-card-toggle").forEach((btn) => {

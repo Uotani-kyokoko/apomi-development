@@ -656,6 +656,25 @@ function ensureMintukuFirstLogin_(sheet, table, idx) {
   return key;
 }
 
+/** プロフィール初回登録が完了しているか（Apomyログイン可否の判定用） */
+function isRegistrationComplete_(row) {
+  return Boolean(realNameFromRow_(row)) && Boolean(nicknameFromRow_(row));
+}
+
+/**
+ * [Apomy] 掲載停止済み（掲載中=FALSE）の完了会員は Apomy からログイン不可
+ * ※みんつく / PM は Apomy 停止と独立して利用可
+ */
+function assertApomyLoginAllowed_(row, appKind) {
+  var kind = String(appKind || 'apomy').trim().toLowerCase();
+  if (kind === 'mintuku' || kind === 'president' || kind === 'presidentmate') return;
+  if (toBool_(row['掲載中'])) return;
+  if (!isRegistrationComplete_(row)) return;
+  throw new Error(
+    'APOMY_UNPUBLISHED:Apomyの掲載が停止されています。みんつくから「Apomyの掲載を再開」するか、オーナーへお問合せください。'
+  );
+}
+
 /**
  * [みんつく] オーナー手動で現在地変更後: 初回ログイン時に番号接頭辞を現在地に合わせる
  * ※みんつく番号が無い場合は触らない（採番は従来フロー）
@@ -1193,10 +1212,9 @@ function aggregateDashboardRows_(rows, matchFn) {
   };
 }
 
-/** [みんつく] みんつく番号の接頭辞（例: 関東）で集計 */
+/** [みんつく] 現在地がその地方の会員で集計 */
 function getMintukuDashboard_(regionId) {
-  var label = mintukuRegionLabel_(regionId);
-  if (!label) {
+  if (!regionId) {
     return {
       asOf: tokyoDateKey_(new Date()),
       totalRegistered: 0,
@@ -1206,10 +1224,9 @@ function getMintukuDashboard_(regionId) {
       newLast7Days: buildDashboardSeries_(buildDashboardDayCounts_())
     };
   }
-  var rows = readUsersColumnsRows_(['みんつく番号', '登録日時']);
+  var rows = readUsersColumnsRows_(['現在地', '登録日時']);
   return aggregateDashboardRows_(rows, function (r) {
-    var parsed = parseMintukuNumber_(r['みんつく番号']);
-    return parsed && parsed.label === label;
+    return isPrefInMintukuRegion_(String(r['現在地'] || '').trim(), regionId);
   });
 }
 
@@ -1343,6 +1360,9 @@ function touchActivity_(body) {
   const ctx = openUserCtx_(memberNo, email);
   assertNotDeniedEmail_(ctx.row['Googleメール']);
   assertMaintenanceAccess_(ctx.row['Googleメール']);
+
+  var appKindTouch = String((body && body.app) || '').trim().toLowerCase();
+  assertApomyLoginAllowed_(ctx.row, appKindTouch);
 
   const now = formatDateTime_(new Date());
   setCtxValue_(ctx, '最終ログイン日時', now);
@@ -1649,6 +1669,7 @@ function login_(body) {
 
   if (rowNumber >= 2) {
     var ctx = loadUserRowCtx_(sheet, headers, rowNumber);
+    assertApomyLoginAllowed_(ctx.row, appKind);
     setCtxValue_(ctx, '最終ログイン日時', now);
     if (googleId) setCtxValue_(ctx, 'GoogleID', googleId);
     if (picture) {
