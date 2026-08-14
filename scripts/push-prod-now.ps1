@@ -28,15 +28,20 @@ if (-not $env:PROD_GITHUB_TOKEN) {
 # NOTE: "@github" breaks PowerShell double-quoted strings; build URL safely.
 $pushUrl = ('https://x-access-token:{0}@github.com/fortunatunabiz/Apomy.git' -f $env:PROD_GITHUB_TOKEN)
 
-Write-Host "==> Fetch prod/main"
-git fetch $pushUrl main:refs/remotes/prod/main
-
-$sha = (git rev-parse prod/main).Trim()
+Write-Host "==> Read remote main (ls-remote)"
+$remoteLine = (git ls-remote $pushUrl refs/heads/main).Trim()
+if (-not $remoteLine) {
+  throw "Could not read remote main"
+}
+$sha = ($remoteLine -split '\s+')[0]
 Write-Host "==> Remote main: $sha"
 Write-Host "==> Local HEAD:  $((git rev-parse HEAD).Trim())"
 
 Write-Host "==> Push with force-with-lease"
 git push --force-with-lease=main:$sha $pushUrl HEAD:main
+if ($LASTEXITCODE -ne 0) {
+  throw "git push failed (exit $LASTEXITCODE). Local prod commit kept for retry."
+}
 
 Write-Host "==> Restore DEV env on local main"
 git reset --hard HEAD~1
