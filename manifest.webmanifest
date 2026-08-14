@@ -2,6 +2,7 @@
   "name": "apomy",
   "short_name": "apomy",
   "description": "ビジネスマッチング",
+  "id": "/apomy",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

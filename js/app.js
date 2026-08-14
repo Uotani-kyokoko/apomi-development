@@ -175,7 +175,22 @@
 
     if (!isMintukuMode()) {
       brandApomy?.classList.remove("hidden");
+      document.title = "apomy - ビジネスマッチング";
+      if (appleTitle) appleTitle.setAttribute("content", "apomy");
+      if (themeMeta) themeMeta.setAttribute("content", "#5B6CFF");
       document.documentElement.style.setProperty("--theme-color", "#5B6CFF");
+      if (manifestLink) {
+        manifestLink.setAttribute("href", "manifest.webmanifest?v=20260814n");
+      }
+      if (appleIcon) appleIcon.setAttribute("href", "icons/apple-touch-icon.png");
+      favicons.forEach((link) => {
+        const sizes = link.getAttribute("sizes") || "";
+        if (sizes.indexOf("512") >= 0) {
+          link.setAttribute("href", "icons/icon-512.png");
+        } else {
+          link.setAttribute("href", "icons/icon-192.png");
+        }
+      });
       prefFilter?.classList.add("hidden");
       regionBtn?.classList.remove("hidden");
       presidentBtn?.classList.remove("hidden");
@@ -1981,33 +1996,63 @@
     });
   }
 
-  /* ---------- PWA インストール（マイページ右） ---------- */
+  /* ---------- PWA インストール（Apomy / みんつく / PM を別アプリとして追加） ---------- */
   let deferredInstallPrompt = null;
 
-  function isAppInstalled() {
+  function isRunningStandalone() {
     try {
       if (window.matchMedia("(display-mode: standalone)").matches) return true;
       if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
     } catch {
       /* ignore */
     }
-    // iOS Safari
     if (typeof navigator.standalone === "boolean" && navigator.standalone) return true;
     return false;
+  }
+
+  /** 現在のモードごとの PWA 識別子（manifest id と対応） */
+  function getInstallAppKey() {
+    if (isPresidentMode()) return "president";
+    if (isMintukuMode()) return `mintuku:${state.mintukuRegion || ""}`;
+    return "apomy";
+  }
+
+  function getInstallAppKeyFromLocation(loc) {
+    const parsed =
+      typeof AppMode !== "undefined" && AppMode.parseModeFromLocation
+        ? AppMode.parseModeFromLocation(loc)
+        : { app: "apomy", region: "" };
+    if (parsed.app === "president") return "president";
+    if (parsed.app === "mintuku") return `mintuku:${parsed.region || ""}`;
+    return "apomy";
+  }
+
+  function getStandaloneAppKey() {
+    if (!isRunningStandalone()) return "";
+    return getInstallAppKeyFromLocation(window.location);
+  }
+
+  function isCurrentAppInstalled() {
+    const standaloneKey = getStandaloneAppKey();
+    if (!standaloneKey) return false;
+    return standaloneKey === getInstallAppKey();
+  }
+
+  function getInstallAppLabel() {
+    if (isPresidentMode()) return "プレジデントメイト";
+    if (isMintukuMode()) return mintukuDisplayName();
+    return "Apomy";
   }
 
   function isIosDevice() {
     const ua = navigator.userAgent || "";
     if (/iPad|iPhone|iPod/.test(ua)) return true;
-    // iPadOS 13+
     return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
   }
 
   function canShowInstallButton() {
-    if (isAppInstalled()) return false;
-    if (deferredInstallPrompt) return true;
-    if (isIosDevice()) return true;
-    return false;
+    if (isCurrentAppInstalled()) return false;
+    return true;
   }
 
   function updateInstallButtonVisibility() {
@@ -2015,11 +2060,27 @@
     if (!btn) return;
     const show = state.activeTab === "mypage" && canShowInstallButton();
     btn.classList.toggle("hidden", !show);
+    if (show) {
+      btn.setAttribute("aria-label", `${getInstallAppLabel()}をホーム画面に追加`);
+    }
   }
 
   function openInstallGuide() {
     const overlay = $("#install-guide-overlay");
     if (!overlay) return;
+    const label = getInstallAppLabel();
+    const title = $("#install-guide-title");
+    const iosSteps = $("#install-guide-steps-ios");
+    const androidSteps = $("#install-guide-steps-android");
+    const note = $("#install-guide-note");
+    if (title) title.textContent = `${label}をホーム画面に追加`;
+    iosSteps?.classList.toggle("hidden", !isIosDevice());
+    androidSteps?.classList.toggle("hidden", isIosDevice());
+    if (note) {
+      note.textContent = isIosDevice()
+        ? "Safari で開いているときだけ追加できます。Apomy・みんつく・プレジデントメイトはそれぞれ別のアイコンとして追加できます。"
+        : "Apomy・みんつく・プレジデントメイトはそれぞれ別のアイコンとして追加できます。";
+    }
     overlay.classList.remove("hidden");
     overlay.setAttribute("aria-hidden", "false");
   }
@@ -2039,19 +2100,15 @@
         deferredInstallPrompt = null;
         updateInstallButtonVisibility();
         if (choice?.outcome === "accepted") {
-          showToast("ホーム画面に追加しました");
+          showToast(`${getInstallAppLabel()}をホーム画面に追加しました`);
         }
       } catch (err) {
         console.warn(err);
-        showToast("インストールを開始できませんでした");
+        openInstallGuide();
       }
       return;
     }
-    if (isIosDevice()) {
-      openInstallGuide();
-      return;
-    }
-    showToast("このブラウザではインストールできません");
+    openInstallGuide();
   }
 
   function bindInstallAppEvents() {
@@ -2064,7 +2121,7 @@
       deferredInstallPrompt = null;
       closeInstallGuide();
       updateInstallButtonVisibility();
-      showToast("ホーム画面に追加しました");
+      showToast(`${getInstallAppLabel()}をホーム画面に追加しました`);
     });
     $("#btn-install-app")?.addEventListener("click", (e) => {
       e.preventDefault();

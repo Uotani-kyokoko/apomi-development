@@ -565,12 +565,17 @@
   <div id="install-guide-overlay" class="install-guide-overlay hidden" aria-hidden="true">
     <div class="install-guide-card" role="dialog" aria-modal="true" aria-labelledby="install-guide-title">
       <h3 id="install-guide-title" class="install-guide-title">ホーム画面に追加</h3>
-      <ol class="install-guide-steps">
+      <ol id="install-guide-steps-ios" class="install-guide-steps">
         <li>画面下部の <strong>共有</strong>（□↑）をタップ</li>
         <li><strong>ホーム画面に追加</strong> を選ぶ</li>
         <li>右上の <strong>追加</strong> をタップ</li>
       </ol>
-      <p class="install-guide-note">Safari で開いているときだけ追加できます。</p>
+      <ol id="install-guide-steps-android" class="install-guide-steps hidden">
+        <li>ブラウザ右上の <strong>メニュー</strong>（⋮）をタップ</li>
+        <li><strong>アプリをインストール</strong> または <strong>ホーム画面に追加</strong> を選ぶ</li>
+        <li>表示名を確認して <strong>インストール</strong> / <strong>追加</strong> をタップ</li>
+      </ol>
+      <p id="install-guide-note" class="install-guide-note">Apomy・みんつく・プレジデントメイトはそれぞれ別のアイコンとして追加できます。</p>
       <button type="button" id="install-guide-close" class="install-guide-close">閉じる</button>
     </div>
   </div>
@@ -581,6 +586,6 @@
   <script src="js/auth.js?v=20260807d"></script>
   <script src="js/mock-api.js?v=20260812a"></script>
   <script src="js/gas-api.js?v=20260814i"></script>
-  <script src="js/app.js?v=20260814m"></script>
+  <script src="js/app.js?v=20260814n"></script>
 </body>
 </html>
