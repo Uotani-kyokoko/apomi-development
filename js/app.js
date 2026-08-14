@@ -156,7 +156,7 @@
       document.documentElement.style.setProperty("--theme-color", "#ffffff");
       brandPresident?.classList.remove("hidden");
       if (manifestLink) {
-        manifestLink.setAttribute("href", "president/manifest.webmanifest?v=20260814e");
+        manifestLink.setAttribute("href", "president/manifest.webmanifest?v=20260814f");
       }
       if (appleIcon) appleIcon.setAttribute("href", "president/icons/apple-touch-icon.png");
       favicons.forEach((link) => {
@@ -1613,8 +1613,6 @@
     const resumeApomyMintuku = $("#btn-resume-apomy-from-mintuku");
     const stopMintuku = $("#btn-stop-mintuku-listing");
     const resumeMintuku = $("#btn-resume-mintuku-listing");
-    const mintukuOnlyWrap = $("#mypage-mintuku-only");
-    const mintukuOnlyChk = $("#chk-mintuku-only");
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
     const salonName = state.salonLabel || "井口智明オンラインサロン";
@@ -1654,7 +1652,6 @@
     // [みんつく] 掲載スイッチ分離 / [プレジデント] PM掲載 / [Apomy] 従来の掲載停止1つ
     const published = user?.isPublished !== false;
     const mintukuOn = Boolean(user?.mintukuListed);
-    const mintukuOnly = Boolean(user?.mintukuOnly);
     const presidentOn = isPresidentMateListed(user);
     const stopPresident = $("#btn-stop-president-listing");
     const resumePresident = $("#btn-resume-president-listing");
@@ -1665,7 +1662,6 @@
       resumeApomyMintuku?.classList.add("hidden");
       stopMintuku?.classList.add("hidden");
       resumeMintuku?.classList.add("hidden");
-      mintukuOnlyWrap?.classList.add("hidden");
       salonBtn?.classList.add("hidden");
       presidentBtn?.classList.add("hidden");
       if (presidentOn) {
@@ -1679,10 +1675,6 @@
       stopApomy?.classList.add("hidden");
       stopPresident?.classList.add("hidden");
       resumePresident?.classList.add("hidden");
-      mintukuOnlyWrap?.classList.remove("hidden");
-      if (mintukuOnlyChk && mintukuOnlyChk.checked !== mintukuOnly) {
-        mintukuOnlyChk.checked = mintukuOnly;
-      }
       if (published) {
         stopApomyMintuku?.classList.remove("hidden");
         resumeApomyMintuku?.classList.add("hidden");
@@ -1703,7 +1695,6 @@
       resumeApomyMintuku?.classList.add("hidden");
       stopMintuku?.classList.add("hidden");
       resumeMintuku?.classList.add("hidden");
-      mintukuOnlyWrap?.classList.add("hidden");
       stopPresident?.classList.add("hidden");
       resumePresident?.classList.add("hidden");
       salonBtn?.classList.remove("hidden");
@@ -1755,8 +1746,8 @@
     if (user.isPublished !== false) return false;
     if (!user.mintukuListed) return false;
     if (!String(user.mintukuNumber || "").trim()) return false;
-    // みんつく側の「Apomy掲載を停止」／「みんつく限定」ON のとき誘導
-    let shouldRedirect = Boolean(user.mintukuOnly);
+    // みんつく側の「Apomy掲載を停止」直後のみ誘導（localStorage）
+    let shouldRedirect = false;
     try {
       if (localStorage.getItem("apomy_open_mintuku_after_stop") === "1") {
         shouldRedirect = true;
@@ -4527,17 +4518,12 @@
     });
 
     $("#btn-resume-apomy-from-mintuku")?.addEventListener("click", async () => {
-      if (!confirm("Apomy（全国）の掲載を再開しますか？\n（みんつく限定にしていた場合は解除されます）")) return;
+      if (!confirm("Apomy（全国）の掲載を再開しますか？")) return;
       try {
         showLoading(true);
         const res = await GasAPI.resumeListing(identityForApi());
         if (state.currentUser) {
           state.currentUser.isPublished = res.data?.isPublished !== false;
-          if (res.data?.mintukuOnly !== undefined) {
-            state.currentUser.mintukuOnly = Boolean(res.data.mintukuOnly);
-          } else {
-            state.currentUser.mintukuOnly = false;
-          }
           if (res.data?.mintukuListed !== undefined) {
             state.currentUser.mintukuListed = Boolean(res.data.mintukuListed);
           }
@@ -4554,72 +4540,6 @@
       } catch (err) {
         console.error(err);
         showToast(err.message || "再開に失敗しました");
-      } finally {
-        showLoading(false);
-      }
-    });
-
-    $("#chk-mintuku-only")?.addEventListener("change", async (e) => {
-      const chk = e.target;
-      const want = Boolean(chk.checked);
-      const prev = Boolean(state.currentUser?.mintukuOnly);
-      if (want === prev) return;
-      if (want) {
-        if (
-          !confirm(
-            "会える距離の範囲だけで繋がる「みんつく限定」にします。\nApomy（全国）の掲載は停止し、みんつく掲載はオンのままです。"
-          )
-        ) {
-          chk.checked = prev;
-          return;
-        }
-      } else if (
-        !confirm(
-          "みんつく限定を解除します。\nApomyの掲載は自動では再開しません（必要なら「Apomyの掲載を再開」から行ってください）。"
-        )
-      ) {
-        chk.checked = prev;
-        return;
-      }
-      try {
-        showLoading(true);
-        const res = await GasAPI.setMintukuOnly({
-          ...identityForApi(),
-          mintukuOnly: want
-        });
-        if (state.currentUser) {
-          state.currentUser.mintukuOnly = res.data?.mintukuOnly !== undefined
-            ? Boolean(res.data.mintukuOnly)
-            : want;
-          if (res.data?.isPublished !== undefined) {
-            state.currentUser.isPublished = Boolean(res.data.isPublished);
-          } else if (want) {
-            state.currentUser.isPublished = false;
-          }
-          if (res.data?.mintukuListed !== undefined) {
-            state.currentUser.mintukuListed = Boolean(res.data.mintukuListed);
-          } else if (want) {
-            state.currentUser.mintukuListed = true;
-          }
-          if (res.data?.mintukuNumber) {
-            state.currentUser.mintukuNumber = String(res.data.mintukuNumber);
-          }
-        }
-        if (want) {
-          try {
-            localStorage.setItem("apomy_open_mintuku_after_stop", "1");
-          } catch (_) {
-            /* ignore */
-          }
-        }
-        applyMyActivity(res.data?.lastLoginAt);
-        updateMypageActionLabels(state.currentUser);
-        invalidateUsersCache();
-        showToast(want ? "みんつく限定にしました" : "みんつく限定を解除しました");
-      } catch (err) {
-        console.error(err);
-        chk.checked = prev;
-        showToast(err.message || "設定に失敗しました");
       } finally {
         showLoading(false);
       }

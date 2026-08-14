@@ -27,15 +27,14 @@
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  *
  * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=…（または r=トークン）で地方一覧。
- * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無 / みんつく課金開始日 / みんつく限定 / 現在地変更日
+ * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無 / みんつく課金開始日 / 現在地変更日
  * 現在地変更日: 初回入力後の「変更」時に記録。以降30日間は変更不可（GASで強制）
  * みんつく課金開始日: 日付あり＝有料。無料期間は初回ログイン基準、課金後はこの日起算で経過表示
- * みんつく限定: TRUEのとき Apomy非掲載・みんつく掲載のみ（会える距離の範囲だけで繋がりたい）
- * Apomy掲載開始時: みんつく掲載=TRUE＋現在地からみんつく番号を採番（みんつく限定中は解除）
+ * Apomy掲載開始時: みんつく掲載=TRUE＋現在地からみんつく番号を採番
  * 一覧: Apomyは掲載中のみ／みんつくはみんつく掲載のみ（相互に独立）
  * 一覧APIは必要列のみ読込（全列 getDataRange しない）。ログイン時は一覧を取らない（FEが繋がる表示時に取得）
  * 設定キー: みんつく問い合わせURL（期限切れ画面の「こちら」）
- * POST: stopMintukuListing / resumeMintukuListing / setMintukuOnly
+ * POST: stopMintukuListing / resumeMintukuListing
  * updateProfile は publish=true で掲載開始＋みんつく採番まで1リクエスト完結可
  * 会員の単票更新は「列検索で行特定→1行読込→メモリ更新→1行 setValues」を基本とし、全件オブジェクト化を避ける
  * 掲載フラグは TRUE/FALSE 文字列で書き込み（チェックボックス／文字列列両対応）
@@ -176,10 +175,6 @@ function doPost(e) {
       case 'resumeMintukuListing':
         // [みんつく] みんつく掲載のみ再開
         data = setMintukuListed_(body, true, 'みんつく掲載再開');
-        break;
-      case 'setMintukuOnly':
-        // [みんつく] みんつく限定 ON/OFF（Apomy非掲載＋みんつく掲載）
-        data = setMintukuOnly_(body, toBool_(body.mintukuOnly || body.only));
         break;
       case 'stopPresidentListing':
         // [プレジデント] プレジデントメイト掲載のみ停止
@@ -846,7 +841,6 @@ function attachMintukuAccess_(user, row) {
   user.mintukuFirstLoginAt = sheetDateToYmd_((row && row['みんつく初回ログイン日']) || '');
   user.mintukuPaidStartAt = access.paidStartAt || '';
   user.mintukuPaidDaysUsed = access.paidDaysUsed || 0;
-  user.mintukuOnly = toBool_((row && row['みんつく限定']) || false);
   return user;
 }
 
@@ -914,7 +908,6 @@ function setMintukuListed_(body, listed, typeLabel) {
     memberNo: no,
     mintukuListed: !!listed,
     isPublished: toBool_(ctx.row['掲載中']),
-    mintukuOnly: toBool_(ctx.row['みんつく限定']),
     lastLoginAt: now
   };
 }
@@ -1131,60 +1124,6 @@ function setPresidentListed_(body, listed, typeLabel) {
     presidentMateListed: !!listed,
     presidentNumber: String(ctx.row['プレジデント番号'] || '').trim(),
     presidentMark: true,
-    lastLoginAt: now
-  };
-}
-
-/**
- * [みんつく] みんつく限定 ON/OFF
- * ON: Apomy非掲載＋みんつく掲載ON＋みんつく限定TRUE（番号も確保）
- * OFF: みんつく限定FALSEのみ（Apomyは自動再開しない）
- */
-function setMintukuOnly_(body, only) {
-  const memberNo = String(body.memberNo || body.member_no || '').trim();
-  const email = String(body.email || '').trim();
-  if (!memberNo && !email) throw new Error('memberNo または email が必要です');
-
-  const ctx = openUserCtx_(memberNo, email);
-  const no = String(ctx.row['会員番号'] || memberNo);
-  const now = formatDateTime_(new Date());
-  var mintukuNumber = String(ctx.row['みんつく番号'] || '').trim();
-
-  if (only) {
-    setCtxValue_(ctx, 'みんつく限定', sheetBool_(true));
-    setCtxValue_(ctx, '掲載中', sheetBool_(false));
-    setCtxValue_(ctx, 'みんつく掲載', sheetBool_(true));
-    var regionId = prefectureToMintukuRegionId_(String(ctx.row['現在地'] || '').trim());
-    if (regionId) {
-      mintukuNumber = ensureMintukuNumberCtx_(ctx, regionId);
-    }
-  } else {
-    setCtxValue_(ctx, 'みんつく限定', sheetBool_(false));
-  }
-
-  setCtxValue_(ctx, '更新日時', now);
-  setCtxValue_(ctx, '最終ログイン日時', now);
-  flushUserCtx_(ctx);
-  SpreadsheetApp.flush();
-
-  var requestId = '';
-  try {
-    requestId = createRequest_(
-      no,
-      only ? 'みんつく限定ON' : 'みんつく限定OFF',
-      '対応済',
-      String(body.note || '')
-    );
-  } catch (err) {
-    Logger.log('createRequest_ failed (mintuku only): ' + err);
-  }
-  return {
-    requestId: requestId,
-    memberNo: no,
-    mintukuOnly: !!only,
-    isPublished: toBool_(ctx.row['掲載中']),
-    mintukuListed: toBool_(ctx.row['みんつく掲載']),
-    mintukuNumber: mintukuNumber || String(ctx.row['みんつく番号'] || '').trim(),
     lastLoginAt: now
   };
 }
@@ -1971,7 +1910,6 @@ function updateProfile_(body) {
     user.isPublished = true;
     user.isNew = false;
     user.mintukuListed = toBool_(ctx.row['みんつく掲載']);
-    user.mintukuOnly = toBool_(ctx.row['みんつく限定']);
     user.mintukuNumber = mintukuNumber || String(ctx.row['みんつく番号'] || '').trim();
   }
   return user;
@@ -2379,17 +2317,11 @@ function htmlDecision_(result) {
 /**
  * [みんつく] Apomy掲載開始時: みんつく掲載ON＋現在地があれば番号採番
  * ※みんつく掲載を明示停止している場合は尊重してONに戻さない
- * ※みんつく限定中なら解除（Apomyに戻るため）
  */
 function ensureMintukuOnApomyPublishCtx_(ctx) {
   if (!ctx) return '';
   ensureHeaderInCtx_(ctx, 'みんつく掲載');
   ensureHeaderInCtx_(ctx, 'みんつく番号');
-  ensureHeaderInCtx_(ctx, 'みんつく限定');
-
-  if (toBool_(ctx.row['みんつく限定'])) {
-    setCtxValue_(ctx, 'みんつく限定', sheetBool_(false));
-  }
 
   var listedRaw = ctx.row['みんつく掲載'];
   var listedSet = !(listedRaw === '' || listedRaw === null || listedRaw === undefined);
@@ -2448,7 +2380,6 @@ function setPublished_(body, published, typeLabel) {
     memberNo: no,
     isPublished: !!published,
     mintukuListed: toBool_(ctx.row['みんつく掲載']),
-    mintukuOnly: toBool_(ctx.row['みんつく限定']),
     mintukuNumber: mintukuNumber || String(ctx.row['みんつく番号'] || '').trim(),
     lastLoginAt: now,
     publishedAt: String(ctx.row['登録日時'] || '')
@@ -2573,7 +2504,6 @@ function mapUser_(r) {
     mintukuListed: Object.prototype.hasOwnProperty.call(r, 'みんつく掲載')
       ? toBool_(r['みんつく掲載'])
       : false,
-    mintukuOnly: toBool_(r['みんつく限定']),
     // [みんつく] 例: 関東1（画面では No.00001 に変換）
     mintukuNumber: String(r['みんつく番号'] || '').trim(),
     mintukuFirstLoginAt: sheetDateToYmd_(r['みんつく初回ログイン日']),

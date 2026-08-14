@@ -274,23 +274,6 @@ const GasAPI = (() => {
       return post('resumeMintukuListing', payload);
     },
 
-    /** [みんつく] みんつく限定 ON/OFF（Apomy非掲載＋みんつく掲載） */
-    async setMintukuOnly(payload) {
-      if (!USE_GAS) {
-        const only = Boolean(payload && (payload.mintukuOnly || payload.only));
-        return {
-          success: true,
-          data: {
-            mintukuOnly: only,
-            isPublished: only ? false : undefined,
-            mintukuListed: only ? true : undefined,
-            lastLoginAt: formatNow()
-          }
-        };
-      }
-      return post('setMintukuOnly', payload);
-    },
-
     /** [プレジデント] プレジデントメイト掲載のみ停止 */
     async stopPresidentListing(payload) {
       if (!USE_GAS) {

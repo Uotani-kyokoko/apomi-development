@@ -1473,44 +1473,6 @@ body.has-connect-banner-dock .app-main {
   color: #64748b;
 }
 
-/* [みんつく] みんつく限定チェック */
-.mypage-mintuku-only {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 0 4px 14px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  user-select: none;
-}
-
-.mypage-mintuku-only.hidden {
-  display: none;
-}
-
-.mypage-mintuku-only input {
-  margin-top: 3px;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  accent-color: #0f766e;
-}
-
-.mypage-mintuku-only-text {
-  font-size: 0.88rem;
-  line-height: 1.45;
-  color: var(--text-primary);
-}
-
-.mypage-mintuku-only-text strong {
-  display: block;
-  margin-bottom: 2px;
-  font-size: 0.92rem;
-}
-
 .mypage-actions {
   display: flex;
   flex-direction: column;
