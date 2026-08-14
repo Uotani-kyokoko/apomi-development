@@ -177,9 +177,8 @@
       brandApomy?.classList.remove("hidden");
       document.documentElement.style.setProperty("--theme-color", "#5B6CFF");
       prefFilter?.classList.add("hidden");
-      // 当面: Apomyからも導線ボタンは出さない（mintuku/・president/ のURL直打ちでテスト）
-      regionBtn?.classList.add("hidden");
-      presidentBtn?.classList.add("hidden");
+      regionBtn?.classList.remove("hidden");
+      presidentBtn?.classList.remove("hidden");
       return;
     }
 

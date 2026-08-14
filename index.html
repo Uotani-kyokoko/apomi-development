@@ -18,7 +18,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260814f">
+  <link rel="stylesheet" href="css/style.css?v=20260814g">
   <!-- GSI は早めに読み込み（ログインボタン表示を速くする） -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -296,13 +296,13 @@
         </div>
       </div>
 
-  <!-- 地域／プレジデント導線: 当面非表示（URL直打ちの開発者テスト用に機能は残す） -->
-      <button type="button" id="btn-region-link" class="filter-link-card hidden">
+  <!-- 地域は現在地からブロック判定 → みんつくへ（Apomy） / 都道府県絞り込み（みんつく） -->
+      <button type="button" id="btn-region-link" class="filter-link-card">
         <span id="region-link-label">地域を選ぶ</span>
         <i class="fa-solid fa-arrow-up-right-from-square"></i>
       </button>
 
-      <button type="button" id="btn-president-mate-link" class="filter-link-card hidden">
+      <button type="button" id="btn-president-mate-link" class="filter-link-card">
         <span>プレジデントメイト</span>
         <i class="fa-solid fa-arrow-up-right-from-square"></i>
       </button>
@@ -572,10 +572,10 @@
 
   <script src="js/env.js?v=20260805b"></script>
   <script src="js/config.js?v=20260805b"></script>
-  <script src="js/app-mode.js?v=20260814f"></script>
+  <script src="js/app-mode.js?v=20260814g"></script>
   <script src="js/auth.js?v=20260807d"></script>
   <script src="js/mock-api.js?v=20260812a"></script>
-  <script src="js/gas-api.js?v=20260814f"></script>
-  <script src="js/app.js?v=20260814f"></script>
+  <script src="js/gas-api.js?v=20260814g"></script>
+  <script src="js/app.js?v=20260814g"></script>
 </body>
 </html>
