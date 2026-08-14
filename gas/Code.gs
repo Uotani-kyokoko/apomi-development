@@ -483,11 +483,39 @@ function mintukuRegionPrefs_(regionId) {
 }
 
 /**
+ * 現在地セルを都道府県名に正規化
+ * 「東京」「東京都港区」「東京都　」なども 東京都 に揃える
+ */
+function canonicalPrefecture_(raw) {
+  var s = String(raw == null ? '' : raw)
+    .replace(/[\s\u3000\u00a0\r\n\t]+/g, '')
+    .replace(/[（(].*$/, '');
+  if (!s) return '';
+  var all = mintukuRegionPrefs_('hokkaido')
+    .concat(mintukuRegionPrefs_('tohoku'))
+    .concat(mintukuRegionPrefs_('kanto'))
+    .concat(mintukuRegionPrefs_('chubu'))
+    .concat(mintukuRegionPrefs_('kinki'))
+    .concat(mintukuRegionPrefs_('chugoku'))
+    .concat(mintukuRegionPrefs_('shikoku'))
+    .concat(mintukuRegionPrefs_('kyushu-okinawa'));
+  var i;
+  for (i = 0; i < all.length; i++) {
+    if (s === all[i] || s.indexOf(all[i]) === 0) return all[i];
+  }
+  for (i = 0; i < all.length; i++) {
+    var stem = all[i].replace(/[都道府県]$/, '');
+    if (stem && (s === stem || s.indexOf(stem) === 0)) return all[i];
+  }
+  return s;
+}
+
+/**
  * [みんつく] 都道府県が指定地方に含まれるか
  * ※ Apomy の「北海道・東北」結合地図とは別（8地方）
  */
 function isPrefInMintukuRegion_(location, regionId) {
-  var pref = String(location || '').trim();
+  var pref = canonicalPrefecture_(location);
   var id = resolveMintukuRegionId_(regionId) || String(regionId || '').trim().toLowerCase();
   if (!pref || !id) return false;
   var prefs = mintukuRegionPrefs_(id);
@@ -1212,7 +1240,7 @@ function aggregateDashboardRows_(rows, matchFn) {
   };
 }
 
-/** [みんつく] 現在地がその地方の会員で集計 */
+/** [みんつく] 現在地がその地方の会員で集計（スプシに見える表記でカウント） */
 function getMintukuDashboard_(regionId) {
   if (!regionId) {
     return {
@@ -1224,9 +1252,31 @@ function getMintukuDashboard_(regionId) {
       newLast7Days: buildDashboardSeries_(buildDashboardDayCounts_())
     };
   }
-  var rows = readUsersColumnsRows_(['現在地', '登録日時']);
+  var sheet = getSheet_(SHEET.USERS);
+  var headers = getSheetHeaders_(sheet);
+  var locCol = headers.indexOf('現在地');
+  var createdCol = headers.indexOf('登録日時');
+  var lastRow = sheet.getLastRow();
+  if (locCol < 0 || lastRow < 2) {
+    return aggregateDashboardRows_([], function () { return false; });
+  }
+  var num = lastRow - 1;
+  var locVals = sheet.getRange(2, locCol + 1, num, 1).getDisplayValues();
+  var createdVals = createdCol >= 0
+    ? sheet.getRange(2, createdCol + 1, num, 1).getValues()
+    : [];
+  var rows = [];
+  var i;
+  for (i = 0; i < locVals.length; i++) {
+    var loc = String(locVals[i][0] || '').trim();
+    if (!loc) continue;
+    rows.push({
+      '現在地': loc,
+      '登録日時': createdCol >= 0 ? createdVals[i][0] : ''
+    });
+  }
   return aggregateDashboardRows_(rows, function (r) {
-    return isPrefInMintukuRegion_(String(r['現在地'] || '').trim(), regionId);
+    return isPrefInMintukuRegion_(r['現在地'], regionId);
   });
 }
 
