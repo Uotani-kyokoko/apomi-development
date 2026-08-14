@@ -1427,15 +1427,13 @@
     const container = $("#mypage-profile");
     if (!user) {
       container.innerHTML = `<div class="empty-state"><p>プロフィールを読み込めませんでした</p></div>`;
-      renderMintukuPlanPanel(null);
       return;
     }
     container.innerHTML = renderProfileCard(user);
-    renderMintukuPlanPanel(user);
     updateMypageActionLabels(user);
   }
 
-  /** [みんつく] 無料期間／課金後の経過日数（マイページ） */
+  /** [みんつく] 無料期間／課金後の経過日数（ホーム） */
   function getMintukuPlanInfo(user) {
     if (!user) return null;
     const firstAt = String(user.mintukuFirstLoginAt || "").trim();
@@ -1566,7 +1564,7 @@
   }
 
   function renderMintukuPlanPanel(user) {
-    const el = $("#mypage-mintuku-plan");
+    const el = $("#home-mintuku-plan");
     if (!el) return;
     if (!isMintukuMode() || !user) {
       el.classList.add("hidden");
@@ -2111,6 +2109,7 @@
     if (tabId === "home") {
       renderAllBanners();
       renderDashboard(state.dashboard);
+      renderMintukuPlanPanel(state.currentUser);
       loadDashboardStats();
     }
   }
@@ -2819,6 +2818,7 @@
     applySalonSettingsFromState();
     applyMastersToFilterUI();
     renderDashboard(state.dashboard);
+    renderMintukuPlanPanel(state.currentUser);
     renderAllBanners();
     refreshConnectList();
     renderMyPage(state.currentUser);
@@ -3889,6 +3889,7 @@
       }
       refreshConnectList();
       renderMyPage(state.currentUser);
+      renderMintukuPlanPanel(state.currentUser);
       Session.save({
         email: state.identity?.email || state.currentUser.email || "",
         memberNo: state.currentUser.id || "",

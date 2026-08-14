@@ -1438,9 +1438,9 @@ body.has-connect-banner-dock .app-main {
   margin-bottom: 8px;
 }
 
-/* [みんつく] 無料期間の経過・残り */
+/* [みんつく] 無料期間の経過・残り（ホーム） */
 .mypage-mintuku-plan {
-  margin: 4px 4px 12px;
+  margin: 0 4px 14px;
   padding: 14px 14px 12px;
   border-radius: 12px;
   background: #f3f5f9;
