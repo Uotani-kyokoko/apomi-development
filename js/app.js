@@ -254,11 +254,22 @@
   }
 
   function parseMintukuNumber(raw) {
-    const s = String(raw || "").trim();
-    const m = s.match(/^(.+?)(\d+)$/);
+    const s = String(raw ?? "")
+      .trim()
+      .replace(/[\s\u3000]/g, "");
+    if (!s) return null;
+    if (/^\d+$/.test(s)) {
+      const n = Number(s);
+      const label = mintukuRegionLabel();
+      return n > 0 && label ? { label, n } : null;
+    }
+    const m = s.match(/^(.+?)(?:No\.?|Ｎｏ\.?)?(\d+)$/i);
     if (!m) return null;
-    const label = m[1] === "近畿" ? "関西" : m[1];
-    return { label: label, n: Number(m[2]) };
+    let label = String(m[1] || "").replace(/(?:No\.?|Ｎｏ\.?)$/i, "");
+    if (label === "近畿") label = "関西";
+    const n = Number(m[2]);
+    if (!label || !n) return null;
+    return { label, n };
   }
 
   function parsePresidentNumber(raw) {
@@ -290,13 +301,20 @@
     return `No.${digits.padStart(5, "0")}`;
   }
 
+  /** みんつく番号の画面表記（例: 中国No.1） */
+  function formatMintukuDisplayNo(n, label = mintukuRegionLabel()) {
+    const num = Number(n);
+    if (!label || !Number.isFinite(num) || num <= 0) return "No.-----";
+    return `${label}No.${Math.floor(num)}`;
+  }
+
   /** カード表示用 */
   function formatUserMemberNo(user) {
     if (isMintukuMode()) {
       const parsed = parseMintukuNumber(user?.mintukuNumber);
       const label = mintukuRegionLabel();
       if (!parsed || parsed.label !== label || !parsed.n) return "No.-----";
-      return `No.${String(parsed.n).padStart(5, "0")}`;
+      return formatMintukuDisplayNo(parsed.n, parsed.label);
     }
     if (isPresidentMode()) {
       const parsed = parsePresidentNumber(user?.presidentNumber);
@@ -523,18 +541,23 @@
     const maxNo = Math.max(maxMemberNoAmong(list), 1);
     const bandCount = Math.max(1, Math.ceil(maxNo / CONNECT_BAND_SIZE));
     const menu = [{ id: "latest", label: "最新ユーザー", type: "latest" }];
+    const mintukuLabel = isMintukuMode() ? mintukuRegionLabel() : "";
 
     for (let i = 0; i < bandCount; i++) {
       const from = i * CONNECT_BAND_SIZE + 1;
       const to = (i + 1) * CONNECT_BAND_SIZE;
       menu.push({
         id: `no-${i + 1}`,
-        label: `No.${from}～No.${to}`,
+        label: mintukuLabel
+          ? `${formatMintukuDisplayNo(from, mintukuLabel)}～${formatMintukuDisplayNo(to, mintukuLabel)}`
+          : `No.${from}～No.${to}`,
         type: "range",
         from,
         to
       });
     }
+
+    if (isMintukuMode()) return menu;
 
     occupiedBands(list, (u) => u.presidentMark).forEach((b) => {
       menu.push({
@@ -1286,6 +1309,10 @@
     }
     if (page.type === "range" || page.type === "president" || page.type === "salon") {
       const prefix = page.type === "president" ? "社長 " : page.type === "salon" ? "サロン " : "";
+      if (isMintukuMode() && page.type === "range") {
+        el.textContent = `${formatMintukuDisplayNo(page.from)} ~ ${formatMintukuDisplayNo(page.to)}`;
+        return;
+      }
       el.textContent = `${prefix}${formatMemberNo(page.from)} ~ ${formatMemberNo(page.to)}`;
       return;
     }
@@ -1316,7 +1343,7 @@
         .filter((u) => {
           const n = userMemberSortKey(u);
           if (n >= page.from && n <= page.to) return true;
-          // みんつく未採番は最終帯へ（ダッシュボード人数と揃える）
+          // みんつく未採番は最終帯へ
           if (isMintukuMode() && n >= Number.MAX_SAFE_INTEGER) {
             return page.to >= lastTo;
           }

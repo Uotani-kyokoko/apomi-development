@@ -560,12 +560,15 @@ function mintukuRegionLabel_(regionId) {
  * [みんつく] 「関東12」→ { label: '関東', n: 12 }
  */
 function parseMintukuNumber_(raw) {
-  var s = String(raw || '').trim();
-  var m = s.match(/^(.+?)(\d+)$/);
+  var s = String(raw == null ? '' : raw).replace(/[\s\u3000]/g, '');
+  if (!s || /^\d+$/.test(s)) return null;
+  var m = s.match(/^(.+?)(?:No\.?|NO\.?|no\.?|Ｎｏ\.?)?(\d+)$/);
   if (!m) return null;
-  var label = m[1];
+  var label = String(m[1] || '').replace(/(?:No\.?|NO\.?|no\.?|Ｎｏ\.?)$/, '');
   if (label === '近畿') label = '関西';
-  return { label: label, n: Number(m[2]) };
+  var n = Number(m[2]);
+  if (!label || !n) return null;
+  return { label: label, n: n };
 }
 
 /** [みんつく] 地方ごとの次番号（互換: 全件オブジェクト配列から） */
@@ -2667,7 +2670,7 @@ function mapUser_(r) {
       ? toBool_(r['みんつく掲載'])
       : false,
     // [みんつく] 例: 関東1（画面では No.00001 に変換）
-    mintukuNumber: String(r['みんつく番号'] || '').trim(),
+    mintukuNumber: String(r['みんつく番号'] == null ? '' : r['みんつく番号']).trim(),
     mintukuFirstLoginAt: sheetDateToYmd_(r['みんつく初回ログイン日']),
     mintukuPaid: isMintukuPaid_(r),
     mintukuPaidStartAt: getMintukuPaidStartRaw_(r),
@@ -2740,7 +2743,7 @@ function mapUserListItem_(r) {
     mintukuListed: Object.prototype.hasOwnProperty.call(r, 'みんつく掲載')
       ? toBool_(r['みんつく掲載'])
       : false,
-    mintukuNumber: String(r['みんつく番号'] || '').trim(),
+    mintukuNumber: String(r['みんつく番号'] == null ? '' : r['みんつく番号']).trim(),
     presidentMateListed: isPresidentMateListed_(r),
     presidentNumber: String(r['プレジデント番号'] || '').trim(),
     presidentMark: toBool_(r['社長マーク']),
