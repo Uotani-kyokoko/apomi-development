@@ -223,7 +223,7 @@ const MockAPI = (() => {
           { value: "https://example.com/region/chubu", label: "中部" },
           { value: "https://example.com/region/chugoku", label: "中国" },
           { value: "https://example.com/region/shikoku", label: "四国" },
-          { value: "https://example.com/region/kinki", label: "近畿" },
+          { value: "https://example.com/region/kinki", label: "関西" },
           { value: "https://example.com/region/kyushu-okinawa", label: "九州・沖縄" }
         ],
         性別: [
@@ -303,7 +303,8 @@ const MockAPI = (() => {
           const meta = AppMode.getRegionMeta(identity.region);
           const label = meta ? meta.label : "";
           const parsed = String(user.mintukuNumber || "").match(/^(.+?)(\d+)$/);
-          if (label && (!parsed || parsed[1] !== label)) {
+          const parsedLabel = parsed && parsed[1] === "近畿" ? "関西" : parsed ? parsed[1] : "";
+          if (label && (!parsed || parsedLabel !== label)) {
             user.mintukuNumber = label + "1";
             user.mintukuListed = true;
             if (currentUser) {

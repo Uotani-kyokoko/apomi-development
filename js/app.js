@@ -23,7 +23,7 @@
   /** ログイン直後は me/touch を1回スキップ（シート二重書き込み・タイムアウト対策） */
   let skipMeTouchOnce = false;
   /** 会員一覧のセッションキャッシュ（繋がる表示時のみ取得） */
-  const USERS_CACHE_KEY = "apomy_users_cache_v1";
+  const USERS_CACHE_KEY = "apomy_users_cache_v2";
   const USERS_CACHE_TTL_MS = 5 * 60 * 1000;
   let usersLoadedAt = 0;
   let usersCacheKey = "";
@@ -62,8 +62,8 @@
     identity: null,
     /** 未掲載時の必須プロフィール入力（初回 / 掲載停止） */
     editRequired: false,
-    /** 繋がるページ id（latest / no-N / pres-N / salon） */
-    connectPageId: "latest",
+    /** 繋がるページ id（latest / no-N / pres-N / salon）。みんつくは番号帯を初期表示 */
+    connectPageId: bootMode.app === "mintuku" ? "no-1" : "latest",
     filters: {
       industry: [],
       gender: "all",
@@ -257,7 +257,8 @@
     const s = String(raw || "").trim();
     const m = s.match(/^(.+?)(\d+)$/);
     if (!m) return null;
-    return { label: m[1], n: Number(m[2]) };
+    const label = m[1] === "近畿" ? "関西" : m[1];
+    return { label: label, n: Number(m[2]) };
   }
 
   function parsePresidentNumber(raw) {
@@ -1307,10 +1308,19 @@
         });
     }
     if (page.type === "range") {
+      const lastTo = Math.max(
+        CONNECT_BAND_SIZE,
+        Math.ceil(Math.max(maxMemberNoAmong(list), 1) / CONNECT_BAND_SIZE) * CONNECT_BAND_SIZE
+      );
       return list
         .filter((u) => {
           const n = userMemberSortKey(u);
-          return n >= page.from && n <= page.to;
+          if (n >= page.from && n <= page.to) return true;
+          // みんつく未採番は最終帯へ（ダッシュボード人数と揃える）
+          if (isMintukuMode() && n >= Number.MAX_SAFE_INTEGER) {
+            return page.to >= lastTo;
+          }
+          return false;
         })
         .sort((a, b) => userMemberSortKey(a) - userMemberSortKey(b));
     }
@@ -1397,12 +1407,13 @@
     return true;
   }
 
-  /** 未許可・存在しないページに居る場合は最新へ戻す */
+  /** 未許可・存在しないページに居る場合は最新へ戻す（みんつくは番号帯） */
   function ensureConnectPageAccess() {
     const menu = getConnectMenu();
     const page = menu.find((p) => p.id === state.connectPageId);
     if (!page || !canAccessConnectPage(page)) {
-      state.connectPageId = "latest";
+      const fallback = isMintukuMode() ? menu.find((p) => p.type === "range") : null;
+      state.connectPageId = fallback ? fallback.id : "latest";
     }
   }
 
@@ -2690,7 +2701,7 @@
           { label: "中部", value: "https://example.com/region/chubu" },
           { label: "中国", value: "https://example.com/region/chugoku" },
           { label: "四国", value: "https://example.com/region/shikoku" },
-          { label: "近畿", value: "https://example.com/region/kinki" },
+          { label: "関西", value: "https://example.com/region/kinki" },
           { label: "九州・沖縄", value: "https://example.com/region/kyushu-okinawa" }
         ];
     const label = $("#region-link-label");
@@ -2742,13 +2753,13 @@
     岐阜県: "中部",
     静岡県: "中部",
     愛知県: "中部",
-    三重県: "近畿",
-    滋賀県: "近畿",
-    京都府: "近畿",
-    大阪府: "近畿",
-    兵庫県: "近畿",
-    奈良県: "近畿",
-    和歌山県: "近畿",
+    三重県: "関西",
+    滋賀県: "関西",
+    京都府: "関西",
+    大阪府: "関西",
+    兵庫県: "関西",
+    奈良県: "関西",
+    和歌山県: "関西",
     鳥取県: "中国",
     島根県: "中国",
     岡山県: "中国",
@@ -2861,7 +2872,15 @@
       }
       // [みんつく] 都道府県プルダウン
       if (isMintukuMode() && locationPref && locationPref !== "all") {
-        if (String(u.location || "").trim() !== locationPref) return false;
+        const want =
+          typeof AppMode !== "undefined" && AppMode.canonicalPrefecture
+            ? AppMode.canonicalPrefecture(locationPref)
+            : locationPref;
+        const got =
+          typeof AppMode !== "undefined" && AppMode.canonicalPrefecture
+            ? AppMode.canonicalPrefecture(u.location)
+            : String(u.location || "").trim();
+        if (got !== want && String(u.location || "").trim() !== locationPref) return false;
       }
       // [プレジデント] 二重チェック（サーバでも絞る）
       if (isPresidentMode()) {

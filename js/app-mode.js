@@ -41,7 +41,7 @@
     },
     kinki: {
       id: "kinki",
-      label: "近畿",
+      label: "関西",
       prefs: ["三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県"]
     },
     chugoku: {
@@ -148,15 +148,44 @@
     return "みんつく" + meta.label;
   }
 
+  function allMintukuPrefs() {
+    const out = [];
+    Object.keys(MINTUKU_REGIONS).forEach(function (id) {
+      MINTUKU_REGIONS[id].prefs.forEach(function (pref) {
+        out.push(pref);
+      });
+    });
+    return out;
+  }
+
+  /** 「広島」「広島県広島市」→ 広島県 */
+  function canonicalPrefecture(raw) {
+    const s = String(raw == null ? "" : raw)
+      .replace(/[\s\u3000\u00a0\r\n\t]+/g, "")
+      .replace(/[（(].*$/, "");
+    if (!s) return "";
+    const all = allMintukuPrefs();
+    let i;
+    for (i = 0; i < all.length; i++) {
+      if (s === all[i] || s.indexOf(all[i]) === 0) return all[i];
+    }
+    for (i = 0; i < all.length; i++) {
+      const stem = all[i].replace(/[都道府県]$/, "");
+      if (stem && (s === stem || s.indexOf(stem) === 0)) return all[i];
+    }
+    return s;
+  }
+
   function prefectureToRegionId(prefecture) {
-    const pref = String(prefecture || "").trim();
-    return PREFECTURE_TO_MINTUKU_REGION[pref] || null;
+    const pref = canonicalPrefecture(prefecture);
+    return PREFECTURE_TO_MINTUKU_REGION[pref] || PREFECTURE_TO_MINTUKU_REGION[String(prefecture || "").trim()] || null;
   }
 
   function isPrefectureInRegion(prefecture, regionId) {
     const meta = getRegionMeta(regionId);
     if (!meta) return false;
-    return meta.prefs.indexOf(String(prefecture || "").trim()) >= 0;
+    const pref = canonicalPrefecture(prefecture);
+    return meta.prefs.indexOf(pref) >= 0;
   }
 
   function mintukuEntryUrl(regionId, opts) {
@@ -201,6 +230,7 @@
     regionToken: regionToken,
     getRegionMeta: getRegionMeta,
     displayName: displayName,
+    canonicalPrefecture: canonicalPrefecture,
     prefectureToRegionId: prefectureToRegionId,
     isPrefectureInRegion: isPrefectureInRegion,
     mintukuEntryUrl: mintukuEntryUrl,

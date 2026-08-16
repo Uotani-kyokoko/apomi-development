@@ -31,7 +31,7 @@
  * 現在地: 初回のみアプリで設定。変更はオーナー手動。手動変更後の初回ログインでみんつく番号を付け直し
  * みんつく課金開始日: 日付あり＝有料。無料期間は初回ログイン基準、課金後はこの日起算で経過表示
  * Apomy掲載開始時: みんつく掲載=TRUE＋現在地からみんつく番号を採番
- * 一覧: Apomyは掲載中のみ／みんつくはみんつく掲載のみ（相互に独立）
+ * 一覧: Apomyは掲載中のみ／みんつくは現在地がその地方なら出す（ダッシュボードと同じ。みんつく掲載は見ない）
  * 一覧APIは必要列のみ読込（全列 getDataRange しない）。ログイン時は一覧を取らない（FEが繋がる表示時に取得）
  * 設定キー: みんつく問い合わせURL（期限切れ画面の「こちら」）
  * POST: stopMintukuListing / resumeMintukuListing
@@ -280,11 +280,9 @@ function getUsers_(p) {
     .filter(function (r) {
       if (isMintuku) {
         if (!isPrefInMintukuRegion_(r['現在地'], mintukuRegion)) return false;
-        if (!includeUnpublished) {
-          if (!toBool_(r['みんつく掲載'])) return false;
-        }
         if (locationPref && locationPref !== 'all') {
-          if (String(r['現在地'] || '').trim() !== locationPref) return false;
+          if (canonicalPrefecture_(r['現在地']) !== canonicalPrefecture_(locationPref) &&
+              String(r['現在地'] || '').trim() !== locationPref) return false;
         }
       } else if (isPresident) {
         if (!toBool_(r['社長マーク'])) return false;
@@ -546,7 +544,7 @@ function mintukuRegionLabel_(regionId) {
     case 'chubu':
       return '中部';
     case 'kinki':
-      return '近畿';
+      return '関西';
     case 'chugoku':
       return '中国';
     case 'shikoku':
@@ -565,7 +563,9 @@ function parseMintukuNumber_(raw) {
   var s = String(raw || '').trim();
   var m = s.match(/^(.+?)(\d+)$/);
   if (!m) return null;
-  return { label: m[1], n: Number(m[2]) };
+  var label = m[1];
+  if (label === '近畿') label = '関西';
+  return { label: label, n: Number(m[2]) };
 }
 
 /** [みんつく] 地方ごとの次番号（互換: 全件オブジェクト配列から） */
@@ -634,7 +634,7 @@ function nextMintukuSeqLocked_(sheet, headers, label) {
 
 /**
  * [みんつく] 初回アクセス時に地方番号を自動採番（アクセス順）
- * 保存例: 関東1 / 近畿2
+ * 保存例: 関東1 / 関西2
  * ※すでに番号がある場合は掲載フラグを勝手にONに戻さない（停止操作を尊重）
  */
 function ensureMintukuNumberCtx_(ctx, regionId) {
