@@ -63,10 +63,6 @@ const AVATAR_FOLDER_ID = '1Dl3UOzrbFwvK8FGUEK7ZVjZ95qUqIXvV';
 const APPLICATION_FOLDER_ID = '1KH9tpnep8-0RFGjpC45kiciVRWH6c26g';
 // === END ENV ===
 
-
-
-
-
 const SHEET = {
   USERS: '会員',
   BANNERS: 'バナー',
@@ -599,8 +595,79 @@ function scanMintukuNumberColMax_(sheet, headers, label) {
   return max;
 }
 
+var MINTUKU_SEQ_LABELS_ = [
+  '北海道',
+  '東北',
+  '関東',
+  '中部',
+  '関西',
+  '中国',
+  '四国',
+  '九州・沖縄'
+];
+var MINTUKU_SEQ_REFRESH_KEY_ = 'mintuku_seq_refreshed_ymd';
+
+/**
+ * [みんつく] カウンタをシートの地方最大以上に合わせる
+ * ※欠番は埋めないので、カウンタの方が大きいときは下げない
+ */
+function refreshMintukuSeqCountersFromSheet_(sheet, headers, props) {
+  var i;
+  for (i = 0; i < MINTUKU_SEQ_LABELS_.length; i++) {
+    var label = MINTUKU_SEQ_LABELS_[i];
+    var key = 'mintuku_seq_' + label;
+    var sheetMax = scanMintukuNumberColMax_(sheet, headers, label);
+    var n = Number(props.getProperty(key) || 0);
+    if (sheetMax > n) n = sheetMax;
+    if (n > 0) {
+      try {
+        props.setProperty(key, String(n));
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  }
+  try {
+    props.setProperty(MINTUKU_SEQ_REFRESH_KEY_, tokyoDateKey_(new Date()) || '');
+  } catch (e2) {
+    /* ignore */
+  }
+}
+
+/**
+ * トリガー用: 1日1回、みんつく番号カウンタをシート最大に合わせる
+ * Apps Script → トリガー → 時間主導 → 日タイマー → この関数
+ */
+function refreshMintukuSeqCountersDaily() {
+  var sheet = getSheet_(SHEET.USERS);
+  var headers = getSheetHeaders_(sheet);
+  var lock = null;
+  try {
+    lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+  } catch (e) {
+    lock = null;
+  }
+  try {
+    refreshMintukuSeqCountersFromSheet_(
+      sheet,
+      headers,
+      PropertiesService.getScriptProperties()
+    );
+  } finally {
+    if (lock) {
+      try {
+        lock.releaseLock();
+      } catch (e2) {
+        /* ignore */
+      }
+    }
+  }
+}
+
 /**
  * [みんつく] 次番号（ScriptProperties + 番号列スキャン。Lockで同時採番を防ぐ）
+ * 東京日付が変わっていたら、先にシート最大へカウンタを合わせる（1日1回）
  */
 function nextMintukuSeqLocked_(sheet, headers, label) {
   var lock = null;
@@ -612,6 +679,11 @@ function nextMintukuSeqLocked_(sheet, headers, label) {
   }
   try {
     var props = PropertiesService.getScriptProperties();
+    var today = tokyoDateKey_(new Date()) || '';
+    var refreshed = String(props.getProperty(MINTUKU_SEQ_REFRESH_KEY_) || '');
+    if (today && refreshed !== today) {
+      refreshMintukuSeqCountersFromSheet_(sheet, headers, props);
+    }
     var key = 'mintuku_seq_' + String(label || '');
     var n = Number(props.getProperty(key) || 0);
     if (!(n > 0)) {
