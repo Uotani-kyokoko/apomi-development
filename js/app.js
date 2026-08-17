@@ -273,10 +273,14 @@
   }
 
   function parsePresidentNumber(raw) {
-    const s = String(raw || "").trim();
-    const m = s.match(/^社長(\d+)$/);
+    const s = String(raw ?? "")
+      .trim()
+      .replace(/[\s\u3000]/g, "");
+    if (!s) return null;
+    const m = s.match(/^社長(?:No\.?|Ｎｏ\.?)?(\d+)$/i);
     if (!m) return null;
-    return { n: Number(m[1]) };
+    const n = Number(m[1]);
+    return n > 0 ? { n } : null;
   }
 
   /** みんつく: みんつく番号 / プレジデント: プレジデント番号 / Apomy: 会員番号 */
@@ -308,6 +312,13 @@
     return `${label}No.${Math.floor(num)}`;
   }
 
+  /** プレジデント番号の画面表記（例: 社長No.1） */
+  function formatPresidentDisplayNo(n) {
+    const num = Number(n);
+    if (!Number.isFinite(num) || num <= 0) return "No.-----";
+    return `社長No.${Math.floor(num)}`;
+  }
+
   /** カード表示用 */
   function formatUserMemberNo(user) {
     if (isMintukuMode()) {
@@ -319,7 +330,7 @@
     if (isPresidentMode()) {
       const parsed = parsePresidentNumber(user?.presidentNumber);
       if (!parsed || !parsed.n) return "No.-----";
-      return `No.${String(parsed.n).padStart(5, "0")}`;
+      return formatPresidentDisplayNo(parsed.n);
     }
     return formatMemberNo(user?.id);
   }
@@ -529,7 +540,7 @@
       occupiedBands(list, () => true).forEach((b) => {
         menu.push({
           id: `pres-${b.index}`,
-          label: `社長 No.${b.from}～No.${b.to}`,
+          label: `${formatPresidentDisplayNo(b.from)}～${formatPresidentDisplayNo(b.to)}`,
           type: "president",
           from: b.from,
           to: b.to
@@ -1311,6 +1322,10 @@
       const prefix = page.type === "president" ? "社長 " : page.type === "salon" ? "サロン " : "";
       if (isMintukuMode() && page.type === "range") {
         el.textContent = `${formatMintukuDisplayNo(page.from)} ~ ${formatMintukuDisplayNo(page.to)}`;
+        return;
+      }
+      if (isPresidentMode() && page.type === "president") {
+        el.textContent = `${formatPresidentDisplayNo(page.from)} ~ ${formatPresidentDisplayNo(page.to)}`;
         return;
       }
       el.textContent = `${prefix}${formatMemberNo(page.from)} ~ ${formatMemberNo(page.to)}`;

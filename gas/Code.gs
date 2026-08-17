@@ -1023,10 +1023,12 @@ function isPresidentMateListed_(row) {
 }
 
 function parsePresidentNumber_(raw) {
-  var s = String(raw || '').trim();
-  var m = s.match(/^社長(\d+)$/);
+  var s = String(raw == null ? '' : raw).replace(/[\s\u3000]/g, '');
+  if (!s) return null;
+  var m = s.match(/^社長(?:No\.?|NO\.?|no\.?|Ｎｏ\.?)?(\d+)$/);
   if (!m) return null;
-  return { n: Number(m[1]) };
+  var n = Number(m[1]);
+  return n > 0 ? { n: n } : null;
 }
 
 function scanPresidentNumberColMax_(sheet, headers) {
