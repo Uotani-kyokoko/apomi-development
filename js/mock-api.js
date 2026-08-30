@@ -105,6 +105,15 @@ const MockAPI = (() => {
     return toDateKeyTokyo(d);
   }
 
+  function parsePresidentNumber(raw) {
+    const s = String(raw == null ? "" : raw).replace(/[\s\u3000]/g, "");
+    if (!s) return null;
+    const m = s.match(/^社長(?:No\.?|NO\.?|no\.?|Ｎｏ\.?)?(\d+)$/);
+    if (!m) return null;
+    const n = Number(m[1]);
+    return n > 0 ? { n } : null;
+  }
+
   function computeDashboardFromUsers(list) {
     const users = Array.isArray(list) ? list : [];
     const now = new Date();
@@ -122,8 +131,7 @@ const MockAPI = (() => {
     users.forEach((u) => {
       const createdKey = toDateKeyTokyo(u.createdAt || u.publishedAt);
       const loginKey = toDateKeyTokyo(u.lastLoginAt);
-      const hasRealName = Boolean(String(u.realName || "").trim());
-      if (u.isPublished === false && loginKey === yesterday && hasRealName) unpublished += 1;
+      if (parsePresidentNumber(u.presidentNumber)) unpublished += 1;
       if (createdKey === yesterday) yesterdayNew += 1;
       if (
         loginKey === yesterday &&
