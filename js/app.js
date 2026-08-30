@@ -1701,7 +1701,9 @@
     const resumeApomyMintuku = $("#btn-resume-apomy-from-mintuku");
     const stopPresident = $("#btn-stop-president-listing");
     if (stopApomyMintuku) {
-      stopApomyMintuku.textContent = "全国の人とはつながりたくない方";
+      stopApomyMintuku.textContent = isPresidentMode()
+        ? "アポミーだけ掲載削除"
+        : "全国の人とはつながりたくない方";
     }
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
