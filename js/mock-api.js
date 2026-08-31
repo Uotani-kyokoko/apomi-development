@@ -126,21 +126,15 @@ const MockAPI = (() => {
 
     let yesterdayNew = 0;
     let unpublished = 0;
-    let yesterdayReturning = 0;
+    let presidentMateParticipants = 0;
 
     users.forEach((u) => {
       const createdKey = toDateKeyTokyo(u.createdAt || u.publishedAt);
       const loginKey = toDateKeyTokyo(u.lastLoginAt);
-      if (parsePresidentNumber(u.presidentNumber)) unpublished += 1;
+      const hasRealName = Boolean(String(u.realName || "").trim());
+      if (u.isPublished === false && loginKey === yesterday && hasRealName) unpublished += 1;
+      if (parsePresidentNumber(u.presidentNumber)) presidentMateParticipants += 1;
       if (createdKey === yesterday) yesterdayNew += 1;
-      if (
-        loginKey === yesterday &&
-        createdKey &&
-        createdKey < yesterday &&
-        u.isPublished !== false
-      ) {
-        yesterdayReturning += 1;
-      }
       if (createdKey && Object.prototype.hasOwnProperty.call(dayCounts, createdKey)) {
         dayCounts[createdKey] += 1;
       }
@@ -159,7 +153,7 @@ const MockAPI = (() => {
       totalRegistered: users.length,
       yesterdayNew,
       unpublished,
-      yesterdayReturning,
+      presidentMateParticipants,
       newLast7Days
     };
   }

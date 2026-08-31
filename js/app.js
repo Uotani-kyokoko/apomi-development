@@ -1087,7 +1087,7 @@
     const total = $("#dash-total");
     const neu = $("#dash-new");
     const unpublished = $("#dash-unpublished");
-    const returning = $("#dash-returning");
+    const presidentMate = $("#dash-president-mate");
     const bars = $("#dash-bars");
     const chartTotal = $("#dash-chart-total");
     const compactDash = isMintukuMode() || isPresidentMode();
@@ -1099,7 +1099,7 @@
       if (total) total.textContent = "—";
       if (neu) neu.textContent = "—";
       if (unpublished) unpublished.textContent = "—";
-      if (returning) returning.textContent = "—";
+      if (presidentMate) presidentMate.textContent = "—";
       if (asof) asof.textContent = "";
       if (bars) bars.innerHTML = "";
       if (chartTotal) chartTotal.textContent = "";
@@ -1109,7 +1109,9 @@
     if (total) total.textContent = formatDashNumber(data.totalRegistered);
     if (neu) neu.textContent = formatDashNumber(data.yesterdayNew);
     if (unpublished) unpublished.textContent = formatDashNumber(data.unpublished);
-    if (returning) returning.textContent = formatDashNumber(data.yesterdayReturning);
+    if (presidentMate) {
+      presidentMate.textContent = formatDashNumber(data.presidentMateParticipants);
+    }
     if (asof) {
       asof.textContent = data.asOf ? `${String(data.asOf).replace(/-/g, "/")} 時点` : "";
     }

@@ -66,6 +66,7 @@ const APPLICATION_FOLDER_ID = '1KH9tpnep8-0RFGjpC45kiciVRWH6c26g';
 
 
 
+
 const SHEET = {
   USERS: '会員',
   BANNERS: 'バナー',
@@ -1425,8 +1426,8 @@ function getPresidentDashboard_() {
  * [Apomy] ホームダッシュボード用集計（Asia/Tokyo）
  * - 登録人数: 会員シート全件
  * - 昨日の新規: 登録日時が昨日
+ * - 昨日の掲載停止者: 掲載中=FALSE かつ 最終ログイン日時が昨日 かつ 本名が空でない
  * - プレジデントメイト参加者: プレジデント番号が採番済みの累計
- * - 再参加者: 昨日ログインがあり、登録日が昨日より前、かつ掲載中=TRUE
  */
 function getApomyDashboard_() {
   var rows = readUsersColumnsRows_([
@@ -1440,7 +1441,7 @@ function getApomyDashboard_() {
   var result = aggregateDashboardRows_(rows, function () {
     return true;
   });
-  result.unpublished = rows.filter(function (r) {
+  result.presidentMateParticipants = rows.filter(function (r) {
     return !!parsePresidentNumber_(r['プレジデント番号']);
   }).length;
   return result;
