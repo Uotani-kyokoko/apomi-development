@@ -1146,7 +1146,8 @@
     if (
       state.dashboard &&
       Date.now() - lastDashboardAt < DASHBOARD_CACHE_MS &&
-      lastDashboardKey === dashKey
+      lastDashboardKey === dashKey &&
+      Object.prototype.hasOwnProperty.call(state.dashboard, "presidentMateParticipants")
     ) {
       renderDashboard(state.dashboard);
       return;
@@ -3016,8 +3017,12 @@
       state.settings = { ...(cached.settings || {}), ...(state.settings || {}) };
     }
     if (cached.dashboard && !state.dashboard) {
-      state.dashboard = cached.dashboard;
-      lastDashboardAt = Number(cached.savedAt) || Date.now();
+      const dash = cached.dashboard;
+      const hasPmField = dash && Object.prototype.hasOwnProperty.call(dash, "presidentMateParticipants");
+      if (hasPmField) {
+        state.dashboard = dash;
+        lastDashboardAt = Number(cached.savedAt) || Date.now();
+      }
     }
   }
 

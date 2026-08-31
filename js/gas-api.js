@@ -178,11 +178,21 @@ const GasAPI = (() => {
     async fetchDashboard(params = {}) {
       if (!USE_GAS) return MockAPI.fetchDashboard(params);
       try {
-        return await get('dashboard', params);
+        const res = await get('dashboard', params);
+        const data = res?.data;
+        // 旧GAS未デプロイ時: unpublished にPM数が入り presidentMateParticipants が無い
+        if (data && !Object.prototype.hasOwnProperty.call(data, 'presidentMateParticipants')) {
+          console.warn('[apomy] dashboard missing presidentMateParticipants; recomputing from users');
+          const usersRes = await get('users', { includeUnpublished: 'true' }, USERS_TIMEOUT_MS);
+          const computed = MockAPI.computeDashboardFromUsers(usersRes.data || []);
+          data.unpublished = computed.unpublished;
+          data.presidentMateParticipants = computed.presidentMateParticipants;
+        }
+        return res;
       } catch (err) {
         // 旧デプロイ時は未掲載込み一覧からフロント集計
         console.warn('[apomy] dashboard API fallback', err);
-        const res = await get('users', { includeUnpublished: 'true' });
+        const res = await get('users', { includeUnpublished: 'true' }, USERS_TIMEOUT_MS);
         return {
           success: true,
           data: MockAPI.computeDashboardFromUsers(res.data || [])
