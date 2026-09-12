@@ -6,3 +6,5 @@
 開発者メール,
 メンテナンス,FALSE
 GoogleクライアントID,（config.jsと同じクライアントIDを入れる）
+みんつくPayPayURL,https://pay.paypay.ne.jp/（PayPay送金リンクを入れる・期限切れしたら更新）
+みんつくフォームURL,https://docs.google.com/forms/d/e/（送金報告フォームのURL）

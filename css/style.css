@@ -355,16 +355,17 @@ img {
   color: #374151;
 }
 
-/* [みんつく] 無料期間終了 */
+/* [みんつく] 無料期間終了（課金案内） */
 #mintuku-expired-screen {
   position: fixed;
   inset: 0;
   z-index: 90;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
-  background: #f3f4f6;
+  padding: 20px 16px 32px;
+  overflow-y: auto;
+  background: #fff;
 }
 
 #mintuku-expired-screen.hidden {
@@ -373,52 +374,152 @@ img {
 
 .mintuku-expired-inner {
   width: 100%;
-  max-width: 360px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 14px;
+  gap: 16px;
+  text-align: left;
 }
 
 .mintuku-expired-title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: #dc2626;
+  text-align: center;
+}
+
+.mintuku-expired-lead {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mintuku-expired-lead p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.75;
+  color: #111827;
+}
+
+.mintuku-expired-em {
+  color: #ea580c;
+  font-weight: 700;
+}
+
+.mintuku-expired-counts-title {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.mintuku-expired-region-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mintuku-expired-region-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: #111827;
+  padding: 4px 0;
+  border-bottom: 1px dotted #e5e7eb;
+}
+
+.mintuku-expired-region-list li.is-mine {
+  background: #fff7ed;
+  margin: 0 -6px;
+  padding: 6px;
+  border-radius: 6px;
+  border-bottom-color: transparent;
+  font-weight: 700;
+}
+
+.mintuku-expired-region-name {
+  flex: 0 0 auto;
+}
+
+.mintuku-expired-region-count {
+  flex: 1 1 auto;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mintuku-expired-region-yen {
+  flex: 0 0 auto;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.mintuku-expired-price-hint {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.mintuku-expired-steps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mintuku-expired-step-label {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
   font-weight: 700;
   color: #111827;
 }
 
-.mintuku-expired-text {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.8;
-  color: #374151;
-}
-
-.mintuku-expired-link {
-  color: #1d4ed8;
-  font-weight: 700;
-  text-decoration: underline;
-}
-
-.mintuku-expired-btn {
-  display: inline-flex;
+.mintuku-expired-cta {
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 200px;
-  padding: 12px 18px;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
   border-radius: 999px;
-  background: #1d4ed8;
-  color: #fff;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
+  box-sizing: border-box;
 }
 
-.mintuku-expired-btn.hidden {
-  display: none;
+.mintuku-expired-cta.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.mintuku-expired-cta-paypay,
+.mintuku-expired-cta-form {
+  background: #facc15;
+  color: #111827;
+  border: 1px solid #eab308;
+}
+
+.mintuku-expired-cta-line {
+  background: #06c755;
+  color: #fff;
+}
+
+.mintuku-expired-cta-brand {
+  font-size: 1rem;
+  letter-spacing: 0.02em;
 }
 
 .mintuku-expired-back {
+  align-self: center;
   border: none;
   background: transparent;
   color: #6b7280;
@@ -426,6 +527,7 @@ img {
   text-decoration: underline;
   cursor: pointer;
   padding: 8px;
+  margin-top: 4px;
 }
 
 .maintenance-admin-hint {

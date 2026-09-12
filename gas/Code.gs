@@ -33,7 +33,8 @@
  * Apomy掲載開始時: みんつく掲載=TRUE＋現在地からみんつく番号を採番
  * 一覧: Apomyは掲載中のみ／みんつくは現在地がその地方なら出す（ダッシュボードと同じ。みんつく掲載は見ない）
  * 一覧APIは必要列のみ読込（全列 getDataRange しない）。ログイン時は一覧を取らない（FEが繋がる表示時に取得）
- * 設定キー: みんつく問い合わせURL（期限切れ画面の「こちら」）
+ * 設定キー: みんつくPayPayURL / みんつくフォームURL（期限切れ画面）
+ * 公式LINEはマスタ区分「公式LINE」を参照
  * POST: stopMintukuListing / resumeMintukuListing
  * updateProfile は publish=true で掲載開始＋みんつく採番まで1リクエスト完結可
  * 会員の単票更新は「列検索で行特定→1行読込→メモリ更新→1行 setValues」を基本とし、全件オブジェクト化を避ける
@@ -62,11 +63,6 @@ const SPREADSHEET_ID = '1JNnkjKwUwNY9OnCAkIvZE_5yOi0xJyUcHzdpBWhhu64';
 const AVATAR_FOLDER_ID = '1Dl3UOzrbFwvK8FGUEK7ZVjZ95qUqIXvV';
 const APPLICATION_FOLDER_ID = '1KH9tpnep8-0RFGjpC45kiciVRWH6c26g';
 // === END ENV ===
-
-
-
-
-
 
 const SHEET = {
   USERS: '会員',
@@ -114,6 +110,10 @@ function doGet(e) {
         break;
       case 'dashboard':
         data = getDashboard_(p);
+        break;
+      case 'mintukuRegionCounts':
+        // [みんつく] 期限切れ画面用・認証不要の地方別人数
+        data = getMintukuRegionCounts_();
         break;
       case 'ping':
         data = { ok: true, message: 'apomy GAS is alive' };
@@ -1415,6 +1415,56 @@ function getMintukuDashboard_(regionId) {
   });
 }
 
+/**
+ * [みんつく] 8地方ごとの現在地人数（期限切れ画面・リアルタイム）
+ * ※みんつく掲載フラグは見ない（ダッシュボードと同じ）
+ */
+function getMintukuRegionCounts_() {
+  var order = [
+    'hokkaido',
+    'tohoku',
+    'kanto',
+    'chubu',
+    'kinki',
+    'chugoku',
+    'shikoku',
+    'kyushu-okinawa'
+  ];
+  var sheet = getSheet_(SHEET.USERS);
+  var headers = getSheetHeaders_(sheet);
+  var locCol = headers.indexOf('現在地');
+  var lastRow = sheet.getLastRow();
+  var counts = {};
+  var i;
+  for (i = 0; i < order.length; i++) counts[order[i]] = 0;
+
+  if (locCol >= 0 && lastRow >= 2) {
+    var locs = sheet.getRange(2, locCol + 1, lastRow - 1, 1).getDisplayValues();
+    for (i = 0; i < locs.length; i++) {
+      var loc = String(locs[i][0] || '').trim();
+      if (!loc) continue;
+      var rid = prefectureToMintukuRegionId_(loc);
+      if (rid && Object.prototype.hasOwnProperty.call(counts, rid)) {
+        counts[rid] += 1;
+      }
+    }
+  }
+
+  var regions = [];
+  for (i = 0; i < order.length; i++) {
+    var id = order[i];
+    regions.push({
+      id: id,
+      label: mintukuRegionLabel_(id),
+      count: counts[id] || 0
+    });
+  }
+  return {
+    asOf: tokyoDateKey_(new Date()),
+    regions: regions
+  };
+}
+
 /** [プレジデント] 社長マーク=TRUE で集計 */
 function getPresidentDashboard_() {
   var rows = readUsersColumnsRows_(['社長マーク', '登録日時']);
@@ -1724,6 +1774,8 @@ function guardMaintenance_(action, params) {
   var act = String(action || '').trim();
   if (
     act === 'settings' ||
+    act === 'masters' ||
+    act === 'mintukuRegionCounts' ||
     act === 'ping' ||
     act === 'approveRequest' ||
     act === 'rejectRequest' ||

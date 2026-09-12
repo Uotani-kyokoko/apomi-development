@@ -129,13 +129,48 @@
   <!-- ===== みんつく期限切れ画面 ===== -->
   <div id="mintuku-expired-screen" class="hidden" aria-live="polite">
     <div class="mintuku-expired-inner">
-      <h1 class="mintuku-expired-title">無料期間が終了しました</h1>
-      <p class="mintuku-expired-text">
-        無料期間(30日)が終了しました。今まで通り閲覧するには
-        <a id="mintuku-expired-link" class="mintuku-expired-link" href="#" target="_blank" rel="noopener noreferrer">こちら</a>
-        からお問合せください
-      </p>
-      <a id="mintuku-expired-btn" class="mintuku-expired-btn hidden" href="#" target="_blank" rel="noopener noreferrer">お問い合わせ</a>
+      <h1 class="mintuku-expired-title">無料期間は終了しました。</h1>
+      <div class="mintuku-expired-lead">
+        <p>
+          『みんつく』は、<strong>1名1円1年</strong>という<strong>前代未聞</strong>の破格サービスです。<br>
+          交流会の都度の参加費用を払う前に、ダイレクトで繋がれる状態を提供していきます。
+        </p>
+        <p>
+          <span class="mintuku-expired-em">地域ごとに金額が変動</span>していきます。自身の地域の金額を送金して下さい。送金確認後に１年間利用可能となります。
+        </p>
+      </div>
+
+      <section class="mintuku-expired-counts" aria-labelledby="mintuku-expired-counts-title">
+        <h2 id="mintuku-expired-counts-title" class="mintuku-expired-counts-title">現在の地域人数</h2>
+        <ul id="mintuku-expired-region-list" class="mintuku-expired-region-list">
+          <!-- JSで埋める -->
+        </ul>
+        <p class="mintuku-expired-price-hint">
+          1,270名の場合は「1,270円」　60名の場合は「100円」
+        </p>
+      </section>
+
+      <ol class="mintuku-expired-steps">
+        <li>
+          <p class="mintuku-expired-step-label">① 自身の地方の金額を送金する</p>
+          <a id="mintuku-expired-paypay" class="mintuku-expired-cta mintuku-expired-cta-paypay" href="#" target="_blank" rel="noopener noreferrer">
+            <span class="mintuku-expired-cta-brand">PayPay</span>
+          </a>
+        </li>
+        <li>
+          <p class="mintuku-expired-step-label">② フォームで名前と送金時間を入力する</p>
+          <a id="mintuku-expired-form" class="mintuku-expired-cta mintuku-expired-cta-form" href="#" target="_blank" rel="noopener noreferrer">
+            <span class="mintuku-expired-cta-brand">Google Forms</span>
+          </a>
+        </li>
+        <li>
+          <p class="mintuku-expired-step-label">③ フォーム確認後に運営が公式ラインから連絡します</p>
+          <a id="mintuku-expired-line" class="mintuku-expired-cta mintuku-expired-cta-line" href="#" target="_blank" rel="noopener noreferrer">
+            <span class="mintuku-expired-cta-brand">アポイントメイト公式ライン</span>
+          </a>
+        </li>
+      </ol>
+
       <button type="button" id="mintuku-expired-back" class="mintuku-expired-back">ログイン画面へ戻る</button>
     </div>
   </div>

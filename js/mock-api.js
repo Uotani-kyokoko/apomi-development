@@ -219,6 +219,12 @@ const MockAPI = (() => {
 
     async fetchMasters() {
       return delay({
+        公式LINE: [
+          {
+            value: "https://lin.ee/example",
+            label: "アポイントメイト公式ライン"
+          }
+        ],
         地域リンク: [
           { value: "https://example.com/region/hokkaido-tohoku", label: "北海道・東北" },
           { value: "https://example.com/region/kanto", label: "関東" },
@@ -292,8 +298,42 @@ const MockAPI = (() => {
         アプリ名: "apomy",
         サロンURL: "https://example.com/salon",
         サロンボタン名: "井口智明オンラインサロン",
-        メンテナンス: "FALSE"
+        メンテナンス: "FALSE",
+        みんつくPayPayURL: "https://pay.paypay.ne.jp/example",
+        みんつくフォームURL: "https://docs.google.com/forms/d/e/example/viewform"
       });
+    },
+
+    async fetchMintukuRegionCounts() {
+      const order = [
+        "hokkaido",
+        "tohoku",
+        "kanto",
+        "chubu",
+        "kinki",
+        "chugoku",
+        "shikoku",
+        "kyushu-okinawa"
+      ];
+      const counts = {
+        hokkaido: 12,
+        tohoku: 48,
+        kanto: 1270,
+        chubu: 210,
+        kinki: 380,
+        chugoku: 95,
+        shikoku: 60,
+        "kyushu-okinawa": 150
+      };
+      const regions = order.map((id) => ({
+        id,
+        label:
+          typeof AppMode !== "undefined" && AppMode.MINTUKU_REGIONS?.[id]
+            ? AppMode.MINTUKU_REGIONS[id].label
+            : id,
+        count: counts[id] || 0
+      }));
+      return delay({ asOf: new Date().toISOString().slice(0, 10), regions });
     },
 
     async fetchCurrentUser(identity = {}) {

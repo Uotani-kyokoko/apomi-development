@@ -200,6 +200,11 @@ const GasAPI = (() => {
       }
     },
 
+    async fetchMintukuRegionCounts() {
+      if (!USE_GAS) return MockAPI.fetchMintukuRegionCounts();
+      return get('mintukuRegionCounts');
+    },
+
     async loginWithGoogle(payload = {}) {
       const idToken = payload.idToken || '';
       const decoded = idToken ? decodeJwtPayload(idToken) : {};

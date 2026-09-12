@@ -1934,56 +1934,131 @@
   function mintukuExpiredMessage(err) {
     const msg = String(err?.message || err || "");
     return msg.replace(/^MINTUKU_EXPIRED:/, "").trim() ||
-      "無料期間(30日)が終了しました。今まで通り閲覧するにはこちらからお問合せください";
+      "無料期間は終了しました。";
   }
 
-  function showMintukuExpiredScreen(err) {
+  /** 地域人数 → 年額（最低100円） */
+  function mintukuYearlyFeeYen(count) {
+    const n = Math.max(0, Number(count) || 0);
+    return Math.max(100, n);
+  }
+
+  function formatMintukuCount(n) {
+    return new Intl.NumberFormat("ja-JP").format(Math.max(0, Number(n) || 0));
+  }
+
+  function bindExternalCta(el, url, missingLabel) {
+    if (!el) return;
+    const safe = String(url || "").trim();
+    el.classList.remove("is-disabled");
+    el.onclick = null;
+    if (safe && /^https?:\/\//i.test(safe)) {
+      el.href = safe;
+      return;
+    }
+    el.removeAttribute("href");
+    el.classList.add("is-disabled");
+    el.onclick = (e) => {
+      e.preventDefault();
+      showToast(`${missingLabel}が未設定です。設定シートまたはマスタを確認してください`);
+    };
+  }
+
+  function renderMintukuExpiredRegionCounts(regions, mineRegionId) {
+    const list = $("#mintuku-expired-region-list");
+    if (!list) return;
+    const rows = Array.isArray(regions) && regions.length
+      ? regions
+      : (typeof AppMode !== "undefined"
+          ? Object.keys(AppMode.MINTUKU_REGIONS || {}).map((id) => ({
+              id,
+              label: AppMode.MINTUKU_REGIONS[id].label,
+              count: 0
+            }))
+          : []);
+    list.innerHTML = rows
+      .map((r) => {
+        const count = Number(r.count) || 0;
+        const yen = mintukuYearlyFeeYen(count);
+        const mineClass = mineRegionId && r.id === mineRegionId ? " is-mine" : "";
+        const label = r.id === "kyushu-okinawa" ? "九州" : (r.label || r.id);
+        return (
+          `<li class="mintuku-expired-region-row${mineClass}">` +
+          `<span class="mintuku-expired-region-name">${escapeHtml(label)}</span>` +
+          `<span class="mintuku-expired-region-count">${formatMintukuCount(count)}名</span>` +
+          `<span class="mintuku-expired-region-yen">（${formatMintukuCount(yen)}円）</span>` +
+          `</li>`
+        );
+      })
+      .join("");
+  }
+
+  async function showMintukuExpiredScreen(err) {
     const screen = $("#mintuku-expired-screen");
     const app = $("#app-screen");
     const login = $("#login-screen");
     if (login) login.classList.add("hidden");
     if (app) app.classList.add("hidden");
     showLoading(false);
-
-    const contactUrl = String(
-      state.settings?.["みんつく問い合わせURL"] ||
-        state.settings?.["みんつくの問い合わせ用リンク"] ||
-        ""
-    ).trim();
-    const link = $("#mintuku-expired-link");
-    const btn = $("#mintuku-expired-btn");
-    const text = document.querySelector(".mintuku-expired-text");
-    if (text) {
-      const body = mintukuExpiredMessage(err);
-      // 仕様文言をベースに「こちら」リンクを維持
-      text.innerHTML =
-        '無料期間(30日)が終了しました。今まで通り閲覧するには' +
-        '<a id="mintuku-expired-link" class="mintuku-expired-link" href="#" target="_blank" rel="noopener noreferrer">こちら</a>' +
-        'からお問合せください';
-    }
-    const linkEl = $("#mintuku-expired-link");
-    if (contactUrl) {
-      if (linkEl) {
-        linkEl.href = contactUrl;
-        linkEl.classList.remove("hidden");
-      }
-      if (btn) {
-        btn.href = contactUrl;
-        btn.classList.remove("hidden");
-      }
-    } else {
-      if (linkEl) {
-        linkEl.removeAttribute("href");
-        linkEl.onclick = (e) => {
-          e.preventDefault();
-          showToast("問い合わせ先が未設定です。設定シートに「みんつく問い合わせURL」を追加してください");
-        };
-      }
-      if (btn) btn.classList.add("hidden");
-      showToast("設定に「みんつく問い合わせURL」がありません");
-    }
     screen?.classList.remove("hidden");
     state.isLoggedIn = false;
+
+    // 自分の地方をハイライト用に残す
+    let mineRegionId = state.mintukuRegion || "";
+    try {
+      const loc = state.currentUser?.location;
+      if (typeof AppMode !== "undefined" && AppMode.prefectureToRegionId && loc) {
+        mineRegionId = AppMode.prefectureToRegionId(loc) || mineRegionId;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    renderMintukuExpiredRegionCounts([], mineRegionId);
+
+    try {
+      const [settingsRes, mastersRes, countsRes] = await Promise.all([
+        GasAPI.fetchSettings().catch(() => null),
+        GasAPI.fetchMasters().catch(() => null),
+        GasAPI.fetchMintukuRegionCounts
+          ? GasAPI.fetchMintukuRegionCounts().catch(() => null)
+          : Promise.resolve(null)
+      ]);
+
+      if (settingsRes?.data) {
+        state.settings = { ...(state.settings || {}), ...settingsRes.data };
+      }
+      if (mastersRes?.data) {
+        state.masters = mastersRes.data;
+      }
+
+      const paypayUrl = String(
+        state.settings?.["みんつくPayPayURL"] ||
+          state.settings?.["みんつくペイペイURL"] ||
+          ""
+      ).trim();
+      const formUrl = String(
+        state.settings?.["みんつくフォームURL"] ||
+          state.settings?.["みんつくGoogleフォームURL"] ||
+          state.settings?.["みんつく問い合わせURL"] ||
+          ""
+      ).trim();
+      const lineUrl = resolveOfficialLineUrl(state.masters);
+
+      bindExternalCta($("#mintuku-expired-paypay"), paypayUrl, "PayPayのURL");
+      bindExternalCta($("#mintuku-expired-form"), formUrl, "フォームのURL");
+      bindExternalCta($("#mintuku-expired-line"), lineUrl, "公式LINEのURL");
+
+      const regions = countsRes?.data?.regions || countsRes?.regions || [];
+      renderMintukuExpiredRegionCounts(regions, mineRegionId);
+    } catch (e) {
+      console.warn("mintuku expired screen bootstrap failed", e);
+      showToast("案内情報の取得に失敗しました。再読み込みしてください");
+    }
+
+    if (err) {
+      console.info("[mintuku] expired", mintukuExpiredMessage(err));
+    }
   }
 
   function hideMintukuExpiredScreen() {

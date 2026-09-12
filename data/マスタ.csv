@@ -1,4 +1,5 @@
 区分,値,表示名,表示順,有効
+公式LINE,https://lin.ee/example,アポイントメイト公式ライン,1,TRUE
 地域リンク,https://example.com/region/hokkaido-tohoku,北海道・東北,1,TRUE
 地域リンク,https://example.com/region/kanto,関東,2,TRUE
 地域リンク,https://example.com/region/chubu,中部,3,TRUE
