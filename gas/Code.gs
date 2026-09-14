@@ -67,6 +67,7 @@ const APPLICATION_FOLDER_ID = '1KH9tpnep8-0RFGjpC45kiciVRWH6c26g';
 
 
 
+
 const SHEET = {
   USERS: '会員',
   BANNERS: 'バナー',
