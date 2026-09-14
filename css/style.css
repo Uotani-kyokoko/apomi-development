@@ -403,6 +403,10 @@ img {
   color: #111827;
 }
 
+.mintuku-expired-line {
+  display: block;
+}
+
 .mintuku-expired-hl-green {
   color: #16a34a;
   font-weight: 800;
