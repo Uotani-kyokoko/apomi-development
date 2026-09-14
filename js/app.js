@@ -1979,14 +1979,12 @@
     list.innerHTML = rows
       .map((r) => {
         const count = Number(r.count) || 0;
-        const yen = mintukuYearlyFeeYen(count);
         const mineClass = mineRegionId && r.id === mineRegionId ? " is-mine" : "";
         const label = r.id === "kyushu-okinawa" ? "九州" : (r.label || r.id);
         return (
           `<li class="mintuku-expired-region-row${mineClass}">` +
           `<span class="mintuku-expired-region-name">${escapeHtml(label)}</span>` +
           `<span class="mintuku-expired-region-count">${formatMintukuCount(count)}名</span>` +
-          `<span class="mintuku-expired-region-yen">（${formatMintukuCount(yen)}円）</span>` +
           `</li>`
         );
       })

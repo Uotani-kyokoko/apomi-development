@@ -363,7 +363,7 @@ img {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 20px 16px 32px;
+  padding: 28px 18px 40px;
   overflow-y: auto;
   background: #fff;
 }
@@ -374,126 +374,137 @@ img {
 
 .mintuku-expired-inner {
   width: 100%;
-  max-width: 420px;
+  max-width: 380px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  text-align: left;
+  gap: 22px;
+  text-align: center;
 }
 
 .mintuku-expired-title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 800;
-  line-height: 1.4;
-  color: #dc2626;
-  text-align: center;
+  line-height: 1.45;
+  color: #e11d48;
+  letter-spacing: 0.02em;
 }
 
 .mintuku-expired-lead {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .mintuku-expired-lead p {
   margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.75;
+  font-size: 0.95rem;
+  line-height: 1.85;
   color: #111827;
 }
 
-.mintuku-expired-em {
-  color: #ea580c;
-  font-weight: 700;
+.mintuku-expired-hl-green {
+  color: #16a34a;
+  font-weight: 800;
+}
+
+.mintuku-expired-hl-blue {
+  color: #38bdf8;
+  font-weight: 800;
+}
+
+.mintuku-expired-hl-orange {
+  color: #c2410c;
+  font-weight: 800;
 }
 
 .mintuku-expired-counts-title {
-  margin: 0 0 10px;
-  font-size: 1.05rem;
+  margin: 0 0 14px;
+  font-size: 1.08rem;
   font-weight: 800;
   color: #111827;
 }
 
 .mintuku-expired-region-list {
   list-style: none;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 18px;
+  row-gap: 10px;
+  max-width: 340px;
+  text-align: left;
 }
 
 .mintuku-expired-region-list li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 0.95rem;
+  gap: 8px;
+  font-size: 0.92rem;
   color: #111827;
-  padding: 4px 0;
-  border-bottom: 1px dotted #e5e7eb;
+  padding: 6px 8px;
+  border-radius: 8px;
 }
 
 .mintuku-expired-region-list li.is-mine {
   background: #fff7ed;
-  margin: 0 -6px;
-  padding: 6px;
-  border-radius: 6px;
-  border-bottom-color: transparent;
-  font-weight: 700;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px #fdba74;
 }
 
 .mintuku-expired-region-name {
   flex: 0 0 auto;
+  min-width: 2.5em;
 }
 
 .mintuku-expired-region-count {
   flex: 1 1 auto;
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-.mintuku-expired-region-yen {
-  flex: 0 0 auto;
-  color: #6b7280;
-  font-size: 0.85rem;
+  border-bottom: 1px solid #d1d5db;
+  padding-bottom: 1px;
 }
 
 .mintuku-expired-price-hint {
-  margin: 10px 0 0;
+  margin: 14px 0 0;
   font-size: 0.82rem;
-  line-height: 1.6;
+  line-height: 1.7;
   color: #4b5563;
 }
 
 .mintuku-expired-steps {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  text-align: left;
 }
 
 .mintuku-expired-step-label {
-  margin: 0 0 8px;
-  font-size: 0.92rem;
+  margin: 0 0 10px;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #111827;
+  text-align: center;
 }
 
 .mintuku-expired-cta {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
   width: 100%;
-  min-height: 52px;
-  padding: 12px 16px;
+  min-height: 54px;
+  padding: 12px 18px;
   border-radius: 999px;
   font-weight: 800;
   text-decoration: none;
   box-sizing: border-box;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
 }
 
 .mintuku-expired-cta.is-disabled {
@@ -503,18 +514,31 @@ img {
 
 .mintuku-expired-cta-paypay,
 .mintuku-expired-cta-form {
-  background: #facc15;
-  color: #111827;
+  background: linear-gradient(180deg, #ffe566 0%, #f5c518 100%);
+  color: #374151;
   border: 1px solid #eab308;
 }
 
 .mintuku-expired-cta-line {
   background: #06c755;
   color: #fff;
+  border: 1px solid #05b34c;
+}
+
+.mintuku-expired-cta-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.mintuku-expired-cta-icon .fa-line {
+  font-size: 1.35rem;
+  color: #fff;
 }
 
 .mintuku-expired-cta-brand {
-  font-size: 1rem;
+  font-size: 1.05rem;
   letter-spacing: 0.02em;
 }
 
@@ -522,12 +546,12 @@ img {
   align-self: center;
   border: none;
   background: transparent;
-  color: #6b7280;
-  font-size: 0.9rem;
+  color: #9ca3af;
+  font-size: 0.85rem;
   text-decoration: underline;
   cursor: pointer;
   padding: 8px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .maintenance-admin-hint {
