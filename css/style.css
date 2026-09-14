@@ -393,7 +393,7 @@ img {
 .mintuku-expired-lead {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
 }
 
 .mintuku-expired-lead p {
@@ -403,8 +403,8 @@ img {
   color: #111827;
 }
 
-.mintuku-expired-line {
-  display: block;
+.mintuku-expired-lead p:nth-child(4) {
+  margin-bottom: 8px;
 }
 
 .mintuku-expired-hl-green {
