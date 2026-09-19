@@ -1706,7 +1706,7 @@
     if (stopApomyMintuku) {
       stopApomyMintuku.textContent = isPresidentMode()
         ? "アポミーだけ掲載削除"
-        : "全国の人とはつながりたくない方";
+        : "掲載を停止する（みんつくも停止）";
     }
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
@@ -4888,16 +4888,17 @@
     $("#apply-salon-image-file")?.addEventListener("change", (e) => handleApplyImageChange(e, "salon"));
     $("#apply-card-image-file")?.addEventListener("change", (e) => handleApplyImageChange(e, "card"));
     $("#btn-stop-listing").addEventListener("click", async () => {
-      if (!confirm("掲載を停止しますか？")) return;
+      if (!confirm("掲載を停止しますか？※みんつくの掲載も同時に停止します。")) return;
       try {
         showLoading(true);
         const res = await GasAPI.stopListing(state.identity || {});
         if (state.currentUser) {
           state.currentUser.isPublished = false;
+          state.currentUser.mintukuListed = false;
         }
         applyMyActivity(res.data?.lastLoginAt);
         invalidateUsersCache();
-        showToast("掲載を停止しました。再開するにはプロフィールを保存してください");
+        showToast("掲載を停止しました（みんつくも停止）。再開するにはプロフィールを保存してください");
         openEditScreen({ required: true });
       } catch (err) {
         console.error(err);
@@ -4907,27 +4908,32 @@
       }
     });
 
-    // [みんつく / PM] Apomy掲載のみ停止（地方・PM掲載は残る）
+    // [みんつく / PM] Apomy掲載停止（みんつくも連動停止。PMは残る）
     $("#btn-stop-apomy-from-mintuku")?.addEventListener("click", async () => {
       const msg = isPresidentMode()
         ? "Apomyの掲載を停止します。※プレジデントメイトの掲載は残ります。"
-        : "Apomyの掲載を停止します。※みんつくの掲載は残ります。";
+        : "Apomyの掲載を停止します。※みんつくの掲載も同時に停止します。";
       if (!confirm(msg)) return;
       try {
         showLoading(true);
         const res = await GasAPI.stopListing(identityForApi());
         if (state.currentUser) {
           state.currentUser.isPublished = false;
+          state.currentUser.mintukuListed = false;
         }
         try {
-          localStorage.setItem("apomy_open_mintuku_after_stop", "1");
+          localStorage.removeItem("apomy_open_mintuku_after_stop");
         } catch (_) {
           /* ignore */
         }
         applyMyActivity(res.data?.lastLoginAt);
         updateMypageActionLabels(state.currentUser);
         invalidateUsersCache();
-        showToast("Apomyの掲載を停止しました（みんつくには残ります）");
+        showToast(
+          isPresidentMode()
+            ? "Apomyの掲載を停止しました（プレジデントメイトには残ります）"
+            : "Apomyの掲載を停止しました（みんつくも停止）"
+        );
       } catch (err) {
         console.error(err);
         showToast(err.message || "停止に失敗しました");

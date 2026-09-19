@@ -31,7 +31,8 @@
  * 現在地: 初回のみアプリで設定。変更はオーナー手動。手動変更後の初回ログインでみんつく番号を付け直し
  * みんつく課金開始日: 日付あり＝有料。無料期間は初回ログイン基準、課金後はこの日起算で経過表示
  * Apomy掲載開始時: みんつく掲載=TRUE＋現在地からみんつく番号を採番
- * 一覧: Apomyは掲載中のみ／みんつくは現在地がその地方なら出す（ダッシュボードと同じ。みんつく掲載は見ない）
+ * Apomy掲載停止時: みんつく掲載も FALSE（みんつくからも外す）。再開時はみんつく掲載も TRUE に戻す
+ * 一覧: Apomyは掲載中のみ／みんつくは現在地がその地方＋みんつく掲載（掲載中FALSEも除外）
  * 一覧APIは必要列のみ読込（全列 getDataRange しない）。ログイン時は一覧を取らない（FEが繋がる表示時に取得）
  * 設定キー: みんつくPayPayURL / みんつくフォームURL（期限切れ画面）
  * 公式LINEはマスタ区分「公式LINE」を参照
@@ -170,11 +171,11 @@ function doPost(e) {
         data = requestListing_(body, 'サロン掲載');
         break;
       case 'stopListing':
-        // [Apomy] 全国掲載のみ停止（みんつく掲載は変えない）
+        // [Apomy] 全国停止＋みんつく掲載も停止
         data = setPublished_(body, false, '掲載停止');
         break;
       case 'resumeListing':
-        // [Apomy] 全国掲載のみ再開
+        // [Apomy] 全国再開＋みんつく掲載も再開
         data = setPublished_(body, true, '掲載再開');
         break;
       case 'stopMintukuListing':
@@ -287,6 +288,10 @@ function getUsers_(p) {
     .filter(function (r) {
       if (isMintuku) {
         if (!isPrefInMintukuRegion_(r['現在地'], mintukuRegion)) return false;
+        // Apomy停止／みんつく明示停止は地方一覧からも外す
+        if (!includeUnpublished) {
+          if (!toBool_(r['掲載中']) || isExplicitFalse_(r['みんつく掲載'])) return false;
+        }
         if (locationPref && locationPref !== 'all') {
           if (canonicalPrefecture_(r['現在地']) !== canonicalPrefecture_(locationPref) &&
               String(r['現在地'] || '').trim() !== locationPref) return false;
@@ -782,8 +787,21 @@ function isRegistrationComplete_(row) {
 }
 
 /**
+ * [Apomy→みんつく] Apomy掲載停止なのにみんつく掲載TRUEのとき、みんつくも落とす
+ * ※空欄は未設定のまま（初回・掲載前）。明示 TRUE の取りこぼしだけ直す
+ */
+function syncMintukuOffWhenApomyStoppedCtx_(ctx) {
+  if (!ctx) return false;
+  if (toBool_(ctx.row['掲載中'])) return false;
+  if (!toBool_(ctx.row['みんつく掲載'])) return false;
+  ensureHeaderInCtx_(ctx, 'みんつく掲載');
+  setCtxValue_(ctx, 'みんつく掲載', sheetBool_(false));
+  return true;
+}
+
+/**
  * [Apomy] 掲載停止済み（掲載中=FALSE）の完了会員は Apomy からログイン不可
- * ※みんつく / PM は Apomy 停止と独立して利用可
+ * ※みんつくは mintukuListed／一覧フィルタで制御。PM は独立
  */
 function assertApomyLoginAllowed_(row, appKind) {
   var kind = String(appKind || 'apomy').trim().toLowerCase();
@@ -804,7 +822,7 @@ function isExplicitFalse_(v) {
 
 /**
  * [みんつく] みんつく掲載=FALSE の完了会員はみんつくからログイン不可
- * ※空欄は初回利用として許可。Apomy掲載停止とは独立
+ * ※空欄は初回利用として許可。Apomy停止時は setPublished_／sync でみんつくも FALSE になる
  */
 function assertMintukuLoginAllowed_(row, appKind) {
   var kind = String(appKind || '').trim().toLowerCase();
@@ -1060,7 +1078,7 @@ function assertMintukuViewerAccess_(p, regionIdOpt, rowsOpt) {
   }
 }
 
-/** [みんつく] みんつく掲載のON/OFF */
+/** [みんつく] みんつく掲載のON/OFF（Apomy掲載中は変えない） */
 function setMintukuListed_(body, listed, typeLabel) {
   const memberNo = String(body.memberNo || body.member_no || '').trim();
   const email = String(body.email || '').trim();
@@ -1607,6 +1625,8 @@ function touchActivity_(body) {
   assertNotDeniedEmail_(ctx.row['Googleメール']);
   assertMaintenanceAccess_(ctx.row['Googleメール']);
 
+  syncMintukuOffWhenApomyStoppedCtx_(ctx);
+
   var appKindTouch = String((body && body.app) || '').trim().toLowerCase();
   assertApomyLoginAllowed_(ctx.row, appKindTouch);
   assertMintukuLoginAllowed_(ctx.row, appKindTouch);
@@ -1919,6 +1939,7 @@ function login_(body) {
 
   if (rowNumber >= 2) {
     var ctx = loadUserRowCtx_(sheet, headers, rowNumber);
+    syncMintukuOffWhenApomyStoppedCtx_(ctx);
     assertApomyLoginAllowed_(ctx.row, appKind);
     assertMintukuLoginAllowed_(ctx.row, appKind);
     assertPresidentLoginAllowed_(ctx.row, appKind);
@@ -2195,7 +2216,7 @@ function updateProfile_(body) {
   var wasPublished = toBool_(ctx.row['掲載中']);
   if (wantPublish) {
     setCtxValue_(ctx, '掲載中', sheetBool_(true));
-    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx) || mintukuNumber;
+    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx, true) || mintukuNumber;
   } else if (wasPublished) {
     mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx) || mintukuNumber;
   }
@@ -2627,22 +2648,22 @@ function htmlDecision_(result) {
 }
 
 /**
- * [みんつく] Apomy掲載開始時: みんつく掲載ON＋現在地があれば番号採番
- * ※みんつく掲載を明示停止している場合は尊重してONに戻さない
+ * [みんつく] Apomy掲載開始／再開時: みんつく掲載ON＋現在地があれば番号採番
+ * @param {boolean=} forceOn true なら明示停止中でも TRUE に戻す（掲載再開時）
  */
-function ensureMintukuOnApomyPublishCtx_(ctx) {
+function ensureMintukuOnApomyPublishCtx_(ctx, forceOn) {
   if (!ctx) return '';
   ensureHeaderInCtx_(ctx, 'みんつく掲載');
   ensureHeaderInCtx_(ctx, 'みんつく番号');
 
   var listedRaw = ctx.row['みんつく掲載'];
   var listedSet = !(listedRaw === '' || listedRaw === null || listedRaw === undefined);
-  if (!listedSet) {
+  if (forceOn || !listedSet) {
     setCtxValue_(ctx, 'みんつく掲載', sheetBool_(true));
   } else if (toBool_(listedRaw)) {
     // すでに TRUE
   } else {
-    // FALSE（みんつく停止中）→ 触らない
+    // FALSE（みんつくのみ停止中）→ touch などでは触らない
     return String(ctx.row['みんつく番号'] || '').trim();
   }
 
@@ -2676,7 +2697,11 @@ function setPublished_(body, published, typeLabel) {
 
   var mintukuNumber = '';
   if (published) {
-    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx);
+    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx, true);
+  } else {
+    // Apomy停止 → みんつくも掲載停止
+    ensureHeaderInCtx_(ctx, 'みんつく掲載');
+    setCtxValue_(ctx, 'みんつく掲載', sheetBool_(false));
   }
   flushUserCtx_(ctx);
   SpreadsheetApp.flush();
