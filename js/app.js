@@ -1504,36 +1504,52 @@
     updateMypageActionLabels(user);
   }
 
-  /** [みんつく] 無料期間／課金後の経過日数（ホーム） */
+  /** [みんつく] 無料期間／課金終了日までの残り日数（ホーム） */
   function getMintukuPlanInfo(user) {
     if (!user) return null;
     const firstAt = String(user.mintukuFirstLoginAt || "").trim();
-    const paidStartAt = String(user.mintukuPaidStartAt || "").trim();
-    const paid = Boolean(paidStartAt) || Boolean(user.mintukuPaid);
+    const paidEndAt = String(user.mintukuPaidEndAt || "").trim();
 
-    const calcDays = (raw) => {
+    const daysSince = (raw) => {
       if (!raw) return null;
       const d = new Date(String(raw).replace(/-/g, "/"));
       if (Number.isNaN(d.getTime())) return null;
       const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      return Math.max(0, Math.floor((today - start) / 86400000));
+      return Math.floor((today - start) / 86400000);
     };
 
-    if (paidStartAt) {
-      let paidDays =
-        user.mintukuPaidDaysUsed !== undefined && user.mintukuPaidDaysUsed !== null
-          ? Number(user.mintukuPaidDaysUsed)
-          : calcDays(paidStartAt);
-      if (paidDays === null || Number.isNaN(paidDays)) paidDays = 0;
+    const daysUntil = (raw) => {
+      if (!raw) return null;
+      const d = new Date(String(raw).replace(/-/g, "/"));
+      if (Number.isNaN(d.getTime())) return null;
+      const end = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return Math.floor((end - today) / 86400000);
+    };
+
+    const paidRawLeft = paidEndAt ? daysUntil(paidEndAt) : null;
+    const paidActive = paidRawLeft !== null && paidRawLeft >= 0;
+
+    // 有料有効（終了日が今日以降）なら終了日カウントダウンを優先表示
+    if (paidActive) {
+      let left = paidRawLeft;
+      if (
+        user.mintukuPaidDaysLeft !== undefined &&
+        user.mintukuPaidDaysLeft !== null &&
+        !Number.isNaN(Number(user.mintukuPaidDaysLeft))
+      ) {
+        left = Math.max(0, Number(user.mintukuPaidDaysLeft));
+      }
       return {
         mode: "paid",
         firstAt,
-        paidStartAt,
+        paidEndAt,
         paid: true,
-        daysUsed: paidDays,
-        daysLeft: 0,
+        daysUsed: 0,
+        daysLeft: left,
         expired: false,
         ok: true
       };
@@ -1542,8 +1558,11 @@
     let daysUsed = user.mintukuDaysUsed;
     let daysLeft = user.mintukuDaysLeft;
     if ((daysUsed === undefined || daysUsed === null) && firstAt) {
-      daysUsed = calcDays(firstAt);
-      if (daysUsed !== null) daysLeft = Math.max(0, 30 - daysUsed);
+      daysUsed = daysSince(firstAt);
+      if (daysUsed !== null) {
+        daysUsed = Math.max(0, daysUsed);
+        daysLeft = Math.max(0, 30 - daysUsed);
+      }
     }
     if (daysUsed === undefined || daysUsed === null) {
       daysUsed = 0;
@@ -1555,16 +1574,31 @@
     } else {
       daysLeft = Number(daysLeft) || 0;
     }
-    const expired = Boolean(user.mintukuExpired) || (!paid && daysUsed >= 30);
+    const freeExpired = Boolean(user.mintukuExpired) || daysUsed >= 30;
+
+    // 無料終了＋終了日が過去 → 課金期限切れ表示
+    if (freeExpired && paidEndAt) {
+      return {
+        mode: "paid",
+        firstAt,
+        paidEndAt,
+        paid: false,
+        daysUsed: 0,
+        daysLeft: 0,
+        expired: true,
+        ok: false
+      };
+    }
+
     return {
       mode: "free",
       firstAt,
-      paidStartAt: "",
+      paidEndAt: "",
       paid: false,
       daysUsed,
       daysLeft,
-      expired,
-      ok: user.mintukuAccessOk !== false && !expired
+      expired: freeExpired,
+      ok: user.mintukuAccessOk !== false && !freeExpired
     };
   }
 
@@ -1652,20 +1686,27 @@
     let rowsHtml = "";
     let note = "";
     if (info.mode === "paid") {
+      const statusValue = info.expired
+        ? "期限切れ"
+        : info.daysLeft === 0
+          ? "本日まで"
+          : `残り ${info.daysLeft} 日`;
       rowsHtml = `
       <div class="mypage-mintuku-plan-row">
-        <span class="mypage-mintuku-plan-label">みんつく課金開始日</span>
-        <span class="mypage-mintuku-plan-value">${formatMintukuDateLabel(info.paidStartAt)}</span>
+        <span class="mypage-mintuku-plan-label">みんつく課金終了日</span>
+        <span class="mypage-mintuku-plan-value">${formatMintukuDateLabel(info.paidEndAt)}</span>
       </div>
       <div class="mypage-mintuku-plan-row">
-        <span class="mypage-mintuku-plan-label">課金からの経過</span>
-        <span class="mypage-mintuku-plan-value">${info.daysUsed} 日目</span>
+        <span class="mypage-mintuku-plan-label">残り日数</span>
+        <span class="mypage-mintuku-plan-value">${statusValue}</span>
       </div>
       <div class="mypage-mintuku-plan-row">
         <span class="mypage-mintuku-plan-label">利用状況</span>
-        <span class="mypage-mintuku-plan-value">有料契約中</span>
+        <span class="mypage-mintuku-plan-value">${info.expired ? "期限切れ" : "有料契約中"}</span>
       </div>`;
-      note = "みんつく課金開始日が入っているため、課金後の経過日数を表示しています。";
+      note = info.expired
+        ? "課金期限が切れています。継続する場合はお問い合わせください。"
+        : "みんつく課金終了日までの残り日数を表示しています。";
     } else {
       let statusValue = info.expired
         ? "無料期間終了"
@@ -1706,7 +1747,7 @@
     if (stopApomyMintuku) {
       stopApomyMintuku.textContent = isPresidentMode()
         ? "アポミーだけ掲載削除"
-        : "掲載を停止する（みんつくも停止）";
+        : "Apomyの掲載を停止する";
     }
     const salonStatus = String(user?.salonListingStatus || "なし");
     const presidentStatus = String(user?.presidentMarkStatus || "なし");
@@ -1815,16 +1856,6 @@
     );
   }
 
-  function listingUnpublishedMessage(raw) {
-    const msg = String(raw || "")
-      .replace(/^APOMY_UNPUBLISHED:/, "")
-      .replace(/^MINTUKU_UNPUBLISHED:/, "")
-      .replace(/^PRESIDENT_UNPUBLISHED:/, "")
-      .trim();
-    if (msg.indexOf("掲載が停止されているためログインできません") >= 0) return msg;
-    return "掲載が停止されているためログインできません";
-  }
-
   /** 掲載停止済みの完了会員（GAS の login assert と同条件） */
   function isListingUnpublishedBlockedUser(user) {
     if (!user || user.isNew) return false;
@@ -1845,8 +1876,8 @@
     return false;
   }
 
-  function handleListingUnpublished(message) {
-    showToast(listingUnpublishedMessage(message));
+  /** 掲載停止時: トーストではなく公式LINE案内画面へ */
+  function handleListingUnpublished(_message) {
     invalidateUsersCache();
     state.allUsers = [];
     try {
@@ -1854,11 +1885,15 @@
     } catch (_) {
       /* ignore */
     }
+    try {
+      window.google?.accounts?.id?.disableAutoSelect?.();
+    } catch (_) {
+      /* ignore */
+    }
     state.isLoggedIn = false;
     state.currentUser = null;
     state.identity = null;
-    $("#app-screen")?.classList.add("hidden");
-    $("#login-screen")?.classList.remove("hidden");
+    showAccessDeniedScreen({ mode: "unpublished" });
   }
 
   function handlePresidentDenied() {
@@ -1876,45 +1911,81 @@
     }, 1400);
   }
 
+  /** Apomy未掲載時にみんつくへ寄せられるか */
+  function canRedirectToMintuku(user) {
+    if (!user || user.mintukuListed === false) return false;
+    if (!String(user.mintukuNumber || "").trim()) return false;
+    if (typeof AppMode === "undefined" || !AppMode.prefectureToRegionId) return false;
+    return Boolean(AppMode.prefectureToRegionId(user.location));
+  }
+
+  /** Apomy未掲載時にプレジデントメイトへ寄せられるか */
+  function canRedirectToPresident(user) {
+    if (!user || !user.presidentMark) return false;
+    return isPresidentMateListed(user);
+  }
+
   /**
-   * [みんつく] Apomy掲載をみんつくから停止した人だけ、Apomy起動時にみんつくへ誘導
-   * （新規・未完成プロフィール・単なる掲載停止は Apomy に残す）
+   * [Apomy] 掲載停止中なら、みんつく／PMが掲載中のとき直接そちらへ
+   * （?stay=1 で Apomy に留まれる）
    * @returns {boolean} 遷移したとき true
    */
-  function redirectApomyUnpublishedToMintuku(user) {
-    if (isMintukuMode() || !user) return false;
+  function redirectApomyUnpublishedToAltApps(user) {
+    if (isMintukuMode() || isPresidentMode() || !user) return false;
     if (user.isNew) return false;
     if (user.isPublished !== false) return false;
-    if (!user.mintukuListed) return false;
-    if (!String(user.mintukuNumber || "").trim()) return false;
-    // みんつく側の「Apomy掲載を停止」直後のみ誘導（localStorage）
-    let shouldRedirect = false;
-    try {
-      if (localStorage.getItem("apomy_open_mintuku_after_stop") === "1") {
-        shouldRedirect = true;
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    if (!shouldRedirect) return false;
-    // 復旧用: ?stay=1 で Apomy に留まる
     try {
       if (new URLSearchParams(window.location.search).get("stay") === "1") return false;
     } catch (_) {
       /* ignore */
     }
-    if (typeof AppMode === "undefined" || !AppMode.prefectureToRegionId) return false;
-    const regionId = AppMode.prefectureToRegionId(user.location);
-    if (!regionId) return false;
-    const entry = AppMode.mintukuEntryUrl(regionId);
-    try {
-      localStorage.removeItem("apomy_open_mintuku_after_stop");
-    } catch (_) {
-      /* ignore */
+    if (typeof AppMode === "undefined") return false;
+
+    if (canRedirectToMintuku(user)) {
+      const regionId = AppMode.prefectureToRegionId(user.location);
+      const entry = AppMode.mintukuEntryUrl(regionId);
+      try {
+        localStorage.removeItem("apomy_open_mintuku_after_stop");
+      } catch (_) {
+        /* ignore */
+      }
+      showToast("Apomy掲載停止中のため、みんつくへ移動します");
+      window.location.replace(entry);
+      return true;
     }
-    showToast("Apomy掲載停止中のため、みんつくへ移動します");
-    window.location.replace(entry);
-    return true;
+
+    if (canRedirectToPresident(user) && AppMode.presidentEntryUrl) {
+      showToast("Apomy掲載停止中のため、プレジデントメイトへ移動します");
+      window.location.replace(AppMode.presidentEntryUrl());
+      return true;
+    }
+
+    return false;
+  }
+
+  /** @deprecated 互換用エイリアス */
+  function redirectApomyUnpublishedToMintuku(user) {
+    return redirectApomyUnpublishedToAltApps(user);
+  }
+
+  /**
+   * Apomy掲載停止直後: みんつく／PMが残っていれば直接遷移
+   * @returns {boolean} 遷移したとき true
+   */
+  function redirectAfterApomyStop(user) {
+    if (!user || typeof AppMode === "undefined") return false;
+    if (canRedirectToMintuku(user)) {
+      const regionId = AppMode.prefectureToRegionId(user.location);
+      showToast("掲載を停止しました。みんつくへ移動します");
+      window.location.replace(AppMode.mintukuEntryUrl(regionId));
+      return true;
+    }
+    if (canRedirectToPresident(user) && AppMode.presidentEntryUrl) {
+      showToast("掲載を停止しました。プレジデントメイトへ移動します");
+      window.location.replace(AppMode.presidentEntryUrl());
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -3347,16 +3418,17 @@
         if (wasNew) state.currentUser.isNew = true;
         lastTouchAt = Date.now();
         applyMyActivity(meRes.data.lastLoginAt);
+        // Apomy未掲載かつみんつく／PM掲載中なら先に遷移（guardより前）
+        if (redirectApomyUnpublishedToAltApps(state.currentUser)) return;
         if (!guardListingAccess(state.currentUser)) return;
-        if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
         if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && meRes.data.mintukuAccessOk === false) {
           showMintukuExpiredScreen();
           return;
         }
       } else if (skipMe && state.currentUser) {
+        if (redirectApomyUnpublishedToAltApps(state.currentUser)) return;
         if (!guardListingAccess(state.currentUser)) return;
-        if (redirectApomyUnpublishedToMintuku(state.currentUser)) return;
         if (redirectMintukuToOwnRegion(state.currentUser)) return;
         if (isMintukuMode() && state.currentUser.mintukuAccessOk === false) {
           showMintukuExpiredScreen();
@@ -4265,11 +4337,36 @@
     }
   }
 
-  async function showAccessDeniedScreen() {
+  function applyAccessDeniedCopy(mode) {
+    const titleEl = $("#access-denied-title");
+    const textEl = $("#access-denied-text");
+    const linkId = "access-denied-line-link";
+    if (mode === "unpublished") {
+      if (titleEl) titleEl.textContent = "掲載が停止されています";
+      if (textEl) {
+        textEl.innerHTML =
+          "再開をご希望の場合は、管理者（" +
+          `<a id="${linkId}" class="access-denied-link" href="#" target="_blank" rel="noopener noreferrer">公式LINE</a>` +
+          "）へお問い合わせください。";
+      }
+      return;
+    }
+    if (titleEl) titleEl.textContent = "アクセスが拒否されました";
+    if (textEl) {
+      textEl.innerHTML =
+        "詳細は " +
+        `<a id="${linkId}" class="access-denied-link" href="#" target="_blank" rel="noopener noreferrer">オーナー</a>` +
+        " へ問合せください。";
+    }
+  }
+
+  async function showAccessDeniedScreen(opts = {}) {
+    const mode = opts.mode === "unpublished" ? "unpublished" : "denied";
     state.isLoggedIn = false;
     state.identity = null;
     state.editRequired = false;
     closeConnectMenu();
+    if (typeof hideMintukuExpiredScreen === "function") hideMintukuExpiredScreen();
     $("#login-screen")?.classList.add("hidden");
     $("#app-screen")?.classList.add("hidden");
     $("#maintenance-screen")?.classList.add("hidden");
@@ -4277,6 +4374,7 @@
     closeFilterScreen();
     closeEditScreen(true);
 
+    applyAccessDeniedCopy(mode);
     applyAccessDeniedLineUrl(resolveOfficialLineUrl());
     try {
       const res = await GasAPI.fetchMasters();
@@ -4485,6 +4583,7 @@
         memberNo: user.id,
         name: user.nickname || user.name || ""
       });
+      if (redirectApomyUnpublishedToAltApps(user)) return;
       if (!guardListingAccess(user)) return;
       showToast("ログインしました");
       applyMyActivity(user.lastLoginAt);
@@ -4612,6 +4711,7 @@
           const user = meRes?.data;
           if (user) {
             state.currentUser = user;
+            if (redirectApomyUnpublishedToAltApps(user)) return true;
             showToast("ようこそ、" + (saved.name || user.nickname || user.name || "会員") + "さん");
             await showApp();
             return true;
@@ -4653,8 +4753,9 @@
     try {
       const meRes = await GasAPI.fetchCurrentUser(identityForApi(state.identity));
       const user = meRes.data;
-      if (!guardListingAccess(user)) return;
       state.currentUser = user;
+      if (redirectApomyUnpublishedToAltApps(user)) return;
+      if (!guardListingAccess(user)) return;
       const welcomeName = displayNameOf(user) || saved.name || "会員";
       showToast("ようこそ、" + welcomeName + "さん");
       await showApp();
@@ -4888,18 +4989,31 @@
     $("#apply-salon-image-file")?.addEventListener("change", (e) => handleApplyImageChange(e, "salon"));
     $("#apply-card-image-file")?.addEventListener("change", (e) => handleApplyImageChange(e, "card"));
     $("#btn-stop-listing").addEventListener("click", async () => {
-      if (!confirm("掲載を停止しますか？※みんつくの掲載も同時に停止します。")) return;
+      if (
+        !confirm(
+          "Apomyの掲載を停止しますか？※みんつく／プレジデントメイトの掲載も停止します。"
+        )
+      ) {
+        return;
+      }
       try {
         showLoading(true);
-        const res = await GasAPI.stopListing(state.identity || {});
-        if (state.currentUser) {
-          state.currentUser.isPublished = false;
-          state.currentUser.mintukuListed = false;
-        }
-        applyMyActivity(res.data?.lastLoginAt);
+        await GasAPI.stopListing({
+          ...(state.identity || {}),
+          cascadeRelated: true
+        });
         invalidateUsersCache();
-        showToast("掲載を停止しました（みんつくも停止）。再開するにはプロフィールを保存してください");
-        openEditScreen({ required: true });
+        state.allUsers = [];
+        try {
+          Session.clear();
+        } catch (_) {
+          /* ignore */
+        }
+        state.isLoggedIn = false;
+        state.currentUser = null;
+        state.identity = null;
+        showToast("掲載を停止しました。再度利用する場合はログインしてください");
+        showLogin();
       } catch (err) {
         console.error(err);
         showToast(err.message || "掲載停止に失敗しました");
@@ -4908,18 +5022,27 @@
       }
     });
 
-    // [みんつく / PM] Apomy掲載停止（みんつくも連動停止。PMは残る）
+    // [みんつく / PM] Apomy掲載停止（みんつく／PM掲載は残る）
     $("#btn-stop-apomy-from-mintuku")?.addEventListener("click", async () => {
       const msg = isPresidentMode()
         ? "Apomyの掲載を停止します。※プレジデントメイトの掲載は残ります。"
-        : "Apomyの掲載を停止します。※みんつくの掲載も同時に停止します。";
+        : "Apomyの掲載を停止します。※みんつくの掲載は残ります。";
       if (!confirm(msg)) return;
       try {
         showLoading(true);
-        const res = await GasAPI.stopListing(identityForApi());
+        const res = await GasAPI.stopListing({
+          ...identityForApi(),
+          keepRelated: true,
+          cascadeRelated: false
+        });
         if (state.currentUser) {
           state.currentUser.isPublished = false;
-          state.currentUser.mintukuListed = false;
+          if (res.data?.mintukuListed !== undefined) {
+            state.currentUser.mintukuListed = Boolean(res.data.mintukuListed);
+          }
+          if (res.data?.presidentMateListed !== undefined) {
+            state.currentUser.presidentMateListed = Boolean(res.data.presidentMateListed);
+          }
         }
         try {
           localStorage.removeItem("apomy_open_mintuku_after_stop");
@@ -4932,7 +5055,7 @@
         showToast(
           isPresidentMode()
             ? "Apomyの掲載を停止しました（プレジデントメイトには残ります）"
-            : "Apomyの掲載を停止しました（みんつくも停止）"
+            : "Apomyの掲載を停止しました（みんつくには残ります）"
         );
       } catch (err) {
         console.error(err);

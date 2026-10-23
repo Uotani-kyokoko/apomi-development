@@ -261,7 +261,17 @@ const GasAPI = (() => {
 
     async stopListing(payload) {
       if (!USE_GAS) {
-        return { success: true, data: { isPublished: false } };
+        const keep =
+          !!(payload && (payload.keepRelated || payload.keepRelatedApps)) ||
+          payload?.cascadeRelated === false;
+        return {
+          success: true,
+          data: {
+            isPublished: false,
+            mintukuListed: keep,
+            presidentMateListed: keep
+          }
+        };
       }
       return post('stopListing', payload);
     },

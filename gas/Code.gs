@@ -27,12 +27,13 @@
  * 【申請】マイページからフォーム送信 → 申請シートへ保存。承認はスプシ手作業
  *
  * 【みんつく】同じ GAS / 同じスプシ。users に app=mintuku&region=…（または r=トークン）で地方一覧。
- * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / 課金有無 / みんつく課金開始日
+ * 会員列: みんつく掲載 / みんつく番号 / みんつく初回ログイン日 / みんつく課金終了日
  * 現在地: 初回のみアプリで設定。変更はオーナー手動。手動変更後の初回ログインでみんつく番号を付け直し
- * みんつく課金開始日: 日付あり＝有料。無料期間は初回ログイン基準、課金後はこの日起算で経過表示
- * Apomy掲載開始時: みんつく掲載=TRUE＋現在地からみんつく番号を採番
- * Apomy掲載停止時: みんつく掲載も FALSE（みんつくからも外す）。再開時はみんつく掲載も TRUE に戻す
- * 一覧: Apomyは掲載中のみ／みんつくは現在地がその地方＋みんつく掲載（掲載中FALSEも除外）
+ * みんつく課金終了日: 日付ありかつ今日以前でない＝有料。無料30日は初回ログイン基準、有料は終了日までの残り日数
+ * ※契約は運用上だいたい1年だが、コードに年数の縛りは持たない（終了日をスプシで管理）
+ * Apomy掲載開始時: みんつく掲載が空欄なら TRUE＋現在地からみんつく番号を採番（FALSEは戻さない）
+ * Apomy掲載停止: デフォルトでみんつく／PMも FALSE。keepRelated=true（みんつく／PM画面からApomyだけ停止）のとき全国のみ
+ * 一覧: Apomyは掲載中のみ／みんつくは現在地がその地方＋みんつく掲載（掲載中は見ない）
  * 一覧APIは必要列のみ読込（全列 getDataRange しない）。ログイン時は一覧を取らない（FEが繋がる表示時に取得）
  * 設定キー: みんつくPayPayURL / みんつくフォームURL（期限切れ画面）
  * 公式LINEはマスタ区分「公式LINE」を参照
@@ -171,11 +172,11 @@ function doPost(e) {
         data = requestListing_(body, 'サロン掲載');
         break;
       case 'stopListing':
-        // [Apomy] 全国停止＋みんつく掲載も停止
+        // [Apomy] 全国停止（デフォルトでみんつく／PMも停止。keepRelated なら全国のみ）
         data = setPublished_(body, false, '掲載停止');
         break;
       case 'resumeListing':
-        // [Apomy] 全国再開＋みんつく掲載も再開
+        // [Apomy] 全国再開（みんつく／PM掲載は戻さない）
         data = setPublished_(body, true, '掲載再開');
         break;
       case 'stopMintukuListing':
@@ -288,9 +289,9 @@ function getUsers_(p) {
     .filter(function (r) {
       if (isMintuku) {
         if (!isPrefInMintukuRegion_(r['現在地'], mintukuRegion)) return false;
-        // Apomy停止／みんつく明示停止は地方一覧からも外す
+        // みんつく明示停止のみ地方一覧から外す（Apomy掲載中は見ない）
         if (!includeUnpublished) {
-          if (!toBool_(r['掲載中']) || isExplicitFalse_(r['みんつく掲載'])) return false;
+          if (isExplicitFalse_(r['みんつく掲載'])) return false;
         }
         if (locationPref && locationPref !== 'all') {
           if (canonicalPrefecture_(r['現在地']) !== canonicalPrefecture_(locationPref) &&
@@ -764,7 +765,7 @@ function ensureMintukuNumber_(sheet, table, idx, regionId) {
 function ensureMintukuFirstLoginCtx_(ctx) {
   if (!ctx) return '';
   ensureHeaderInCtx_(ctx, 'みんつく初回ログイン日');
-  ensureHeaderInCtx_(ctx, '課金有無');
+  ensureHeaderInCtx_(ctx, 'みんつく課金終了日');
   var current = sheetDateToYmd_(ctx.row['みんつく初回ログイン日']);
   if (current) return current;
   var key = tokyoDateKey_(new Date());
@@ -787,30 +788,19 @@ function isRegistrationComplete_(row) {
 }
 
 /**
- * [Apomy→みんつく] Apomy掲載停止なのにみんつく掲載TRUEのとき、みんつくも落とす
- * ※空欄は未設定のまま（初回・掲載前）。明示 TRUE の取りこぼしだけ直す
+ * [互換] 旧: Apomy停止時にみんつくも落としていた。現在は独立のため何もしない
+ * ※呼び出し側を壊さないよう残置
  */
 function syncMintukuOffWhenApomyStoppedCtx_(ctx) {
-  if (!ctx) return false;
-  if (toBool_(ctx.row['掲載中'])) return false;
-  if (!toBool_(ctx.row['みんつく掲載'])) return false;
-  ensureHeaderInCtx_(ctx, 'みんつく掲載');
-  setCtxValue_(ctx, 'みんつく掲載', sheetBool_(false));
-  return true;
+  return false;
 }
 
 /**
- * [Apomy] 掲載停止済み（掲載中=FALSE）の完了会員は Apomy からログイン不可
- * ※みんつくは mintukuListed／一覧フィルタで制御。PM は独立
+ * [Apomy] 掲載停止済みの完了会員は FE 側でみんつく／PMへ遷移 or ログアウト
+ * ※ここでは落とさず isPublished=false のまま返す（遷移判定に mintuku/PM フラグが必要）
  */
 function assertApomyLoginAllowed_(row, appKind) {
-  var kind = String(appKind || 'apomy').trim().toLowerCase();
-  if (kind === 'mintuku' || kind === 'president' || kind === 'presidentmate') return;
-  if (toBool_(row['掲載中'])) return;
-  if (!isRegistrationComplete_(row)) return;
-  throw new Error(
-    'APOMY_UNPUBLISHED:掲載が停止されているためログインできません'
-  );
+  // no-op（互換のため残置。判定は FE の redirect / guardListingAccess）
 }
 
 /** シート上で明示的に FALSE か（空欄は未設定扱い） */
@@ -822,7 +812,7 @@ function isExplicitFalse_(v) {
 
 /**
  * [みんつく] みんつく掲載=FALSE の完了会員はみんつくからログイン不可
- * ※空欄は初回利用として許可。Apomy停止時は setPublished_／sync でみんつくも FALSE になる
+ * ※空欄は初回利用として許可。Apomy停止とは独立（みんつく掲載は別操作）
  */
 function assertMintukuLoginAllowed_(row, appKind) {
   var kind = String(appKind || '').trim().toLowerCase();
@@ -930,6 +920,21 @@ function mintukuDaysSinceFirst_(firstRaw) {
 }
 
 /**
+ * [みんつく] 終了日までの残り日数（終了日当日=0、過ぎていれば負）
+ * ※契約年数などの固定期間は持たない。終了日そのものだけを見る
+ */
+function mintukuDaysUntilEnd_(endRaw) {
+  var end = parseDate_(endRaw);
+  if (!end) return null;
+  var a = tokyoDateKey_(end);
+  var b = tokyoDateKey_(new Date());
+  if (!a || !b) return null;
+  var de = new Date(a + 'T00:00:00+09:00');
+  var db = new Date(b + 'T00:00:00+09:00');
+  return Math.floor((de.getTime() - db.getTime()) / 86400000);
+}
+
+/**
  * シートの日付／日時を yyyy-MM-dd に正規化
  * ※ Date を String() すると "Thu Aug 13 2026 ..." になり表示が壊れるため使わない
  */
@@ -957,46 +962,46 @@ function sheetDateToYmd_(v) {
 }
 
 /**
- * [みんつく] みんつく課金開始日があれば有料扱い（主キー）
- * 互換: 旧列名「課金開始日」も読む
+ * [みんつく] みんつく課金終了日（有料の主キー）
+ * 互換: 旧列名「課金終了日」も読む
  */
-function getMintukuPaidStartRaw_(row) {
-  var v = sheetDateToYmd_((row && row['みんつく課金開始日']) || '');
+function getMintukuPaidEndRaw_(row) {
+  var v = sheetDateToYmd_((row && row['みんつく課金終了日']) || '');
   if (v) return v;
-  return sheetDateToYmd_((row && row['課金開始日']) || '');
+  return sheetDateToYmd_((row && row['課金終了日']) || '');
 }
 
-function isMintukuPaid_(row) {
-  if (getMintukuPaidStartRaw_(row)) return true;
-  var v = row && row['課金有無'];
-  if (v === true || v === 1) return true;
-  var s = String(v || '').trim().toUpperCase();
-  if (!s) return false;
-  if (s === 'TRUE' || s === '1' || s === '○' || s === 'はい' || s === '有' || s === 'あり') return true;
-  return toBool_(v);
+/** [みんつく] 終了日があり、かつ今日が終了日以前なら有料有効 */
+function isMintukuPaidActive_(row) {
+  var end = getMintukuPaidEndRaw_(row);
+  if (!end) return false;
+  var left = mintukuDaysUntilEnd_(end);
+  return left !== null && left >= 0;
 }
 
 /**
  * [みんつく] 利用可否
  * - 無料: 初回ログイン日から30日（day 0〜29）
- * - みんつく課金開始日に日付あり → 有料（期限なし）
- * - 表示用 daysUsed/daysLeft は無料期間基準。課金後の経過は paidDaysUsed
+ * - みんつく課金終了日があり今日以前でない → 有料（残り日数表示）
+ * - 表示用 daysUsed/daysLeft は無料期間基準。有料の残りは paidDaysLeft
  */
 function evaluateMintukuAccess_(row) {
   var first = sheetDateToYmd_((row && row['みんつく初回ログイン日']) || '');
-  var paidStart = getMintukuPaidStartRaw_(row);
-  var paid = isMintukuPaid_(row);
-  var paidDaysUsed = paidStart ? mintukuDaysSinceFirst_(paidStart) : 0;
+  var paidEnd = getMintukuPaidEndRaw_(row);
+  var paidDaysLeft = paidEnd != null && paidEnd !== '' ? mintukuDaysUntilEnd_(paidEnd) : null;
+  if (paidDaysLeft === null && paidEnd) paidDaysLeft = 0;
+  var paidActive = paidEnd && paidDaysLeft !== null && paidDaysLeft >= 0;
+  var paidExpired = paidEnd && paidDaysLeft !== null && paidDaysLeft < 0;
 
   if (!first) {
     return {
       ok: true,
       expired: false,
-      paid: paid,
+      paid: !!paidActive,
       daysUsed: 0,
       daysLeft: 30,
-      paidStartAt: paidStart,
-      paidDaysUsed: paidDaysUsed
+      paidEndAt: paidEnd,
+      paidDaysLeft: paidActive ? paidDaysLeft : paidExpired ? 0 : 0
     };
   }
   var daysUsed = mintukuDaysSinceFirst_(first);
@@ -1004,22 +1009,22 @@ function evaluateMintukuAccess_(row) {
     return {
       ok: true,
       expired: false,
-      paid: paid,
+      paid: !!paidActive,
       daysUsed: daysUsed,
       daysLeft: 30 - daysUsed,
-      paidStartAt: paidStart,
-      paidDaysUsed: paidDaysUsed
+      paidEndAt: paidEnd,
+      paidDaysLeft: paidActive ? paidDaysLeft : 0
     };
   }
-  if (paid) {
+  if (paidActive) {
     return {
       ok: true,
       expired: false,
       paid: true,
       daysUsed: daysUsed,
       daysLeft: 0,
-      paidStartAt: paidStart,
-      paidDaysUsed: paidDaysUsed
+      paidEndAt: paidEnd,
+      paidDaysLeft: paidDaysLeft
     };
   }
   return {
@@ -1028,8 +1033,8 @@ function evaluateMintukuAccess_(row) {
     paid: false,
     daysUsed: daysUsed,
     daysLeft: 0,
-    paidStartAt: paidStart,
-    paidDaysUsed: paidDaysUsed
+    paidEndAt: paidEnd,
+    paidDaysLeft: 0
   };
 }
 
@@ -1041,8 +1046,8 @@ function attachMintukuAccess_(user, row) {
   user.mintukuDaysUsed = access.daysUsed;
   user.mintukuDaysLeft = access.daysLeft;
   user.mintukuFirstLoginAt = sheetDateToYmd_((row && row['みんつく初回ログイン日']) || '');
-  user.mintukuPaidStartAt = access.paidStartAt || '';
-  user.mintukuPaidDaysUsed = access.paidDaysUsed || 0;
+  user.mintukuPaidEndAt = access.paidEndAt || '';
+  user.mintukuPaidDaysLeft = access.paidDaysLeft || 0;
   return user;
 }
 
@@ -2216,7 +2221,8 @@ function updateProfile_(body) {
   var wasPublished = toBool_(ctx.row['掲載中']);
   if (wantPublish) {
     setCtxValue_(ctx, '掲載中', sheetBool_(true));
-    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx, true) || mintukuNumber;
+    // 空欄のみ ON。FALSE（明示停止）は再開しても戻さない
+    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx) || mintukuNumber;
   } else if (wasPublished) {
     mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx) || mintukuNumber;
   }
@@ -2648,8 +2654,8 @@ function htmlDecision_(result) {
 }
 
 /**
- * [みんつく] Apomy掲載開始／再開時: みんつく掲載ON＋現在地があれば番号採番
- * @param {boolean=} forceOn true なら明示停止中でも TRUE に戻す（掲載再開時）
+ * [みんつく] Apomy掲載開始時: みんつく掲載が空欄なら TRUE＋現在地があれば番号採番
+ * ※FALSE（明示停止）は戻さない。forceOn は互換のため残すが true でも FALSE は戻さない
  */
 function ensureMintukuOnApomyPublishCtx_(ctx, forceOn) {
   if (!ctx) return '';
@@ -2658,12 +2664,12 @@ function ensureMintukuOnApomyPublishCtx_(ctx, forceOn) {
 
   var listedRaw = ctx.row['みんつく掲載'];
   var listedSet = !(listedRaw === '' || listedRaw === null || listedRaw === undefined);
-  if (forceOn || !listedSet) {
+  if (!listedSet) {
     setCtxValue_(ctx, 'みんつく掲載', sheetBool_(true));
   } else if (toBool_(listedRaw)) {
     // すでに TRUE
   } else {
-    // FALSE（みんつくのみ停止中）→ touch などでは触らない
+    // FALSE（明示停止）→ Apomy再開でも戻さない
     return String(ctx.row['みんつく番号'] || '').trim();
   }
 
@@ -2690,6 +2696,21 @@ function setPublished_(body, published, typeLabel) {
   const no = String(ctx.row['会員番号'] || memberNo);
   const now = formatDateTime_(new Date());
   const flag = sheetBool_(published);
+  // 停止時はデフォルトで連動停止。みんつく／PM画面から全国だけ止めるときは keepRelated=true
+  var keepRelated = false;
+  if (!published) {
+    keepRelated = toBool_(body && (body.keepRelated || body.keepRelatedApps));
+    if (
+      body &&
+      (body.cascadeRelated === false ||
+        body.cascadeRelated === 'false' ||
+        body.cascadeRelated === 0 ||
+        body.cascadeRelated === '0')
+    ) {
+      keepRelated = true;
+    }
+  }
+  const cascadeRelated = !published && !keepRelated;
 
   setCtxValue_(ctx, '掲載中', flag);
   setCtxValue_(ctx, '更新日時', now);
@@ -2697,12 +2718,16 @@ function setPublished_(body, published, typeLabel) {
 
   var mintukuNumber = '';
   if (published) {
-    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx, true);
-  } else {
-    // Apomy停止 → みんつくも掲載停止
+    // 空欄のみ ON。FALSE は戻さない
+    mintukuNumber = ensureMintukuOnApomyPublishCtx_(ctx);
+  } else if (cascadeRelated) {
+    // Apomy画面からの停止: みんつく／PMも止める（空欄＝PM掲載扱いなので明示 FALSE）
     ensureHeaderInCtx_(ctx, 'みんつく掲載');
+    ensureHeaderInCtx_(ctx, 'プレジデントメイト掲載');
     setCtxValue_(ctx, 'みんつく掲載', sheetBool_(false));
+    setCtxValue_(ctx, 'プレジデントメイト掲載', sheetBool_(false));
   }
+  // keepRelated の停止: 他フラグは触らない
   flushUserCtx_(ctx);
   SpreadsheetApp.flush();
 
@@ -2718,6 +2743,8 @@ function setPublished_(body, published, typeLabel) {
     isPublished: !!published,
     mintukuListed: toBool_(ctx.row['みんつく掲載']),
     mintukuNumber: mintukuNumber || String(ctx.row['みんつく番号'] || '').trim(),
+    // 連動停止直後は空欄扱い（true）に戻さないよう明示
+    presidentMateListed: cascadeRelated ? false : isPresidentMateListed_(ctx.row),
     lastLoginAt: now,
     publishedAt: String(ctx.row['登録日時'] || '')
   };
@@ -2839,11 +2866,14 @@ function mapUser_(r) {
     // [みんつく] 例: 関東1（画面では No.00001 に変換）
     mintukuNumber: String(r['みんつく番号'] == null ? '' : r['みんつく番号']).trim(),
     mintukuFirstLoginAt: sheetDateToYmd_(r['みんつく初回ログイン日']),
-    mintukuPaid: isMintukuPaid_(r),
-    mintukuPaidStartAt: getMintukuPaidStartRaw_(r),
-    mintukuPaidDaysUsed: getMintukuPaidStartRaw_(r)
-      ? mintukuDaysSinceFirst_(getMintukuPaidStartRaw_(r))
-      : 0,
+    mintukuPaid: isMintukuPaidActive_(r),
+    mintukuPaidEndAt: getMintukuPaidEndRaw_(r),
+    mintukuPaidDaysLeft: (function () {
+      var end = getMintukuPaidEndRaw_(r);
+      if (!end) return 0;
+      var left = mintukuDaysUntilEnd_(end);
+      return left !== null && left >= 0 ? left : 0;
+    })(),
     // [プレジデント] 空欄掲載扱いのため FE は isPresidentMateListed 相当で判定可
     presidentMateListed: isPresidentMateListed_(r),
     presidentNumber: String(r['プレジデント番号'] || '').trim(),
