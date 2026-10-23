@@ -167,7 +167,8 @@
           link.setAttribute("href", "president/icons/icon-192.png");
         }
       });
-      regionBtn?.classList.add("hidden");
+      // PM → みんつくへ（地域を選ぶ）。PMボタン自体は不要
+      regionBtn?.classList.remove("hidden");
       presidentBtn?.classList.add("hidden");
       prefFilter?.classList.add("hidden");
       return;
@@ -219,8 +220,9 @@
       }
     });
 
+    // みんつく内は地方切替なし。PMへは絞り込みから遷移可
     regionBtn?.classList.add("hidden");
-    presidentBtn?.classList.add("hidden");
+    presidentBtn?.classList.remove("hidden");
     prefFilter?.classList.remove("hidden");
   }
 
@@ -2983,7 +2985,7 @@
   }
 
   function openRegionByCurrentLocation() {
-    // [みんつく] みんつく内では地域導線を出さない（入口はApomy側）
+    // [みんつく] みんつく内では地方切替なし（PM／Apomyから入る）
     if (isMintukuMode()) {
       showToast("みんつくでは地域の切り替えはありません");
       return;
@@ -2998,7 +3000,7 @@
       showToast("日本在住者のみのサービスとなります。");
       return;
     }
-    // [みんつく] Apomyの「地域を選ぶ」→ みんつく地方アプリへ
+    // [Apomy / PM] 「地域を選ぶ」→ 現在地の地方のみんつくへ
     if (typeof AppMode !== "undefined" && AppMode.prefectureToRegionId) {
       const mintukuRegionId = AppMode.prefectureToRegionId(location);
       if (!mintukuRegionId) {
@@ -4846,7 +4848,8 @@
 
     $("#btn-president-mate-link")?.addEventListener("click", () => {
       scheduleTouchActivity();
-      if (isMintukuMode() || isPresidentMode()) return;
+      // PM画面では自分自身への導線は出さない
+      if (isPresidentMode()) return;
       const user = state.currentUser;
       if (isTruthyFlag(user?.presidentMark)) {
         const url =
