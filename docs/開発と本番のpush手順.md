@@ -121,7 +121,8 @@ powershell -ExecutionPolicy Bypass -File scripts/push-prod.ps1
 3. `prod`（`fortunatunabiz/Apomy`）の `main` へ push  
 4. 一時 commit を消し、ローカルを **開発 env に戻す**
 
-別名: トークン必須の簡易版 `scripts/push-prod-now.ps1`（force-with-lease あり。常用は `push-prod.ps1` を推奨）。
+履歴が分岐して通常 push が rejected になる場合は、トークン必須の `scripts/push-prod-now.ps1`（`--force-with-lease`）を使う。  
+（本番 tip が「一時 prod-env commit」のまま残っていると分岐しやすい。）
 
 ### 4.3 push 後に必須：本番 GAS 再デプロイ
 
