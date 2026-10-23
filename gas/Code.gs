@@ -350,8 +350,7 @@ var USER_LIST_COLUMNS_ = [
   'SNS1',
   'SNS2',
   'SNS3',
-  'SNS4',
-  'LINE'
+  'SNS4'
 ];
 
 /**
@@ -2087,10 +2086,11 @@ function updateProfile_(body) {
   ensureHeaderInCtx_(ctx, '本名');
 
   const nicknameCol = nicknameHeader_(ctx.headers);
+  // SNSは SNS1〜4 のみ（旧列 LINE / Instagram / X / YouTube は書かない＝列を復活させない）
   const allowed = [
     nicknameCol, '本名', '性別', '年代', '業種', '職種', '現在地', '出身地',
     '自己紹介', 'こんな人と繋がりたい', 'こんな人とは繋がりたくない',
-    'タグ', 'プロフィール画像URL', 'LINE', 'Instagram', 'X', 'YouTube', '年間経費', '社名'
+    'タグ', 'プロフィール画像URL', '年間経費', '社名'
   ];
 
   const map = {
@@ -2204,7 +2204,7 @@ function updateProfile_(body) {
     setCtxValue_(ctx, 'SNS2', links[1] || '');
     setCtxValue_(ctx, 'SNS3', links[2] || '');
     setCtxValue_(ctx, 'SNS4', links[3] || '');
-    setCtxValue_(ctx, 'LINE', links[0] || '');
+    // 旧列「LINE」へは書かない（削除した列が ensureHeader で復活するのを防ぐ）
   }
 
   allowed.forEach(function (col) {
@@ -2975,23 +2975,13 @@ function extractSnsLinks_(r) {
     var v = String(r[col] || '').trim();
     if (v) links.push(v);
   });
-  if (links.length) {
-    var legacyLine = String(r['LINE'] || '').trim();
-    var first = String(links[0] || '').toLowerCase();
-    var firstIsLine = first.indexOf('line.me') >= 0 || first.indexOf('page.line.me') >= 0;
-    if (!firstIsLine && legacyLine) {
-      links = [legacyLine].concat(links.filter(function (u) {
-        return String(u || '').trim() !== legacyLine;
-      }));
-    }
-    return links.slice(0, 4);
-  }
+  if (links.length) return links.slice(0, 4);
 
-  // 旧列からの読み取り互換（LINEを先頭）
-  var line = String(r['LINE'] || '').trim();
+  // 移行過渡期のみ: 旧列がまだ残っている会員向けの読取（列は新設しない）
+  var line = String((r && r['LINE']) || '').trim();
   if (line) links.push(line);
   ['Instagram', 'Facebook', 'X', 'YouTube'].forEach(function (col) {
-    var v = String(r[col] || '').trim();
+    var v = String((r && r[col]) || '').trim();
     if (v) links.push(v);
   });
   return links.slice(0, 4);
